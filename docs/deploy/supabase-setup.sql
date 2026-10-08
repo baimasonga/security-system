@@ -15,7 +15,7 @@ BEGIN
 END
 $$;
 -- Safe to re-run: this also (re)sets the password of an existing role.
-ALTER ROLE trust_app WITH LOGIN CONNECTION LIMIT 40 PASSWORD 'CHANGE-ME-generate-a-long-random-password';
+ALTER ROLE trust_app WITH LOGIN CONNECTION LIMIT 40 PASSWORD 'aKL&d5zSTcASb9SShFcBsr7s9cL';
 
 -- 3. Role-level settings travel through connection poolers (startup options do not).
 ALTER ROLE trust_app SET search_path = trust;
