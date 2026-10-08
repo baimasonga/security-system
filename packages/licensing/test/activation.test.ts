@@ -613,17 +613,15 @@ describe('validate / refresh / revocation / plan changes', () => {
     const orig = w.store.transaction.bind(w.store);
     w.store.transaction = (async (fn: Parameters<typeof orig>[0]) =>
       orig(async (tx) => {
-        const share = tx.findLicenseForShare.bind(tx);
-        const upd = tx.findLicenseForUpdate.bind(tx);
-        tx.findLicenseForShare = async (...a) => (calls.push('share'), share(...a));
-        tx.findLicenseForUpdate = async (...a) => (calls.push('update'), upd(...a));
+        const ctx = tx.findLicenseContext.bind(tx);
+        tx.findLicenseContext = async (o, i, lock) => (calls.push(lock), ctx(o, i, lock));
         return fn(tx);
       })) as typeof w.store.transaction;
     const g = await activate(w, s.alice, dev, s.licenseKey);
-    expect(calls).toEqual(['update']);
+    expect(calls).toEqual(['update']); // exclusive lock
     calls.length = 0;
     await refresh(w, dev, g.activationId);
-    expect(calls).toEqual(['share']);
+    expect(calls).toEqual(['share']); // shared lock
   });
 
   it('a suspension that lands between device authentication and lease issuance is still honoured (no stale lease)', async () => {

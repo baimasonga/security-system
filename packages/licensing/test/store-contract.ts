@@ -201,6 +201,31 @@ export function licensingStoreContract(
         expect((await f.store.listSubscriptions(f.orgA)).map((x) => x.id)).toEqual([s.id]);
       });
 
+      it('findLicenseContext returns license, plan, product and subscription in one read (tenant-scoped, any lock mode)', async () => {
+        const f = await fixture();
+        const s = sub(f.orgA, f.pln.id);
+        await f.store.insertSubscription(s);
+        const withSub = lic(f.orgA, f.prd.id, f.pln.id, s.id);
+        const noSub = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(withSub);
+        await f.store.insertLicense(noSub);
+        for (const lock of ['none', 'share', 'update'] as const) {
+          const c = await f.store.findLicenseContext(f.orgA, withSub.id, lock);
+          expect(c, lock).toMatchObject({
+            license: { id: withSub.id, subscriptionId: s.id, state: 'active' },
+            plan: { id: f.pln.id, deviceLimit: 3, capabilities: ['CLOUD_SYNC', 'OCR_ADVANCED'] },
+            product: { id: f.prd.id, code: f.prd.code },
+            subscription: { id: s.id, status: 'active', currentPeriodEnd: s.currentPeriodEnd },
+          });
+          expect(c!.license.createdAt).toEqual(T);
+          expect(
+            (await f.store.findLicenseContext(f.orgA, noSub.id, lock))!.subscription,
+          ).toBeUndefined();
+          expect(await f.store.findLicenseContext(f.orgB, withSub.id, lock), lock).toBeUndefined();
+          expect(await f.store.findLicenseContext(f.orgA, 'lic_nope', lock)).toBeUndefined();
+        }
+      });
+
       it('a license cannot reference another tenant’s subscription', async () => {
         const f = await fixture();
         const s = sub(f.orgA, f.pln.id);
@@ -320,6 +345,54 @@ export function licensingStoreContract(
         expect((await f.store.findDevice(f.orgA, d1.id))!.publicKey).toMatchObject({ kty: 'OKP' });
       });
 
+      it('findActivationWithDevice returns the activation and its device; unknown ids give undefined', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(l);
+        const d = await f.store.insertDevice(dev(f.orgA));
+        const a = act({ orgId: f.orgA, licenseId: l.id, deviceId: d.id, by: f.user });
+        await f.store.insertActivation(a);
+        const r = await f.store.findActivationWithDevice(a.id);
+        expect(r!.activation).toMatchObject({ id: a.id, orgId: f.orgA, licenseId: l.id });
+        expect(r!.device).toMatchObject({ id: d.id, thumbprint: d.thumbprint });
+        expect(r!.device.publicKey).toMatchObject({ kty: 'OKP' });
+        expect(await f.store.findActivationWithDevice('act_nope')).toBeUndefined();
+      });
+
+      it('findActivationSlot reports this device’s active activation and the license’s active count', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        const other = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(l);
+        await f.store.insertLicense(other);
+        const [d1, d2, d3] = [
+          await f.store.insertDevice(dev(f.orgA)),
+          await f.store.insertDevice(dev(f.orgA)),
+          await f.store.insertDevice(dev(f.orgA)),
+        ];
+        expect(await f.store.findActivationSlot(l.id, d1.id)).toEqual({
+          existing: undefined,
+          used: 0,
+        });
+        const a1 = act({ orgId: f.orgA, licenseId: l.id, deviceId: d1.id, by: f.user });
+        const gone = act(
+          { orgId: f.orgA, licenseId: l.id, deviceId: d3.id, by: f.user },
+          { status: 'deactivated', deactivatedAt: T },
+        );
+        await f.store.insertActivation(a1);
+        await f.store.insertActivation(gone);
+        await f.store.insertActivation(
+          act({ orgId: f.orgA, licenseId: l.id, deviceId: d2.id, by: f.user }),
+        );
+        await f.store.insertActivation(
+          act({ orgId: f.orgA, licenseId: other.id, deviceId: d1.id, by: f.user }),
+        );
+        const slot = await f.store.findActivationSlot(l.id, d1.id);
+        expect(slot.used).toBe(2); // deactivated and other-license activations do not count
+        expect(slot.existing).toMatchObject({ id: a1.id, status: 'active' });
+        expect((await f.store.findActivationSlot(l.id, d3.id)).existing).toBeUndefined();
+      });
+
       it('allows one ACTIVE activation per license+device; history and re-activation are fine', async () => {
         const f = await fixture();
         const l = lic(f.orgA, f.prd.id, f.pln.id, null);
@@ -382,6 +455,46 @@ export function licensingStoreContract(
         await expect(f.store.updateActivation({ ...a, orgId: f.orgB })).rejects.toThrow(
           'activation_not_found',
         );
+      });
+
+      it('recordLease stores the lease record and the activation’s lease fields together, or neither', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(l);
+        const d = await f.store.insertDevice(dev(f.orgA));
+        const a = act({ orgId: f.orgA, licenseId: l.id, deviceId: d.id, by: f.user });
+        await f.store.insertActivation(a);
+        const rec = (orgId: string, jti: string) => ({
+          jti,
+          orgId,
+          activationId: a.id,
+          planVersion: 1,
+          issuedAt: T,
+          expiresAt: later(1000),
+        });
+        // a lease for another tenant's view of this activation is refused and changes nothing
+        await expect(
+          f.store.recordLease(rec(f.orgB, 'lse_x'), {
+            ...a,
+            lastLeaseId: 'lse_x',
+            lastLeaseExp: later(1000),
+          }),
+        ).rejects.toThrow('cross_tenant_reference');
+        expect((await f.store.findActivation(f.orgA, a.id))!.lastLeaseId).toBeNull();
+        expect(await f.store.purgeExpiredLeases(later(10_000))).toBe(0);
+
+        await f.store.recordLease(rec(f.orgA, 'lse_ok'), {
+          ...a,
+          lastValidatedAt: later(7),
+          lastLeaseId: 'lse_ok',
+          lastLeaseExp: later(1000),
+        });
+        expect(await f.store.findActivation(f.orgA, a.id)).toMatchObject({
+          lastValidatedAt: later(7),
+          lastLeaseId: 'lse_ok',
+          lastLeaseExp: later(1000),
+        });
+        expect(await f.store.purgeExpiredLeases(later(10_000))).toBe(1); // the record exists
       });
 
       it('lease records require an existing activation of the same tenant', async () => {
@@ -494,6 +607,33 @@ export function licensingStoreContract(
         expect(await f.store.purgeExpiredChallenges(later(10_000), 3)).toBe(1);
         expect(await f.store.purgeExpiredChallenges(later(10_000), 3)).toBe(0);
         expect((await f.store.consumeChallenge('fresh', later(5))).status).toBe('ok'); // untouched
+      });
+
+      it('insertChallengeIfBelow stores up to the limit of outstanding challenges, then refuses', async () => {
+        const f = await fixture();
+        const inst = 'inst_limitlimitlimitlimit';
+        const mk = (h: string, over = {}) => ch(h, { installationId: inst, ...over });
+        const now = later(1000);
+        expect(await f.store.insertChallengeIfBelow(mk('l1'), 3, now)).toBe(true);
+        expect(await f.store.insertChallengeIfBelow(mk('l2'), 3, now)).toBe(true);
+        expect(
+          await f.store.insertChallengeIfBelow(mk('l3', { expiresAt: later(500) }), 3, now),
+        ).toBe(true); // already expired: not outstanding
+        expect(await f.store.insertChallengeIfBelow(mk('l4'), 3, now)).toBe(true);
+        expect(await f.store.insertChallengeIfBelow(mk('l5'), 3, now)).toBe(false); // 3 outstanding: l1, l2, l4
+        expect(await f.store.consumeChallenge('l1', now)).toMatchObject({ status: 'ok' });
+        expect(await f.store.insertChallengeIfBelow(mk('l5'), 3, now)).toBe(true); // a slot freed up
+        expect(await f.store.consumeChallenge('l5', now)).toMatchObject({ status: 'ok' });
+        expect(await f.store.consumeChallenge('l2', now)).toMatchObject({ status: 'ok' }); // refusal did not corrupt others
+        // other installations are unaffected
+        expect(
+          await f.store.insertChallengeIfBelow(
+            ch('o1', { installationId: 'inst_otherotherotherother' }),
+            1,
+            now,
+          ),
+        ).toBe(true);
+        // (the refused 'l5' was not stored: inserting the same hash later succeeded above)
       });
 
       it('counts only unconsumed, unexpired challenges per installation; purge removes expired', async () => {

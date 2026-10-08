@@ -112,6 +112,13 @@ export type ConsumeResult =
  * for flows where authority comes from a secret/proof rather than a tenant session, and are named
  * accordingly.
  */
+export interface LicenseContext {
+  license: License;
+  plan: Plan;
+  product: Product;
+  subscription: Subscription | undefined;
+}
+
 export interface LicensingRepo {
   insertProduct(p: Product): Promise<void>;
   findProductById(id: string): Promise<Product | undefined>;
@@ -145,6 +152,16 @@ export interface LicensingRepo {
    * licenses do not serialize.
    */
   findLicenseForShare(orgId: string, id: string): Promise<License | undefined>;
+  /**
+   * License + plan + product + subscription in ONE read (one database round trip), optionally taking the
+   * same row lock as `findLicenseForShare` / `findLicenseForUpdate` on the license row. Undefined if the
+   * license does not exist in `orgId`. `subscription` is undefined when the license has none.
+   */
+  findLicenseContext(
+    orgId: string,
+    id: string,
+    lock: 'none' | 'share' | 'update',
+  ): Promise<LicenseContext | undefined>;
   listLicenses(orgId: string): Promise<License[]>;
   findLicenseByKeyDigest(digest: string): Promise<License | undefined>;
 
@@ -165,14 +182,37 @@ export interface LicensingRepo {
   findActivation(orgId: string, id: string): Promise<Activation | undefined>;
   /** Inside a transaction this also locks the activation row (PostgreSQL adapter). */
   findActivationForDeviceAuth(id: string): Promise<Activation | undefined>;
+  /** `findActivationForDeviceAuth` plus the activation's device, in one read. */
+  findActivationWithDevice(
+    id: string,
+  ): Promise<{ activation: Activation; device: Device } | undefined>;
+  /**
+   * What activation needs to decide: this device's ACTIVE activation of the license (if any) and how many
+   * active activations the license has — in one read. Call it under the license lock.
+   */
+  findActivationSlot(
+    licenseId: string,
+    deviceId: string,
+  ): Promise<{ existing: Activation | undefined; used: number }>;
   findActiveActivation(licenseId: string, deviceId: string): Promise<Activation | undefined>;
   countActiveActivations(licenseId: string): Promise<number>;
   listActivationsForLicense(orgId: string, licenseId: string): Promise<Activation[]>;
 
   insertLease(r: LeaseRecord): Promise<void>;
+  /**
+   * `insertLease(r)` followed by `updateActivation(a)` as ONE write (one round trip). Throws
+   * `cross_tenant_reference` / `activation_not_found` like the two calls would; nothing is written then.
+   */
+  recordLease(r: LeaseRecord, a: Activation): Promise<void>;
 
   insertChallenge(c: Challenge): Promise<void>;
   countOutstandingChallenges(installationId: string, now: Date): Promise<number>;
+  /**
+   * Stores `c` unless the installation already has `max` or more outstanding (unconsumed, unexpired at
+   * `now`) challenges; returns whether it was stored. One round trip. A soft limit: concurrent callers may
+   * overshoot by the number of racing requests (rate limiting is the hard control).
+   */
+  insertChallengeIfBelow(c: Challenge, max: number, now: Date): Promise<boolean>;
   /** Atomic: exactly one concurrent caller can obtain `ok` for a given nonce. */
   consumeChallenge(nonceHash: string, now: Date): Promise<ConsumeResult>;
   /** Deletes up to `limit` challenges that expired before `before`. Returns the number deleted. */

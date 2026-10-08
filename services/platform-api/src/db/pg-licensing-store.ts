@@ -7,6 +7,7 @@ import type {
   ConsumeResult,
   Device,
   License,
+  LicenseContext,
   LicensingRepo,
   LicensingStore,
   LicensingTx,
@@ -99,6 +100,74 @@ const challenge = (r: Row): Challenge => ({
   expiresAt: r.expires_at,
   consumedAt: r.consumed_at,
 });
+
+/** `t.a AS p__a, t.b AS p__b, …` so several tables can be read in one row and split apart again. */
+const prefixed = (t: string, p: string, cols: readonly string[]) =>
+  cols.map((c) => `${t}.${c} AS ${p}__${c}`).join(', ');
+const unprefix = (r: Row, p: string): Row => {
+  const out: Row = {};
+  for (const [k, v] of Object.entries(r))
+    if (k.startsWith(`${p}__`)) out[k.slice(p.length + 2)] = v;
+  return out;
+};
+const LICENSE_COLS = [
+  'id',
+  'org_id',
+  'product_id',
+  'plan_id',
+  'subscription_id',
+  'kind',
+  'status',
+  'key_hash',
+  'expires_at',
+  'entitlement_overrides',
+  'created_at',
+] as const;
+const PLAN_COLS = [
+  'id',
+  'product_id',
+  'code',
+  'tier',
+  'version',
+  'entitlements',
+  'capabilities',
+  'device_limit',
+  'updated_at',
+] as const;
+const PRODUCT_COLS = ['id', 'code', 'name', 'status', 'created_at'] as const;
+const SUB_COLS = [
+  'id',
+  'org_id',
+  'plan_id',
+  'status',
+  'trial_end',
+  'current_period_end',
+  'created_at',
+] as const;
+const DEVICE_COLS = ['id', 'org_id', 'thumbprint', 'public_key_jwk', 'created_at'] as const;
+const ACTIVATION_COLS = [
+  'id',
+  'org_id',
+  'license_id',
+  'device_id',
+  'installation_id',
+  'activated_by',
+  'status',
+  'activated_at',
+  'last_validated_at',
+  'last_lease_id',
+  'last_lease_exp',
+  'deactivated_at',
+] as const;
+
+const CONTEXT_SQL = `SELECT ${prefixed('l', 'l', LICENSE_COLS)}, ${prefixed('p', 'p', PLAN_COLS)},
+       ${prefixed('pr', 'pr', PRODUCT_COLS)}, ${prefixed('s', 's', SUB_COLS)}
+  FROM licenses l
+  JOIN plans p ON p.id = l.plan_id
+  JOIN products pr ON pr.id = l.product_id
+  LEFT JOIN subscriptions s ON s.id = l.subscription_id AND s.org_id = l.org_id
+ WHERE l.id = $1 AND l.org_id = $2`;
+const CONTEXT_LOCK = { none: '', share: ' FOR SHARE OF l', update: ' FOR UPDATE OF l' } as const;
 
 /** Map PostgreSQL constraint failures to the same error messages the in-memory adapter throws. */
 function translate(e: unknown, map: Record<string, string>): never {
@@ -277,6 +346,21 @@ class PgRepo implements LicensingRepo {
       await this.#many('SELECT * FROM licenses WHERE org_id = $1 ORDER BY created_at, id', [orgId])
     ).map(license);
   }
+  async findLicenseContext(
+    orgId: string,
+    id: string,
+    lock: 'none' | 'share' | 'update',
+  ): Promise<LicenseContext | undefined> {
+    const r = await this.#one(CONTEXT_SQL + CONTEXT_LOCK[lock], [id, orgId]);
+    if (!r) return undefined;
+    const s = unprefix(r, 's');
+    return {
+      license: license(unprefix(r, 'l')),
+      plan: plan(unprefix(r, 'p')),
+      product: product(unprefix(r, 'pr')),
+      subscription: s['id'] === null ? undefined : subscription(s),
+    };
+  }
   async findLicenseByKeyDigest(digest: string) {
     const r = await this.#one('SELECT * FROM licenses WHERE key_hash = $1', [digest]);
     return r ? license(r) : undefined;
@@ -303,12 +387,18 @@ class PgRepo implements LicensingRepo {
     return r ? device(r) : undefined;
   }
   async insertDevice(d: Device): Promise<Device> {
+    // One statement for both outcomes: the inserted row, else the one that already exists.
     const ins = await this.#one(
-      `INSERT INTO devices (id, org_id, thumbprint, public_key_jwk, created_at) VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (thumbprint) DO NOTHING RETURNING *`,
+      `WITH ins AS (
+         INSERT INTO devices (id, org_id, thumbprint, public_key_jwk, created_at) VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (thumbprint) DO NOTHING RETURNING *)
+       SELECT * FROM ins
+       UNION ALL
+       SELECT * FROM devices WHERE thumbprint = $3 AND NOT EXISTS (SELECT 1 FROM ins)`,
       [d.id, d.orgId, d.thumbprint, d.publicKey, d.createdAt],
     );
     if (ins) return device(ins);
+    // Lost a race with a concurrent insert that committed after our statement started; it is visible now.
     const existing = await this.findDeviceByThumbprint(d.thumbprint);
     if (!existing) throw new Error('device insert raced with a delete'); // devices are never deleted
     return existing;
@@ -376,6 +466,27 @@ class PgRepo implements LicensingRepo {
     );
     return r ? activation(r) : undefined;
   }
+  async findActivationWithDevice(id: string) {
+    const r = await this.#one(
+      `SELECT ${prefixed('a', 'a', ACTIVATION_COLS)}, ${prefixed('d', 'd', DEVICE_COLS)}
+         FROM activations a JOIN devices d ON d.id = a.device_id AND d.org_id = a.org_id
+        WHERE a.id = $1${this.#tx ? ' FOR UPDATE OF a' : ''}`,
+      [id],
+    );
+    return r
+      ? { activation: activation(unprefix(r, 'a')), device: device(unprefix(r, 'd')) }
+      : undefined;
+  }
+  async findActivationSlot(licenseId: string, deviceId: string) {
+    // Both facts in one read; the count row always exists, the activation columns are NULL when absent.
+    const r = (await this.#one(
+      `SELECT c.used, a.*
+         FROM (SELECT count(*)::int AS used FROM activations WHERE license_id = $1 AND status = 'active') c
+         LEFT JOIN activations a ON a.license_id = $1 AND a.device_id = $2 AND a.status = 'active'`,
+      [licenseId, deviceId],
+    ))!;
+    return { existing: r['id'] === null ? undefined : activation(r), used: r['used'] as number };
+  }
   async findActiveActivation(licenseId: string, deviceId: string) {
     const r = await this.#one(
       "SELECT * FROM activations WHERE license_id = $1 AND device_id = $2 AND status = 'active'",
@@ -410,6 +521,37 @@ class PgRepo implements LicensingRepo {
     }
   }
 
+  async recordLease(r: LeaseRecord, a: Activation) {
+    // One statement: the lease INSERT's foreign keys and the activation UPDATE succeed or fail together.
+    try {
+      const res = await this.#q.query(
+        `WITH lease AS (
+           INSERT INTO leases (jti, org_id, activation_id, plan_version, issued_at, expires_at)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING 1)
+         UPDATE activations SET installation_id=$7, status=$8, last_validated_at=$9, last_lease_id=$10,
+                last_lease_exp=$11, deactivated_at=$12
+          WHERE id=$3 AND org_id=$2 AND EXISTS (SELECT 1 FROM lease)`,
+        [
+          r.jti,
+          r.orgId,
+          r.activationId,
+          r.planVersion,
+          r.issuedAt,
+          r.expiresAt,
+          a.installationId,
+          a.status,
+          a.lastValidatedAt,
+          a.lastLeaseId,
+          a.lastLeaseExp,
+          a.deactivatedAt,
+        ],
+      );
+      if (res.rowCount !== 1) throw new Error('activation_not_found');
+    } catch (e) {
+      translate(e, { '*fk': 'cross_tenant_reference' });
+    }
+  }
+
   // ---- challenges ----
   async insertChallenge(c: Challenge) {
     await this.#q.query(
@@ -424,6 +566,25 @@ class PgRepo implements LicensingRepo {
         c.consumedAt,
       ],
     );
+  }
+  async insertChallengeIfBelow(c: Challenge, max: number, now: Date) {
+    const r = await this.#q.query(
+      `INSERT INTO challenges (nonce_hash, purpose, installation_id, subject_id, created_at, expires_at, consumed_at)
+       SELECT $1::text,$2::text,$3::text,$4::text,$5::timestamptz,$6::timestamptz,$7::timestamptz
+        WHERE (SELECT count(*) FROM challenges WHERE installation_id = $3 AND consumed_at IS NULL AND expires_at > $8) < $9`,
+      [
+        c.nonceHash,
+        c.purpose,
+        c.installationId,
+        c.subjectId,
+        c.createdAt,
+        c.expiresAt,
+        c.consumedAt,
+        now,
+        max,
+      ],
+    );
+    return r.rowCount === 1;
   }
   async countOutstandingChallenges(installationId: string, now: Date) {
     const r = await this.#one(

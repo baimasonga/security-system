@@ -164,6 +164,36 @@ class PgAuthRepo implements AuthRepo {
     ]);
     return r.rows[0] ? session(r.rows[0]) : undefined;
   }
+  async findSessionWithUser(hash: string) {
+    const r = await this.#db.query(
+      `SELECT s.id AS s_id, s.user_id AS s_user_id, s.token_hash AS s_token_hash, s.created_at AS s_created_at,
+              s.expires_at AS s_expires_at, s.revoked_at AS s_revoked_at,
+              u.id AS u_id, u.email AS u_email, u.password_hash AS u_password_hash, u.status AS u_status,
+              u.platform_role AS u_platform_role, u.created_at AS u_created_at
+         FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1`,
+      [hash],
+    );
+    const x = r.rows[0];
+    if (!x) return undefined;
+    return {
+      session: session({
+        id: x.s_id,
+        user_id: x.s_user_id,
+        token_hash: x.s_token_hash,
+        created_at: x.s_created_at,
+        expires_at: x.s_expires_at,
+        revoked_at: x.s_revoked_at,
+      }),
+      user: user({
+        id: x.u_id,
+        email: x.u_email,
+        password_hash: x.u_password_hash,
+        status: x.u_status,
+        platform_role: x.u_platform_role,
+        created_at: x.u_created_at,
+      }),
+    };
+  }
   async revokeSession(id: string, at: Date) {
     await this.#db.query(
       'UPDATE sessions SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL',

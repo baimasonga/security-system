@@ -104,8 +104,9 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
   // ---- telemetry --------------------------------------------------------------------------
   it('telemetry sink persists only allow-listed attributes and pseudonymized security subjects', async () => {
     const pool = createSchemaPool();
+    const sink = new PgTelemetrySink(pool);
     const t = new Telemetry({
-      sink: new PgTelemetrySink(pool),
+      sink,
       clock: { now: () => new Date('2026-01-01T00:00:00Z') },
       pseudonymKey: 'k'.repeat(32),
     });
@@ -119,6 +120,7 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
       subject: 'inst_rawinstallationid',
       attributes: { license_key: 'LK-AAAAA-BBBBB-CCCCC-DDDDD-EEEEE', ip_class: 'dc' },
     });
+    await sink.flush();
     const tel = (await pool.query('SELECT * FROM telemetry_events')).rows;
     const sec = (await pool.query('SELECT * FROM security_events')).rows;
     expect(tel).toHaveLength(1);
@@ -130,6 +132,57 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
     });
     expect(sec[0]!.subject).toMatch(/^ps_/);
     expect(JSON.stringify([tel, sec])).not.toMatch(/salary|LK-AAAAA|inst_rawinstallationid/);
+  });
+
+  it('product telemetry is batched off the request path; security signals are written immediately', async () => {
+    const pool = createSchemaPool();
+    const sink = new PgTelemetrySink(pool, { flushMs: 60_000, maxBatch: 5 });
+    const rec = (i: number) => ({
+      id: `tel_${i}`,
+      occurredAt: '2026-01-01T00:00:00.000Z',
+      name: 'app.started' as const,
+      attributes: { n: i },
+    });
+    const count = async () =>
+      (await pool.query('SELECT count(*)::int AS n FROM telemetry_events')).rows[0]!.n as number;
+    for (let i = 0; i < 4; i++) await sink.recordTelemetry(rec(i));
+    expect(await count()).toBe(0); // buffered, not yet a round trip
+    await sink.recordSecurity({
+      id: 'sec_1',
+      occurredAt: '2026-01-01T00:00:00.000Z',
+      kind: 'challenge_replay',
+      severity: 'medium',
+      orgId: null,
+      subject: null,
+      attributes: {},
+    } as never);
+    expect((await pool.query('SELECT count(*)::int AS n FROM security_events')).rows[0]!.n).toBe(1);
+    await sink.recordTelemetry(rec(4)); // reaches maxBatch: flushed
+    await sink.flush();
+    expect(await count()).toBe(5);
+    await sink.recordTelemetry(rec(5));
+    await sink.flush(); // shutdown drain
+    expect(await count()).toBe(6);
+    expect(sink.dropped).toBe(0);
+  });
+
+  it('a failing telemetry batch is counted and dropped; it never fails a caller', async () => {
+    const pool = createSchemaPool();
+    const sink = new PgTelemetrySink(pool, { flushMs: 60_000 });
+    await sink.recordTelemetry({
+      id: 'tel_dup',
+      occurredAt: '2026-01-01T00:00:00.000Z',
+      name: 'app.started',
+      attributes: {},
+    } as never);
+    await sink.recordTelemetry({
+      id: 'tel_dup',
+      occurredAt: '2026-01-01T00:00:00.000Z',
+      name: 'app.started',
+      attributes: {},
+    } as never); // PK violation
+    await expect(sink.flush()).resolves.toBeUndefined();
+    expect(sink.dropped).toBe(2);
   });
 
   // ---- keys & durability across restarts ------------------------------------------------------
@@ -235,40 +288,56 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
       return { pool, store };
     }
 
-    it('FOR SHARE holders coexist; an exclusive (FOR UPDATE) locker waits for all of them', async () => {
-      const { store } = await oneLicense();
-      const order: string[] = [];
-      let releaseA!: () => void;
-      const aHolds = new Promise<void>((r) => (releaseA = r));
-      let aLocked!: () => void;
-      const aReady = new Promise<void>((r) => (aLocked = r));
+    it.each([
+      ['findLicenseForShare / findLicenseForUpdate', 'legacy'],
+      ['findLicenseContext(share) / findLicenseContext(update)', 'context'],
+    ] as const)(
+      'FOR SHARE holders coexist; an exclusive (FOR UPDATE) locker waits for all of them: %s',
+      async (_n, api) => {
+        const { store } = await oneLicense();
+        type Tx = Parameters<Parameters<typeof store.transaction>[0]>[0];
+        const share = (tx: Tx) =>
+          api === 'legacy'
+            ? tx.findLicenseForShare('org_s', 'lic_s')
+            : tx.findLicenseContext('org_s', 'lic_s', 'share');
+        const exclusive = (tx: Tx) =>
+          api === 'legacy'
+            ? tx.findLicenseForUpdate('org_s', 'lic_s')
+            : tx.findLicenseContext('org_s', 'lic_s', 'update');
+        const order: string[] = [];
+        let releaseA!: () => void;
+        const aHolds = new Promise<void>((r) => (releaseA = r));
+        let aLocked!: () => void;
+        const aReady = new Promise<void>((r) => (aLocked = r));
 
-      const a = store.transaction(async (tx) => {
-        await tx.findLicenseForShare('org_s', 'lic_s');
-        order.push('A:locked');
-        aLocked();
-        await aHolds;
-        order.push('A:done');
-      });
-      await aReady;
-      // B shares the lock while A still holds it: must complete without waiting for A.
-      await store.transaction(async (tx) => {
-        await tx.findLicenseForShare('org_s', 'lic_s');
-        order.push('B:shared-ok');
-      });
-      // C wants it exclusively: must NOT get it while A holds its shared lock.
-      let cGotIt = false;
-      const c = store.transaction(async (tx) => {
-        await tx.findLicenseForUpdate('org_s', 'lic_s');
-        cGotIt = true;
-        order.push('C:exclusive');
-      });
-      await new Promise((r) => setTimeout(r, 300));
-      expect(cGotIt).toBe(false);
-      releaseA();
-      await Promise.all([a, c]);
-      expect(order).toEqual(['A:locked', 'B:shared-ok', 'A:done', 'C:exclusive']);
-    }, 20_000);
+        const a = store.transaction(async (tx) => {
+          await share(tx);
+          order.push('A:locked');
+          aLocked();
+          await aHolds;
+          order.push('A:done');
+        });
+        await aReady;
+        // B shares the lock while A still holds it: must complete without waiting for A.
+        await store.transaction(async (tx) => {
+          await share(tx);
+          order.push('B:shared-ok');
+        });
+        // C wants it exclusively: must NOT get it while A holds its shared lock.
+        let cGotIt = false;
+        const c = store.transaction(async (tx) => {
+          await exclusive(tx);
+          cGotIt = true;
+          order.push('C:exclusive');
+        });
+        await new Promise((r) => setTimeout(r, 300));
+        expect(cGotIt).toBe(false);
+        releaseA();
+        await Promise.all([a, c]);
+        expect(order).toEqual(['A:locked', 'B:shared-ok', 'A:done', 'C:exclusive']);
+      },
+      20_000,
+    );
 
     it('the retention DELETE uses the expires_at index instead of scanning the table', async () => {
       const { pool } = await oneLicense();

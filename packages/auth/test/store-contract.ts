@@ -98,6 +98,37 @@ export function authStoreContract(name: string, make: () => AuthHarness | Promis
       await s.revokeSession('ses_missing', first); // no-op, no throw
     });
 
+    it('findSessionWithUser returns the session with its user (copies); unknown hash gives undefined', async () => {
+      const { store: s } = await make();
+      await s.insertUser(user('w', { platformRole: 'platform_admin' }));
+      await s.insertUser(user('x', { status: 'disabled' as const }));
+      const exp = new Date(T.getTime() + 3600_000);
+      const ses = (id: string, userId: string) => ({
+        id,
+        userId,
+        tokenHash: `h_${id}`,
+        createdAt: T,
+        expiresAt: exp,
+        revokedAt: null,
+      });
+      await s.insertSession(ses('ses_w', 'usr_w'));
+      await s.insertSession(ses('ses_x', 'usr_x'));
+      expect(await s.findSessionWithUser('h_ses_w')).toMatchObject({
+        session: { id: 'ses_w', userId: 'usr_w', expiresAt: exp, revokedAt: null },
+        user: {
+          id: 'usr_w',
+          email: 'w@x.test',
+          status: 'active',
+          platformRole: 'platform_admin',
+          createdAt: T,
+        },
+      });
+      expect((await s.findSessionWithUser('h_ses_x'))!.user.status).toBe('disabled'); // the caller decides
+      expect(await s.findSessionWithUser('ses_w')).toBeUndefined(); // by token hash only
+      await s.revokeSession('ses_w', T);
+      expect((await s.findSessionWithUser('h_ses_w'))!.session.revokedAt).toEqual(T);
+    });
+
     describe('transactions with atomic audit', () => {
       it('commit persists the change and its audit events, in order', async () => {
         const h = await make();

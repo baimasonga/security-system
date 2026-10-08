@@ -681,23 +681,23 @@ export class LicensingService {
     // Retention is NOT done here: it ran a DELETE on every challenge and was found to scale with table
     // size under load. See runMaintenance().
 
-    if (
-      (await this.#d.store.countOutstandingChallenges(input.installationId, now)) >=
-      this.#d.config.maxOutstandingChallenges
-    ) {
-      throw new DomainError('rate_limited', 'too many outstanding challenges');
-    }
     const nonce = newSecretToken('chal');
     const expiresAt = new Date(now.getTime() + this.#d.config.challengeTtlSeconds * 1000);
-    await this.#d.store.insertChallenge({
-      nonceHash: sha256Hex(nonce),
-      purpose: input.purpose,
-      installationId: input.installationId,
-      subjectId,
-      createdAt: now,
-      expiresAt,
-      consumedAt: null,
-    });
+    // Limit check and insert in one round trip.
+    const stored = await this.#d.store.insertChallengeIfBelow(
+      {
+        nonceHash: sha256Hex(nonce),
+        purpose: input.purpose,
+        installationId: input.installationId,
+        subjectId,
+        createdAt: now,
+        expiresAt,
+        consumedAt: null,
+      },
+      this.#d.config.maxOutstandingChallenges,
+      now,
+    );
+    if (!stored) throw new DomainError('rate_limited', 'too many outstanding challenges');
     return { nonce, purpose: input.purpose, expiresAt: expiresAt.toISOString() };
   }
 
@@ -764,36 +764,31 @@ export class LicensingService {
     const now = this.#d.clock.now();
     const result = await this.#d.store
       .transaction(async (tx) => {
-        const lic = await tx.findLicenseForUpdate(found.orgId, found.id);
-        if (!lic) throw new DomainError('invalid_license', UNIFORM_INVALID);
-        const ctx = await this.#loadContext(tx, lic);
-        const ev = this.#evaluate(lic, ctx.sub);
+        const ctx = await tx.findLicenseContext(found.orgId, found.id, 'update');
+        if (!ctx) throw new DomainError('invalid_license', UNIFORM_INVALID);
+        const lic = ctx.license;
+        const ev = this.#evaluate(lic, ctx.subscription);
         if (ev.outcome.decision !== 'ALLOW')
           throw new DomainError(ev.code ?? 'invalid_license', ev.outcome.reasons[0] ?? 'denied');
 
-        let device = await tx.findDeviceByThumbprint(thumbprint);
-        let newDevice = false;
-        if (device && device.orgId !== lic.orgId) {
+        // Register-or-find the device in one idempotent write (also covers a concurrent registration of
+        // the same key). A key already registered to another tenant is returned, then refused below.
+        const candidate: Device = {
+          id: newId('dev'),
+          orgId: lic.orgId,
+          thumbprint,
+          publicKey: devicePublicKey,
+          createdAt: now,
+        };
+        const device = await tx.insertDevice(candidate);
+        if (device.orgId !== lic.orgId) {
           throw new DomainError('device_key_conflict', 'device key is registered elsewhere');
         }
-        if (!device) {
-          const candidate: Device = {
-            id: newId('dev'),
-            orgId: lic.orgId,
-            thumbprint,
-            publicKey: devicePublicKey,
-            createdAt: now,
-          };
-          // A concurrent activation may have registered this key between our read and write.
-          device = await tx.insertDevice(candidate);
-          if (device.orgId !== lic.orgId) {
-            throw new DomainError('device_key_conflict', 'device key is registered elsewhere');
-          }
-          newDevice = device.id === candidate.id;
-        }
+        const newDevice = device.id === candidate.id;
 
         const resolved = resolveEntitlements(ctx.plan, lic.overrides);
-        let act = await tx.findActiveActivation(lic.id, device.id);
+        const slot = await tx.findActivationSlot(lic.id, device.id);
+        let act = slot.existing;
         let reissued = false;
         if (act) {
           // Idempotent: same device re-activating (retry, reinstall) does not consume another slot.
@@ -801,8 +796,7 @@ export class LicensingService {
           await tx.updateActivation(act);
           reissued = true;
         } else {
-          const used = await tx.countActiveActivations(lic.id);
-          if (used >= resolved.deviceLimit)
+          if (slot.used >= resolved.deviceLimit)
             throw new DomainError('device_limit_reached', 'device limit reached', {
               limit: resolved.deviceLimit,
             });
@@ -908,47 +902,58 @@ export class LicensingService {
 
   /** Online refresh. A lease alone can never obtain another lease: a device signature is required. */
   async refresh(input: DeviceAuthInput): Promise<LeaseGrant> {
-    const ctx = await this.#authenticateDevice('refresh', input);
+    const ctx = await this.#proveDevice('refresh', input);
     const now = this.#d.clock.now();
-    const grant = await this.#d.store.transaction(async (tx) => {
-      // Lock order is always license -> activation. Re-evaluate under the lock: the state read while
-      // authenticating the device may have changed (e.g. suspension) before we got here.
-      // SHARED lock: keeps the license state stable while we issue, but concurrent refreshes of a hot
-      // license do not serialize (only activate / state changes take the exclusive lock).
-      const lic = await tx.findLicenseForShare(ctx.lic.orgId, ctx.lic.id);
-      if (!lic) throw new DomainError('internal', 'license missing');
-      const fresh = await this.#loadContext(tx, lic);
-      const ev = this.#evaluate(lic, fresh.sub);
-      if (ev.outcome.decision !== 'ALLOW') {
-        throw new DomainError(ev.code ?? 'invalid_license', ev.outcome.reasons[0] ?? 'denied');
-      }
-      const act = await tx.findActivationForDeviceAuth(ctx.act.id);
-      if (!act || act.status !== 'active')
-        throw new DomainError('activation_not_found', 'activation is not active');
-      const resolved = resolveEntitlements(fresh.plan, lic.overrides);
-      const g = await this.#issueLease(tx, {
-        lic,
-        act: { ...act, lastValidatedAt: now },
-        device: ctx.device,
-        product: fresh.product,
-        plan: fresh.plan,
-        resolved,
-        ev,
-        now,
+    let denied: DomainError | undefined;
+    const grant = await this.#d.store
+      .transaction(async (tx) => {
+        denied = undefined; // the callback may be re-run after a deadlock
+        // The license is evaluated ONCE, here, under the lock (no separate unlocked pre-check: that was a
+        // duplicate read of license/plan/product/subscription). Lock order is always license -> activation.
+        // SHARED lock: keeps the license state stable while we issue, but concurrent refreshes of a hot
+        // license do not serialize (only activate / state changes take the exclusive lock).
+        const fresh = await tx.findLicenseContext(ctx.act.orgId, ctx.act.licenseId, 'share');
+        if (!fresh) throw new DomainError('internal', 'license missing');
+        const lic = fresh.license;
+        const ev = this.#evaluate(lic, fresh.subscription);
+        if (ev.outcome.decision !== 'ALLOW') {
+          denied = new DomainError(ev.code ?? 'invalid_license', ev.outcome.reasons[0] ?? 'denied');
+          throw denied;
+        }
+        const act = await tx.findActivationForDeviceAuth(ctx.act.id);
+        if (!act || act.status !== 'active')
+          throw new DomainError('activation_not_found', 'activation is not active');
+        const resolved = resolveEntitlements(fresh.plan, lic.overrides);
+        const g = await this.#issueLease(tx, {
+          lic,
+          act: { ...act, lastValidatedAt: now },
+          device: ctx.device,
+          product: fresh.product,
+          plan: fresh.plan,
+          resolved,
+          ev,
+          now,
+        });
+        await tx.audit.append({
+          actor: { type: 'device', id: ctx.device.id },
+          action: 'lease.issued',
+          target: { type: 'activation', id: ctx.act.id },
+          orgId: lic.orgId,
+          metadata: {
+            expires_at: g.leaseExpiresAt,
+            plan_version: g.entitlements.planVersion,
+            via: 'refresh',
+          },
+        });
+        return g;
+      })
+      .catch(async (e: unknown) => {
+        // A refusal is recorded after the (rolled back) transaction, exactly as the pre-check used to.
+        if (denied && e === denied) {
+          await this.#recordValidationFailed('refresh', ctx.device, ctx.act, denied.code);
+        }
+        throw e;
       });
-      await tx.audit.append({
-        actor: { type: 'device', id: ctx.device.id },
-        action: 'lease.issued',
-        target: { type: 'activation', id: ctx.act.id },
-        orgId: lic.orgId,
-        metadata: {
-          expires_at: g.leaseExpiresAt,
-          plan_version: g.entitlements.planVersion,
-          via: 'refresh',
-        },
-      });
-      return g;
-    });
     await this.#d.telemetry.track('lease.refreshed', { tier: grant.entitlements.tier });
     return grant;
   }
@@ -1008,18 +1013,6 @@ export class LicensingService {
       now: this.#d.clock.now(),
       config: this.#d.config,
     });
-  }
-
-  async #loadContext(repo: LicensingRepo, lic: License) {
-    const [plan, product, sub] = await Promise.all([
-      repo.findPlan(lic.planId),
-      repo.findProductById(lic.productId),
-      lic.subscriptionId
-        ? repo.findSubscription(lic.orgId, lic.subscriptionId)
-        : Promise.resolve(undefined),
-    ]);
-    if (!plan || !product) throw new DomainError('internal', 'catalog inconsistency');
-    return { plan, product, sub };
   }
 
   async #licenseView(repo: LicensingRepo, lic: License): Promise<LicenseView> {
@@ -1126,15 +1119,18 @@ export class LicensingService {
       // Fail closed: no signature, no lease, and the surrounding transaction rolls back.
       throw new DomainError('internal', 'lease signing unavailable');
     }
-    await tx.insertLease({
-      jti,
-      orgId: a.lic.orgId,
-      activationId: a.act.id,
-      planVersion: a.resolved.planVersion,
-      issuedAt: times.issuedAt,
-      expiresAt: times.expiresAt,
-    });
-    await tx.updateActivation({ ...a.act, lastLeaseId: jti, lastLeaseExp: times.expiresAt });
+    // Lease record + the activation's lease fields in one write.
+    await tx.recordLease(
+      {
+        jti,
+        orgId: a.lic.orgId,
+        activationId: a.act.id,
+        planVersion: a.resolved.planVersion,
+        issuedAt: times.issuedAt,
+        expiresAt: times.expiresAt,
+      },
+      { ...a.act, lastLeaseId: jti, lastLeaseExp: times.expiresAt },
+    );
     return {
       activationId: a.act.id,
       deviceId: a.device.id,
@@ -1199,19 +1195,15 @@ export class LicensingService {
     }
   }
 
-  async #authenticateDevice(
-    purpose: Exclude<ProofPurpose, 'activate'>,
-    input: DeviceAuthInput,
-    opts?: { requireValidLicense?: boolean },
-  ) {
+  /** Activation lookup + challenge consumption + device signature check. Evaluates NO license state. */
+  async #proveDevice(purpose: Exclude<ProofPurpose, 'activate'>, input: DeviceAuthInput) {
     need(INSTALLATION_ID.test(input.installationId), 'invalid installation id');
     need(ACTIVATION_ID.test(input.activationId), 'invalid activation id');
-    const act = await this.#d.store.findActivationForDeviceAuth(input.activationId);
-    if (!act || act.status !== 'active') {
+    const found = await this.#d.store.findActivationWithDevice(input.activationId);
+    if (!found || found.activation.status !== 'active') {
       throw new DomainError('activation_not_found', 'activation is not active');
     }
-    const device = await this.#d.store.findDevice(act.orgId, act.deviceId);
-    if (!device) throw new DomainError('internal', 'device missing');
+    const { activation: act, device } = found;
     if (act.installationId !== input.installationId) {
       throw new DomainError('invalid_device_proof', 'device proof is invalid');
     }
@@ -1224,21 +1216,38 @@ export class LicensingService {
       thumbprint: device.thumbprint,
       signature: input.signature,
     });
+    return { act, device };
+  }
 
-    const lic = await this.#d.store.findLicense(act.orgId, act.licenseId);
-    if (!lic) throw new DomainError('internal', 'license missing');
-    const { plan, product, sub } = await this.#loadContext(this.#d.store, lic);
+  async #recordValidationFailed(
+    purpose: string,
+    device: Device,
+    act: Activation,
+    code: string,
+  ): Promise<void> {
+    await this.#d.audit.append({
+      actor: { type: 'device', id: device.id },
+      action: 'license.validation_failed',
+      target: { type: 'activation', id: act.id },
+      orgId: act.orgId,
+      metadata: { reason: code, purpose },
+    });
+    await this.#d.telemetry.track('validation.failed', { reason: code });
+  }
+
+  async #authenticateDevice(
+    purpose: Exclude<ProofPurpose, 'activate'>,
+    input: DeviceAuthInput,
+    opts?: { requireValidLicense?: boolean },
+  ) {
+    const { act, device } = await this.#proveDevice(purpose, input);
+    const lctx = await this.#d.store.findLicenseContext(act.orgId, act.licenseId, 'none');
+    if (!lctx) throw new DomainError('internal', 'license missing');
+    const { license: lic, plan, product, subscription: sub } = lctx;
     const ev = this.#evaluate(lic, sub);
     if (opts?.requireValidLicense !== false && ev.outcome.decision !== 'ALLOW') {
       const code = ev.code ?? 'invalid_license';
-      await this.#d.audit.append({
-        actor: { type: 'device', id: device.id },
-        action: 'license.validation_failed',
-        target: { type: 'activation', id: act.id },
-        orgId: act.orgId,
-        metadata: { reason: code, purpose },
-      });
-      await this.#d.telemetry.track('validation.failed', { reason: code });
+      await this.#recordValidationFailed(purpose, device, act, code);
       throw new DomainError(code, ev.outcome.reasons[0] ?? 'denied');
     }
     return { act, device, lic, plan, product, sub, ev };

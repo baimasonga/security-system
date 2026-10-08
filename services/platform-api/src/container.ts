@@ -219,6 +219,7 @@ export async function createContainer(
       if (closed) return;
       closed = true;
       await writes.flush().catch(() => undefined);
+      await (telemetrySink as { flush?: () => Promise<void> }).flush?.().catch(() => undefined);
       if (usePg) setTransactionObserver({});
       metrics.close();
       await ownPool?.end();

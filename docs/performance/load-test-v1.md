@@ -19,7 +19,7 @@ same machine and the _shapes_ of the curves are the reliable part.
 | Is it correct under load?           | Yes, in every run: **0 errors, 0 dropped, 0 licenses over their device limit, 0 deadlocks, audit chain verified** (130k events in 2.5 s), a 300-way stampede on a limit-5 license produced exactly 5 activations                                                                                                                                                                          |
 | Single-instance capacity (loopback) | Refresh flow: clean to ~300 flows/s, saturates ~380–400. Activation flow: clean to ~200–300, saturates ~330. Knee is sharp (p99 ~50 ms → > 1 s within one step)                                                                                                                                                                                                                           |
 | Is it stable over time?             | 120,000 flows / 20 min: p50 19.5 ms, p99 29.7 ms, **flat memory (141–144 MB), flat event-loop delay, flat per-minute p99** (27–32 ms, apart from one isolated 180 ms minute, LT-12)                                                                                                                                                                                                       |
-| What limits it?                     | CPU (Node ~3 ms + PostgreSQL ~3.5 ms per refresh flow, ~22 database round trips) on this box; and — **the important one** — the **single audit chain, whose ceiling depends on network round-trip time to PostgreSQL** (§3.7)                                                                                                                                                             |
+| What limits it?                     | CPU (Node ~3 ms + PostgreSQL ~3.5 ms per refresh flow, ~22 database round trips at the time; 10 after ADR-009) on this box; and — **the important one** — the **single audit chain, whose ceiling depends on network round-trip time to PostgreSQL** (§3.7)                                                                                                                               |
 | Did testing find real defects?      | **Yes — three in the code under test** (an unindexed per-request DELETE that would have collapsed the service after ~1 h of sustained load; a needless exclusive lock that serialized hot licenses; a pending `pg@9` incompatibility) **and two in my own work** (operator knobs that silently did nothing; a test flag that silently never failed). All fixed, with regression tests; §4 |
 | What is _not_ shown?                | Throughput scaling across instances (no spare cores here), real network/disk latencies, runs longer than 20 min, failover, very large tables, real client behaviour (§5)                                                                                                                                                                                                                  |
 
@@ -184,6 +184,34 @@ shared the CPU during the first step, so only the shape is claimed): activation 
 300-way stampede still correct (exactly 5 activations, 0 deadlocks); 5-minute soak at 100 flows/s: 30,000 flows, 0 errors,
 p99 27.9 ms, flat per-minute p99 (27–29 ms) and flat memory. Not re-run: the 20-minute soak and multi-instance runs.
 
+### 3.11 After ADR-009: fewer database round trips per flow
+
+Statements sent to PostgreSQL per call chain (traced by `tests/integration/roundtrips.e2e.test.ts`, which now fails if a
+flow exceeds its budget): **activation 23 → 14, refresh flow (challenge + refresh) 21 → 10, validation 11 → 5.**
+Decisions, locks and audit events are unchanged ([ADR-009](../adr/ADR-009-fewer-database-round-trips.md)).
+
+Refresh flow at injected round-trip times (`latency-sweep`, same box, same session, "before" = commit `1edd86b`
+built in a separate worktree, "after" = this change; offered rate → achieved, p50 / p99 ms):
+
+| RTT API↔DB | Offered | Before                              | After                         |
+| ---------- | ------- | ----------------------------------- | ----------------------------- |
+| ≈ 0        | 300/s   | 300 · 25 / 135                      | 300 · 16 / 54                 |
+| ≈ 2 ms     | 25/s    | 25 · 102 / 111                      | 25 · 76 / 82                  |
+| ≈ 2 ms     | 100/s   | 100 · 76 / 90                       | 100 · 47 / 59                 |
+| ≈ 2 ms     | 200/s   | **142** · 2,789 / 3,775 (saturated) | **199** · 40 / 56 (clean)     |
+| ≈ 2 ms     | 300/s   | –                                   | 282 · 436 / 943 (knee)        |
+| ≈ 4 ms     | 100/s   | 92 · 815 / 1,620 (saturated)        | 100 · 62 / 71 (clean)         |
+| ≈ 4 ms     | 200/s   | 90 · 5,240 / 6,063                  | 180 · 909 / 1,554 (saturated) |
+
+Reading: the sustainable rate at a 2 ms round trip roughly **doubled (≈ 100 → ≈ 200+ flows/s)**, at 4 ms from < 100 to
+≥ 100, and latency at light load fell by ≈ 25–40 % — in line with the ≈ 50 % cut in statements, since signing, proof
+verification and the audit lock hold are unchanged. On loopback (CPU-bound) the ramps show the same shape with more
+headroom: activation clean to 400/s (p99 281 ms; before: 389 achieved, p99 952 ms), refresh clean to 400/s (p99 64 ms;
+before 314 ms) and 584/s achieved at 600 offered (before 502). Herd and hot-license scenarios were re-run and remain
+correct (exactly 5 activations on the limit-5 license, 0 deadlocks). 5-minute soak at 100 flows/s: 30,000 flows, 0 errors,
+p50 18.0 ms, p99 25.0 ms (before: 18.9 / 27.9), flat per-minute p99. Not re-run: the 20-minute soak, multi-instance runs.
+Caveat: one shared 4-vCPU box; the load generator sat in the same CPU pool.
+
 ## 4. Findings and dispositions
 
 | ID    | Severity      | Finding                                                                                                                                                                      | Evidence                                        | Status                                                                                                                                                                                         |
@@ -192,7 +220,7 @@ p99 27.9 ms, flat per-minute p99 (27–29 ms) and flat memory. Not re-run: the 2
 | LT-2  | Medium        | Refresh took an exclusive license lock → hot licenses serialized                                                                                                             | §3.4                                            | **Fixed**: shared lock (`FOR SHARE`); semantics tested on PostgreSQL; service test asserts which lock each path takes                                                                          |
 | LT-3  | Medium        | Concurrent statements issued on one transaction connection (works today, removed in `pg@9`)                                                                                  | driver deprecation warning during load          | **Fixed**: explicit per-connection serialization + test                                                                                                                                        |
 | LT-4  | **High**      | Audit-chain throughput is bounded by ≈ 1/(4·RTT): hundreds/s at same-AZ latency, ~100/s cross-AZ; bursts can hit it                                                          | §3.1, §3.7                                      | **Fixed structurally (ADR-008)**: independent per-organization chains (optionally sharded); §3.10. Residual per-chain ceiling remains                                                          |
-| LT-5  | Info          | Per-box capacity ≈ 200–300 flows/s, ~22 round trips and ~6.7 ms CPU per refresh flow                                                                                         | §3.3, §3.6                                      | Documented; round-trip reduction recommended                                                                                                                                                   |
+| LT-5  | Info          | Per-box capacity ≈ 200–300 flows/s, ~22 round trips and ~6.7 ms CPU per refresh flow                                                                                         | §3.3, §3.6                                      | **Fixed (ADR-009)**: 21 → 10 statements per refresh flow, 23 → 14 per activation; §3.11                                                                                                        |
 | LT-6  | Info          | Pool > 10 reduces throughput (audit-lock convoy)                                                                                                                             | §3.6                                            | Documented; default kept                                                                                                                                                                       |
 | LT-7  | Info          | Single-license stampede of 300 ≈ 2 s                                                                                                                                         | §3.5                                            | Documented (correct; clients should back off)                                                                                                                                                  |
 | LT-8  | Medium (mine) | Operator knobs (`CHALLENGE_*`, `LEASE_*`) were silently not applied — a patch step matched nothing — so the first "after" soak ran with default retention and proved nothing | exact row counts (121,000 = all) vs expectation | **Fixed** + regression test that each knob changes behaviour; **process lesson**: patch scripts must assert their anchors, and a measured outcome must be checked against its _expected_ value |
@@ -222,10 +250,9 @@ case; tables stayed small (≤ 130k audit rows) — the audit index and verifica
 
 1. **Audit chain ceiling (LT-4): done (ADR-008).** Remaining: set `AUDIT_CHAIN_SHARDS` only for tenants that show
    `audit_lock_wait_ms` growth; publish the verify `anchor` externally (R-13); re-run `latency-sweep` on real hardware.
-2. **Cut round trips per flow** (≈ 22 → ≈ 12): the refresh path loads license/plan/product/subscription twice
-   (pre-check and in-transaction) and issues three separately-committed statements (challenge insert, challenge consume,
-   the transaction). Expected gain 15–25 % CPU and a proportional latency win at real RTT. Needs care: failure auditing
-   must be preserved.
+2. **Round trips per flow: done (ADR-009).** Remaining statements are mostly structural (BEGIN, audit head lock, audit
+   insert, COMMIT, challenge consume). Next candidates if needed: issue the challenge without a database write
+   (stateless signed challenge — needs a new ADR, it changes replay protection) and pipelining `BEGIN` with the first read.
 3. **Validate scale-out on real hardware** (≥ 8 cores, separate database host): `--instances 2,4` with `latency-sweep`;
    move rate limiting and login lockout out of process memory first (R-7).
 4. **Long soak (≥ 24 h) with `log_checkpoints`, autovacuum stats and table/index bloat sampling**, including a rolling

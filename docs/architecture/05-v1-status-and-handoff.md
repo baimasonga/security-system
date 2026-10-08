@@ -45,7 +45,7 @@ PostgreSQL), all passing. Also passing: `tsc`, ESLint
 
 ## 3. Recommended next steps (in order)
 
-1. **Act on the load-test findings** ([report](../performance/load-test-v1.md) §7): cut database round trips per flow, then validate scale-out and run a ≥ 24 h soak on production-like hardware; run the first backup-restore drill.
+1. **Act on the load-test findings** ([report](../performance/load-test-v1.md) §7): validate scale-out and run a ≥ 24 h soak on production-like hardware; run the first backup-restore drill.
 2. First CI run on GitHub; fix fallout; pin actions by SHA; enable branch protection + required checks + CODEOWNERS teams.
 3. KMS/HSM `KeyCustody` implementation and a rehearsed rotation + compromise drill (closes the main gap in key-management §5).
 4. Identity hardening: email verification, password reset, MFA/passkeys (operators first), refresh rotation.

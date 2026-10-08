@@ -160,13 +160,13 @@ export class AuthService {
     if (!token || token.length > 128 || !token.startsWith('sess_')) {
       throw new DomainError('unauthenticated', 'authentication required');
     }
-    const session = await this.#store.findSessionByTokenHash(sha256Hex(token));
+    const found = await this.#store.findSessionWithUser(sha256Hex(token));
     const now = this.#clock.now();
-    if (!session || session.revokedAt || session.expiresAt.getTime() <= now.getTime()) {
+    if (!found || found.session.revokedAt || found.session.expiresAt.getTime() <= now.getTime()) {
       throw new DomainError('unauthenticated', 'authentication required');
     }
-    const user = await this.#store.findUserById(session.userId);
-    if (!user || user.status !== 'active')
+    const { session, user } = found;
+    if (user.status !== 'active')
       throw new DomainError('unauthenticated', 'authentication required');
     return {
       kind: 'user',

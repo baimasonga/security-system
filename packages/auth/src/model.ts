@@ -48,6 +48,8 @@ export interface AuthRepo {
   listMembershipsForOrg(orgId: string): Promise<Membership[]>;
   insertSession(s: Session): Promise<void>;
   findSessionByTokenHash(hash: string): Promise<Session | undefined>;
+  /** `findSessionByTokenHash` plus the session's user in one read (one round trip per authenticated request). */
+  findSessionWithUser(hash: string): Promise<{ session: Session; user: User } | undefined>;
   revokeSession(id: string, at: Date): Promise<void>;
 }
 
@@ -127,6 +129,11 @@ class MemoryRepo implements AuthRepo {
   async findSessionByTokenHash(hash: string) {
     const s = [...this.s.sessions.values()].find((x) => x.tokenHash === hash);
     return s ? { ...s } : undefined;
+  }
+  async findSessionWithUser(hash: string) {
+    const s = [...this.s.sessions.values()].find((x) => x.tokenHash === hash);
+    const u = s && this.s.users.get(s.userId);
+    return s && u ? { session: { ...s }, user: { ...u } } : undefined;
   }
   async revokeSession(id: string, at: Date) {
     const s = this.s.sessions.get(id);

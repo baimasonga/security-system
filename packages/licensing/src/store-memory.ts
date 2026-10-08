@@ -128,6 +128,22 @@ class Repo implements LicensingRepo {
   async listLicenses(orgId: string) {
     return clone([...this.s.licenses.values()].filter((l) => l.orgId === orgId));
   }
+  async findLicenseContext(orgId: string, id: string, _lock: 'none' | 'share' | 'update') {
+    const license = await this.findLicense(orgId, id);
+    if (!license) return undefined;
+    const plan = this.s.plans.get(license.planId);
+    const product = this.s.products.get(license.productId);
+    if (!plan || !product) return undefined;
+    const sub = license.subscriptionId
+      ? this.s.subscriptions.get(license.subscriptionId)
+      : undefined;
+    return clone({
+      license,
+      plan,
+      product,
+      subscription: sub && sub.orgId === orgId ? sub : undefined,
+    });
+  }
   async findLicenseByKeyDigest(digest: string) {
     return clone([...this.s.licenses.values()].find((l) => l.keyDigest === digest));
   }
@@ -179,6 +195,19 @@ class Repo implements LicensingRepo {
   async findActivationForDeviceAuth(id: string) {
     return clone(this.s.activations.get(id));
   }
+  async findActivationWithDevice(id: string) {
+    const activation = this.s.activations.get(id);
+    const device = activation && this.s.devices.get(activation.deviceId);
+    return activation && device && device.orgId === activation.orgId
+      ? clone({ activation, device })
+      : undefined;
+  }
+  async findActivationSlot(licenseId: string, deviceId: string) {
+    return {
+      existing: await this.findActiveActivation(licenseId, deviceId),
+      used: await this.countActiveActivations(licenseId),
+    };
+  }
   async findActiveActivation(licenseId: string, deviceId: string) {
     return clone(
       [...this.s.activations.values()].find(
@@ -205,8 +234,22 @@ class Repo implements LicensingRepo {
     this.s.leases.set(r.jti, clone(r));
   }
 
+  async recordLease(r: LeaseRecord, a: Activation) {
+    const act = this.s.activations.get(r.activationId);
+    if (!act || act.orgId !== r.orgId || a.id !== r.activationId) {
+      throw new Error('cross_tenant_reference');
+    }
+    await this.updateActivation(a); // throws before anything is stored if the update is invalid
+    await this.insertLease(r);
+  }
+
   async insertChallenge(c: Challenge) {
     this.s.challenges.set(c.nonceHash, clone(c));
+  }
+  async insertChallengeIfBelow(c: Challenge, max: number, now: Date) {
+    if ((await this.countOutstandingChallenges(c.installationId, now)) >= max) return false;
+    await this.insertChallenge(c);
+    return true;
   }
   async countOutstandingChallenges(installationId: string, now: Date) {
     return [...this.s.challenges.values()].filter(
