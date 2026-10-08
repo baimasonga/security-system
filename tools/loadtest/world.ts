@@ -6,7 +6,7 @@ import { SoftwareDeviceKey } from '@trust/sdk-core';
 import { loadConfig } from '../../services/platform-api/src/config.ts';
 import { createContainer } from '../../services/platform-api/src/container.ts';
 import { MIGRATIONS_DIR, applyMigrations } from '../../services/platform-api/src/db/migrate.ts';
-import { Http, sleep, type OpResult } from './lib.ts';
+import { Http, sleep, type OpResult, type Requester } from './lib.ts';
 
 export const SIGNING_PEM = generateKeyPairSync('ed25519')
   .privateKey.export({ type: 'pkcs8', format: 'pem' })
@@ -139,11 +139,12 @@ export interface Server {
 
 export async function startServer(
   dbUrl: string,
-  o: { port: number; pool: number; logLevel?: string },
+  o: { port: number; pool: number; logLevel?: string; extraEnv?: Record<string, string> },
 ): Promise<Server> {
   const big = '10000000';
   const child: ChildProcess = spawn('node', ['services/platform-api/src/main.ts'], {
-    stdio: ['ignore', 'ignore', 'inherit'],
+    // LT_DEBUG=1 shows the server's structured log (otherwise discarded to keep the measurement quiet).
+    stdio: ['ignore', process.env['LT_DEBUG'] ? 'inherit' : 'ignore', 'inherit'],
     env: {
       ...process.env,
       ...baseEnv(dbUrl),
@@ -156,6 +157,7 @@ export async function startServer(
       RATE_LIMIT_REGISTER: big,
       RATE_LIMIT_CHALLENGE: big,
       RATE_LIMIT_ACTIVATE: big,
+      ...o.extraEnv, // explicit overrides win over the tool's defaults
     },
   });
   const base = `http://127.0.0.1:${o.port}`;
@@ -191,7 +193,7 @@ export class VDev {
   }
 
   async #challenge(
-    h: Http,
+    h: Requester,
     purpose: 'activate' | 'validate' | 'refresh' | 'deactivate',
     subject: string,
   ) {
@@ -224,7 +226,7 @@ export class VDev {
       : { ok: false, code: String(r.body?.code ?? `http_${r.status}`) };
   }
 
-  async activate(h: Http): Promise<OpResult> {
+  async activate(h: Requester): Promise<OpResult> {
     const nonce = await this.#challenge(h, 'activate', '');
     const r = await h.request(
       'POST',
@@ -241,7 +243,7 @@ export class VDev {
     if (r.status === 200) this.activationId = r.body.activation_id;
     return VDev.classify(r);
   }
-  async deviceCall(h: Http, purpose: 'refresh' | 'validate'): Promise<OpResult> {
+  async deviceCall(h: Requester, purpose: 'refresh' | 'validate'): Promise<OpResult> {
     const act = this.activationId!;
     const nonce = await this.#challenge(h, purpose, act);
     return VDev.classify(

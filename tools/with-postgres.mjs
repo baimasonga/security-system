@@ -58,7 +58,7 @@ try {
     '-D',
     data,
     '-o',
-    `-p ${port} -c listen_addresses=127.0.0.1 -c fsync=off -c unix_socket_directories=${dir}`,
+    `-p ${port} -c listen_addresses=127.0.0.1 -c fsync=${process.env.PG_FSYNC === 'on' ? 'on' : 'off'} -c max_connections=300 -c unix_socket_directories=${dir}`,
     '-l',
     join(dir, 'log'),
     '-w',

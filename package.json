@@ -21,6 +21,7 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
     "dev": "node services/platform-api/src/main.ts",
     "migrate": "node tools/migrate.ts",
+    "loadtest": "PG_FSYNC=on node tools/with-postgres.mjs node tools/loadtest/run.ts",
     "audit:deps": "npm audit --omit=dev --audit-level=high"
   },
   "devDependencies": {

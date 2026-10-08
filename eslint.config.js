@@ -32,6 +32,12 @@ export default tseslint.config(
     },
   },
   {
+    // Measurement scripts parse untyped JSON from the server under test; `any` is pragmatic here and these
+    // files never ship in the service.
+    files: ['tools/loadtest/**'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
     files: ['services/platform-api/src/config.ts', 'services/platform-api/src/db/migrate.ts'],
     rules: { 'security/detect-non-literal-fs-filename': 'off' }, // paths come from operator-controlled env/CLI arguments, by design
   },

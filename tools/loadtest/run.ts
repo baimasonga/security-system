@@ -6,26 +6,45 @@ import { performance } from 'node:perf_hooks';
 import pg from 'pg';
 import { PgAuditLog } from '../../services/platform-api/src/db/pg-audit-log.ts';
 import {
-  Http,
+  Balancer,
+  type Http,
+  type Requester,
   loadavg,
   openLoop,
+  postgresCpuS,
   percentiles,
   procStat,
   round,
-  sleep,
   type OpResult,
   type StepReport,
 } from './lib.ts';
+import { startDelayProxy } from './delayproxy.ts';
 import { VDev, seedWorld, startServer, type Server, type SeedUser } from './world.ts';
 
+// `--key value` pairs and bare `--flag`s (a flag is any `--x` not followed by a value).
 const args = new Map<string, string>();
-for (let i = 2; i < process.argv.length; i += 2)
-  args.set(process.argv[i]!.replace(/^--/, ''), process.argv[i + 1] ?? '');
+for (let i = 2; i < process.argv.length; i++) {
+  const tok = process.argv[i]!;
+  if (!tok.startsWith('--')) throw new Error(`unexpected argument "${tok}"`);
+  const next = process.argv[i + 1];
+  if (next === undefined || next.startsWith('--')) args.set(tok.slice(2), '');
+  else {
+    args.set(tok.slice(2), next);
+    i++;
+  }
+}
 const num = (k: string, d: number) => (args.has(k) ? Number(args.get(k)) : d);
 const list = (k: string, d: number[]) => (args.has(k) ? args.get(k)!.split(',').map(Number) : d);
 const dbUrl = process.env['DATABASE_URL']!;
 if (!dbUrl) throw new Error('DATABASE_URL required (run via tools/with-postgres.mjs)');
 
+/** Extra server environment, e.g. --srvenv CHALLENGE_RETENTION_SECONDS=180,MAINTENANCE_INTERVAL_SECONDS=30 */
+const srvEnv: Record<string, string> = Object.fromEntries(
+  (args.get('srvenv') ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)] as [string, string]),
+);
 const POOL = num('pool', 10);
 const PORT = num('port', 18200);
 const result: Record<string, unknown> = {
@@ -36,6 +55,7 @@ const result: Record<string, unknown> = {
   pool: POOL,
   logLevel: args.get('log') ?? 'info',
 };
+let dirty = 0; // steps that saw errors or generator-side drops (for --assert-clean)
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
 // ---- observation helpers ----------------------------------------------------------------------
@@ -50,7 +70,7 @@ async function dbStats() {
     'SELECT deadlocks::int, xact_commit::bigint::int AS commits, xact_rollback::bigint::int AS rollbacks FROM pg_stat_database WHERE datname = current_database()',
   );
   const sizes = await q(
-    "SELECT relname, (pg_total_relation_size(c.oid)/1048576.0)::numeric(10,2)::float AS mb, reltuples::bigint::int AS rows FROM pg_class c WHERE relname IN ('audit_events','leases','challenges','activations','devices') AND relkind='r'",
+    "SELECT relname, (pg_total_relation_size(c.oid)/1048576.0)::numeric(10,2)::float AS mb, COALESCE((SELECT n_live_tup FROM pg_stat_user_tables t WHERE t.relid = c.oid), 0)::int AS rows FROM pg_class c WHERE relname IN ('audit_events','leases','challenges','activations','devices') AND relkind='r'",
   );
   return {
     ...a,
@@ -58,8 +78,44 @@ async function dbStats() {
     tables: Object.fromEntries(sizes.map((s: any) => [s.relname, { mb: s.mb, rows: s.rows }])),
   };
 }
-async function serverMetrics(h: Http, token: string): Promise<any> {
-  return (await h.request('GET', '/v1/admin/metrics', undefined, token)).body;
+/** Admin metrics from EVERY instance, merged (counters/histogram totals summed, gauges summed or maxed). */
+async function serverMetrics(c: Ctx): Promise<any> {
+  const all = await Promise.all(
+    c.admins.map(
+      async (h) => (await h.request('GET', '/v1/admin/metrics', undefined, c.operatorToken)).body,
+    ),
+  );
+  if (all.length === 1) return all[0];
+  const out: any = { counters: {}, gauges: {}, histograms: {} };
+  for (const m of all) {
+    for (const [k, v] of Object.entries<number>(m.counters))
+      out.counters[k] = (out.counters[k] ?? 0) + v;
+    for (const [k, v] of Object.entries<number>(m.gauges))
+      out.gauges[k] =
+        k.includes('event_loop') || k.includes('rss')
+          ? Math.max(out.gauges[k] ?? 0, v)
+          : (out.gauges[k] ?? 0) + v;
+    for (const [k, h] of Object.entries<any>(m.histograms)) {
+      const o = (out.histograms[k] ??= { count: 0, sum_ms: 0, max_ms: 0, p99_ms: 0 });
+      o.count += h.count;
+      o.sum_ms += h.sum_ms;
+      o.max_ms = Math.max(o.max_ms, h.max_ms);
+      o.p99_ms = Math.max(o.p99_ms, h.p99_ms);
+    }
+  }
+  return out;
+}
+/** Summed CPU seconds / RSS over all server processes. */
+function procSum(c: Ctx) {
+  const ps = c.servers.map((s) => procStat(s.pid)!);
+  return {
+    cpuS: ps.reduce((a, p) => a + p.cpuS, 0),
+    rssMb: round(
+      ps.reduce((a, p) => a + p.rssMb, 0),
+      1,
+    ),
+    threads: ps.reduce((a, p) => a + p.threads, 0),
+  };
 }
 const cnt = (m: any, prefix: string) =>
   Object.entries(m.counters)
@@ -77,6 +133,9 @@ function serverDelta(before: any, after: any) {
     auditAppends: dc,
     auditLockWaitMeanMs: dc ? round(ds / dc, 2) : 0,
     auditLockWaitP99MsCumulative: after.histograms['audit_lock_wait_ms']?.p99_ms ?? 0,
+    maintenanceRuns: cnt(after, 'maintenance_runs_total') - cnt(before, 'maintenance_runs_total'),
+    maintenanceDeleted:
+      cnt(after, 'maintenance_deleted_total') - cnt(before, 'maintenance_deleted_total'),
     eventLoopP99Ms: after.gauges['process_event_loop_delay_p99_ms'],
     poolWaiting: after.gauges['db_pool_waiting'],
     poolTotal: after.gauges['db_pool_total'],
@@ -84,8 +143,9 @@ function serverDelta(before: any, after: any) {
 }
 
 interface Ctx {
-  srv: Server;
-  http: Http;
+  servers: Server[];
+  admins: Http[];
+  http: Requester;
   users: SeedUser[];
   operatorToken: string;
   extras: Record<string, SeedUser>;
@@ -101,11 +161,25 @@ async function withServer<T>(
   const t0 = performance.now();
   const w = await seedWorld(dbUrl, { users, deviceLimit, ...(extraOrgs ? { extraOrgs } : {}) });
   log(`seeded in ${round((performance.now() - t0) / 1000, 1)}s`);
-  const srv = await startServer(dbUrl, { port: PORT, pool, logLevel: args.get('log') ?? 'info' });
-  const http = new Http(srv.base, 256);
+  const instances = num('instances', 1);
+  const servers: Server[] = [];
+  for (let i = 0; i < instances; i++)
+    servers.push(
+      await startServer(dbUrl, {
+        port: PORT + i,
+        pool,
+        logLevel: args.get('log') ?? 'info',
+        extraEnv: srvEnv,
+      }),
+    );
+  const http = new Balancer(
+    servers.map((s) => s.base),
+    256,
+  );
   try {
     return await fn({
-      srv,
+      servers,
+      admins: http.members,
       http,
       users: w.users,
       operatorToken: w.operatorToken,
@@ -113,7 +187,7 @@ async function withServer<T>(
     });
   } finally {
     http.destroy();
-    await srv.stop();
+    for (const s of servers) await s.stop();
   }
 }
 
@@ -126,8 +200,10 @@ async function step(
   op: (i: number) => Promise<OpResult>,
   maxInFlight = 400,
 ) {
-  const m0 = await serverMetrics(c.http, c.operatorToken);
-  const p0 = procStat(c.srv.pid)!;
+  const m0 = await serverMetrics(c);
+  const p0 = procSum(c);
+  const lg0 = process.cpuUsage();
+  const pg0 = postgresCpuS();
   const d0 = await dbStats();
   let poolWaitMax = 0,
     connsMax = 0,
@@ -142,12 +218,14 @@ async function step(
       const s = await dbStats();
       connsMax = Math.max(connsMax, s.conns);
       lockWaitMax = Math.max(lockWaitMax, s.lock_waiting);
-      const m = await serverMetrics(c.http, c.operatorToken);
+      const m = await serverMetrics(c);
       poolWaitMax = Math.max(poolWaitMax, m.gauges['db_pool_waiting'] ?? 0);
     },
   });
-  const m1 = await serverMetrics(c.http, c.operatorToken);
-  const p1 = procStat(c.srv.pid)!;
+  const m1 = await serverMetrics(c);
+  const p1 = procSum(c);
+  const lg = process.cpuUsage(lg0);
+  const pgCpuPct = round(((postgresCpuS() - pg0) / rep.durationS) * 100, 0);
   const d1 = await dbStats();
   const out = {
     ...rep,
@@ -165,14 +243,18 @@ async function step(
       commits: d1.commits - d0.commits,
       rollbacks: d1.rollbacks - d0.rollbacks,
     },
+    // If the generator itself is near 100% of one core, the numbers are generator-bound, not server-bound.
+    postgresCpuPct: pgCpuPct,
+    loadgenCpuPct: round(((lg.user + lg.system) / 1e6 / rep.durationS) * 100, 0),
     loadavg: loadavg(),
   };
+  if (Object.keys(rep.errors).length > 0 || rep.dropped > 0) dirty++;
   const errs =
     Object.entries(rep.errors)
       .map(([k, v]) => `${k}=${v}`)
       .join(' ') || '-';
   log(
-    `${name.padEnd(22)} target ${String(rps).padStart(4)} rps → ${String(rep.achievedRps).padStart(6)} rps  p50 ${rep.latencyMs['p50']} p95 ${rep.latencyMs['p95']} p99 ${rep.latencyMs['p99']} max ${rep.maxMs}ms  dropped ${rep.dropped}  err: ${errs}  srvCPU ${out.server.cpuPct}%  retries ${out.server.txRetries} lockwait ${out.server.auditLockWaitMeanMs}ms  deadlocks ${out.db.deadlocks}`,
+    `${name.padEnd(22)} target ${String(rps).padStart(4)} rps → ${String(rep.achievedRps).padStart(6)} rps  p50 ${rep.latencyMs['p50']} p95 ${rep.latencyMs['p95']} p99 ${rep.latencyMs['p99']} max ${rep.maxMs}ms  dropped ${rep.dropped}  err: ${errs}  srvCPU ${out.server.cpuPct}% genCPU ${out.loadgenCpuPct}% pgCPU ${out.postgresCpuPct}%  retries ${out.server.txRetries} lockwait ${out.server.auditLockWaitMeanMs}ms  deadlocks ${out.db.deadlocks}`,
   );
   return out;
 }
@@ -205,41 +287,132 @@ async function activateMany(c: Ctx, devs: VDev[], concurrency: number) {
 }
 
 const scenarios: Record<string, () => Promise<void>> = {
+  /**
+   * Same workload with a fixed network round trip between the API and PostgreSQL. Database round trips
+   * dominate per-request latency and the audit-chain lock is held across several of them plus the commit,
+   * so distance matters far more than on loopback.
+   */
+  async 'latency-sweep'() {
+    const w = await seedWorld(dbUrl, { users: num('users', 600), deviceLimit: 10 });
+    const target = Number(new URL(dbUrl).port);
+    const rows: unknown[] = [];
+    for (const oneWay of list('oneway', [0, 1, 2])) {
+      const proxy = await startDelayProxy(target, oneWay);
+      const proxied = new URL(dbUrl);
+      proxied.port = String(proxy.port);
+      const srv = await startServer(proxied.toString(), {
+        port: PORT,
+        pool: POOL,
+        logLevel: 'info',
+        extraEnv: srvEnv,
+      });
+      const http = new Balancer([srv.base], 256);
+      const c: Ctx = {
+        servers: [srv],
+        admins: http.members,
+        http,
+        users: w.users,
+        operatorToken: w.operatorToken,
+        extras: {},
+      };
+      try {
+        const devs = w.users.map((u) => new VDev(u));
+        await activateMany(c, devs, 32);
+        for (const rps of list('rps', [25, 50, 100, 200])) {
+          const r = await step(c, `refresh rtt=${oneWay * 2}ms`, rps, num('seconds', 12), (i) =>
+            devs[i % devs.length]!.deviceCall(c.http, 'refresh'),
+          );
+          rows.push({ rttMs: oneWay * 2, ...r });
+          if (saturated(r)) break;
+        }
+      } finally {
+        http.destroy();
+        await srv.stop();
+        await proxy.close();
+      }
+    }
+    result['rows'] = rows;
+  },
+
+  /** Cost of the retention DELETE on a big table, with and without the expires_at index (migration 0002). */
+  async 'purge-micro'() {
+    await seedWorld(dbUrl, { users: 1, deviceLimit: 1 });
+    const rowsN = num('rows', 500_000);
+    await dbc.query('CREATE TABLE challenges_noindex (LIKE challenges INCLUDING DEFAULTS)'); // same columns, no indexes
+    for (const t of ['challenges', 'challenges_noindex']) {
+      await dbc.query(
+        `INSERT INTO ${t} (nonce_hash, purpose, installation_id, expires_at, consumed_at)
+         SELECT $1 || g, 'refresh', 'inst_x', now() + interval '1 day' + (g || ' ms')::interval, now() FROM generate_series(1, $2::int) g`,
+        [t, rowsN],
+      );
+      await dbc.query(`ANALYZE ${t}`);
+    }
+    const out: Record<string, unknown> = { rows: rowsN };
+    for (const [label, t] of [
+      ['indexed (0002)', 'challenges'],
+      ['no index (before)', 'challenges_noindex'],
+    ] as const) {
+      const lat: number[] = [];
+      for (let i = 0; i < 40; i++) {
+        const s0 = performance.now();
+        // nothing is expired: this is the steady-state cost of "is there anything to delete?"
+        await dbc.query(
+          `DELETE FROM ${t} WHERE ctid IN (SELECT ctid FROM ${t} WHERE expires_at < now() - interval '1 hour' LIMIT 5000)`,
+        );
+        lat.push(performance.now() - s0);
+      }
+      out[label] = {
+        meanMs: round(lat.reduce((a, b) => a + b, 0) / lat.length, 2),
+        ...percentiles(lat, [50, 99]),
+      };
+      log(label, JSON.stringify(out[label]));
+    }
+    result['purge'] = out;
+  },
+
   async 'audit-micro'() {
     await seedWorld(dbUrl, { users: 1, deviceLimit: 1 });
     const rows: unknown[] = [];
-    for (const conc of list('conc', [1, 2, 4, 8, 16, 32, 64])) {
-      const pool = new pg.Pool({ connectionString: dbUrl, max: conc });
-      const log_ = new PgAuditLog(pool, { now: () => new Date() });
-      const lat: number[] = [];
-      let stop = false,
-        n = 0;
-      setTimeout(() => (stop = true), num('seconds', 6) * 1000);
-      const t0 = performance.now();
-      await Promise.all(
-        Array.from({ length: conc }, async () => {
-          while (!stop) {
-            const s = performance.now();
-            await log_.append({
-              actor: { type: 'system' },
-              action: 'bench.event',
-              metadata: { n: 1 },
-            });
-            lat.push(performance.now() - s);
-            n++;
-          }
-        }),
-      );
-      const secs = (performance.now() - t0) / 1000;
-      const row = {
-        concurrency: conc,
-        eventsPerSec: round(n / secs, 0),
-        latencyMs: percentiles(lat, [50, 99]),
-      };
-      rows.push(row);
-      log(JSON.stringify(row));
-      await pool.end();
-    }
+    const target = Number(new URL(dbUrl).port);
+    for (const oneWay of list('oneway', [0]))
+      for (const conc of list('conc', [1, 2, 4, 8, 16, 32, 64])) {
+        // oneWay > 0 inserts a delaying proxy (round trip ≈ 2 × oneWay ms) between this process and PostgreSQL
+        const proxy = oneWay > 0 ? await startDelayProxy(target, oneWay) : undefined;
+        const url = new URL(dbUrl);
+        if (proxy) url.port = String(proxy.port);
+        const pool = new pg.Pool({ connectionString: url.toString(), max: conc });
+        const log_ = new PgAuditLog(pool, { now: () => new Date() });
+        const lat: number[] = [];
+        let stop = false,
+          n = 0;
+        setTimeout(() => (stop = true), num('seconds', 6) * 1000);
+        const t0 = performance.now();
+        await Promise.all(
+          Array.from({ length: conc }, async () => {
+            while (!stop) {
+              const s = performance.now();
+              await log_.append({
+                actor: { type: 'system' },
+                action: 'bench.event',
+                metadata: { n: 1 },
+              });
+              lat.push(performance.now() - s);
+              n++;
+            }
+          }),
+        );
+        const secs = (performance.now() - t0) / 1000;
+        const row = {
+          rttMs: oneWay * 2,
+          concurrency: conc,
+          eventsPerSec: round(n / secs, 0),
+          latencyMs: percentiles(lat, [50, 99]),
+        };
+        rows.push(row);
+        log(JSON.stringify(row));
+        await pool.end();
+        await proxy?.close();
+      }
     const v0 = performance.now();
     const verify = await new PgAuditLog(new pg.Pool({ connectionString: dbUrl }), {
       now: () => new Date(),
@@ -329,7 +502,7 @@ const scenarios: Record<string, () => Promise<void>> = {
         const lim = c.extras['limited']!;
         const n = num('devices', 300);
         const devs = Array.from({ length: n }, () => new VDev(lim));
-        const m0 = await serverMetrics(c.http, c.operatorToken);
+        const m0 = await serverMetrics(c);
         const d0 = await dbStats();
         const t0 = performance.now();
         const codes: Record<string, number> = {};
@@ -342,7 +515,7 @@ const scenarios: Record<string, () => Promise<void>> = {
             codes[r.code] = (codes[r.code] ?? 0) + 1;
           }),
         );
-        const m1 = await serverMetrics(c.http, c.operatorToken);
+        const m1 = await serverMetrics(c);
         const d1 = await dbStats();
         result['herd'] = {
           devices: n,
@@ -369,8 +542,8 @@ const scenarios: Record<string, () => Promise<void>> = {
       const timeline: unknown[] = [];
       const baseline = {
         db: await dbStats(),
-        proc: procStat(c.srv.pid)!,
-        m: await serverMetrics(c.http, c.operatorToken),
+        proc: procSum(c),
+        m: await serverMetrics(c),
       };
       const mixed = async (): Promise<OpResult> => {
         const x = Math.random();
@@ -394,10 +567,10 @@ const scenarios: Record<string, () => Promise<void>> = {
         op: mixed,
         onTick: async (t) => {
           if (Math.floor(t) % 30 !== 0) return;
-          const p = procStat(c.srv.pid)!,
+          const p = procSum(c),
             now = performance.now();
           const s = await dbStats(),
-            m = await serverMetrics(c.http, c.operatorToken);
+            m = await serverMetrics(c);
           timeline.push({
             tS: Math.round(t),
             srvRssMb: p.rssMb,
@@ -418,7 +591,7 @@ const scenarios: Record<string, () => Promise<void>> = {
           );
         },
       });
-      const m1 = await serverMetrics(c.http, c.operatorToken);
+      const m1 = await serverMetrics(c);
       const v0 = performance.now();
       const verify = (
         await c.http.request('GET', '/v1/admin/audit/verify', undefined, c.operatorToken)
@@ -479,6 +652,10 @@ try {
   await dbc.end();
 }
 result['finishedAt'] = new Date().toISOString();
+if (args.has('assert-clean') && dirty > 0) {
+  console.error(`--assert-clean: ${dirty} step(s) saw errors or dropped operations`);
+  process.exit(1);
+}
 if (args.has('out')) {
   writeFileSync(args.get('out')!, JSON.stringify(result, null, 2));
   log('wrote', args.get('out'));

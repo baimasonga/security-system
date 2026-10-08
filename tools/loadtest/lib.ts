@@ -60,6 +60,9 @@ export class Http {
   }
 }
 
+/** Anything that can issue requests (a single connection pool or a balancer over several). */
+export type Requester = Pick<Http, 'request'>;
+
 // ---- statistics -----------------------------------------------------------------------------
 export function percentiles(
   samples: number[],
@@ -213,4 +216,37 @@ export function procStat(
 }
 export function loadavg(): number {
   return round(Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]), 2);
+}
+
+/** Round-robin over several server instances (simulates a load balancer; no stickiness). */
+export class Balancer {
+  readonly #hs: Http[];
+  #i = 0;
+  constructor(bases: string[], maxSockets: number) {
+    this.#hs = bases.map((b) => new Http(b, maxSockets));
+  }
+  get members(): Http[] {
+    return this.#hs;
+  }
+  request(method: string, path: string, body?: unknown, token?: string) {
+    return this.#hs[this.#i++ % this.#hs.length]!.request(method, path, body, token);
+  }
+  destroy() {
+    this.#hs.forEach((h) => h.destroy());
+  }
+}
+
+import { execSync } from 'node:child_process';
+/** Summed CPU seconds of every PostgreSQL process (backends, WAL writer, etc.). */
+export function postgresCpuS(): number {
+  try {
+    const pids = execSync('pgrep -u postgres -x postgres || true')
+      .toString()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(Number);
+    return pids.reduce((a, pid) => a + (procStat(pid)?.cpuS ?? 0), 0);
+  } catch {
+    return 0;
+  }
 }

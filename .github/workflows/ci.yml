@@ -50,6 +50,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx vitest run --project db
+      - name: Load-test smoke (the tool still works and a light load produces no errors)
+        run: |
+          npm run loadtest -- --scenario activate-ramp --users 40 --rps 20 --seconds 4 --assert-clean
+          npm run loadtest -- --scenario refresh-ramp --users 40 --rps 20 --seconds 4 --assert-clean
 
   security:
     name: Dependency and secret scanning
