@@ -369,6 +369,18 @@ paths:
             schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
           }
       responses: { '200': { description: Audit events (hash-chained) } }
+  /v1/admin/metrics:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Operational metrics (request/transaction latency, retries, audit-lock wait, pool, process). Labels are route templates and enumerated outcomes only.
+      parameters:
+        - {
+            name: format,
+            in: query,
+            schema: { type: string, enum: [json, prometheus], default: json },
+          }
+      responses: { '200': { description: Metrics snapshot } }
   /v1/admin/audit/verify:
     get:
       tags: [admin]

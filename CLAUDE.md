@@ -6,6 +6,7 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 
 - `npm run check` — format check, lint + architecture boundaries, typecheck, unit/integration/security tests (must pass before any push)
 - `npm run test:db` — PostgreSQL tests against a throwaway cluster (or `DATABASE_URL`); also re-runs the behavioural suites on PG
+- `npm run loadtest -- --scenario <name> …` — open-loop load/soak tool against a real server + PostgreSQL (`--assert-clean` exits non-zero on any error)
 - `npm run migrate` — apply SQL migrations (`DATABASE_URL` required)
 - `npm run format` — Prettier write
 - `node tools/gen-lease-vectors.ts > docs/api/lease-test-vectors.json` — only when the lease wire format changes (ADR required)
@@ -24,3 +25,5 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 - Adding a store-port method? Add it to the contract suite first (`packages/*/test/*contract.ts`) so every adapter must satisfy it. PostgreSQL work that counts/changes activations must lock the license row (`findLicenseForUpdate`).
 - State changes that must be audited write their audit event through `tx.audit.append(...)` inside `store.transaction(...)` — never `audit.append` after the fact (ADR-006). Only refusals/denials (no state change) use the standalone `audit.append`.
 - Store-transaction callbacks must be re-runnable (PostgreSQL retries them after deadlocks): derive state from reads inside the transaction, no irreversible side effects. Lock order is always license → activation.
+- Changes to locking, transactions, the audit path, retention or schema: re-run the relevant load-test scenarios and compare with `docs/performance/load-test-v1.md`. Check every measured outcome against its _expected_ value — a result that "looks fine" can come from a setting that never applied.
+- New operator config knobs need a test proving they change behaviour end to end (see `maintenance.test.ts`); patch/refactor scripts must assert that their edit anchors matched.

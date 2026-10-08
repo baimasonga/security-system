@@ -12,7 +12,9 @@ Required documentation set (brief §56) and its status. Every doc is versioned w
 | API Specification                                                   | ✅ V1                                                                     | [api/openapi.yaml](api/openapi.yaml), [api/lease-test-vectors.json](api/lease-test-vectors.json)             |
 | Key Management Design                                               | ✅ V1                                                                     | [security/key-management.md](security/key-management.md)                                                     |
 | Invariant traceability                                              | ✅                                                                        | [security/invariants-traceability.md](security/invariants-traceability.md)                                   |
-| ADRs                                                                | ✅ 001–004                                                                | [adr/](adr/)                                                                                                 |
+| ADRs                                                                | ✅ 001–007                                                                | [adr/](adr/)                                                                                                 |
+| Load & soak test report                                             | ✅ V1 (single shared VM — see its limits section)                         | [performance/load-test-v1.md](performance/load-test-v1.md)                                                   |
+| Capacity & monitoring runbook                                       | ✅                                                                        | [runbooks/capacity-and-monitoring.md](runbooks/capacity-and-monitoring.md)                                   |
 | Incident Response Procedures                                        | 🟡 drafted, unrehearsed                                                   | [runbooks/incident-response.md](runbooks/incident-response.md)                                               |
 | Recovery Procedures                                                 | 🟡 drafted; needs PG adapters                                             | [runbooks/recovery.md](runbooks/recovery.md)                                                                 |
 | Status and handoff                                                  | ✅                                                                        | [architecture/05-v1-status-and-handoff.md](architecture/05-v1-status-and-handoff.md)                         |
@@ -28,3 +30,4 @@ Architecture decision records:
 4. [ADR-004 — Authentication modes by endpoint class](adr/ADR-004-authentication-modes.md)
 5. [ADR-005 — PostgreSQL adapters](adr/ADR-005-postgresql-adapters.md)
 6. [ADR-006 — Atomic audit and transaction retry](adr/ADR-006-atomic-audit-and-transaction-retry.md)
+7. [ADR-007 — Shared license lock; retention off the request path](adr/ADR-007-locking-and-retention-under-load.md)

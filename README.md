@@ -24,6 +24,7 @@ npm ci
 npm run check        # format, lint (+ architecture boundaries), typecheck, unit/integration/security tests
 npm run test:db      # PostgreSQL: schema, adapters, contracts, and the behavioural suites re-run on PG
                      # (spins up a throwaway local cluster; or set DATABASE_URL)
+npm run loadtest -- --scenario refresh-ramp --rps 100,200,300   # open-loop load test (docs/performance)
 npm run dev          # API on http://127.0.0.1:8080, in-memory stores, ephemeral dev-only keys
 
 # durable mode:
