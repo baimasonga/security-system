@@ -18,7 +18,7 @@ describe('OpenAPI ↔ implementation drift', () => {
 
   it('every implemented route is documented, and every documented route is implemented', async () => {
     const seen = new Set<string>();
-    const c = createContainer(loadConfig({ NODE_ENV: 'test' } as NodeJS.ProcessEnv));
+    const c = await createContainer(loadConfig({ NODE_ENV: 'test' } as NodeJS.ProcessEnv));
     app = await buildApp(c, {
       onRoute: (m, u) => {
         if (m !== 'HEAD' && m !== 'OPTIONS')

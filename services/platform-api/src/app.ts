@@ -48,6 +48,8 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
 
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 
+  app.addHook('onClose', async () => c.close());
+
   registerAuthRoutes(app, c);
   registerOrgRoutes(app, c);
   registerLicenseRoutes(app, c);

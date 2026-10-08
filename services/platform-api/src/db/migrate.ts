@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Client } from 'pg';
 
 export interface MigrationResult {
@@ -56,3 +57,32 @@ export async function applyMigrations(client: Client, dir: string): Promise<Migr
     await client.query('SELECT pg_advisory_unlock(727274)');
   }
 }
+
+/** Startup guard: refuse to serve traffic on a database that is missing (or ahead of) known migrations. */
+export async function assertSchemaCurrent(
+  db: { query(text: string): Promise<{ rows: Array<{ version: string }> }> },
+  dir: string,
+): Promise<void> {
+  const expected = readdirSync(dir)
+    .filter((f) => FILE.test(f))
+    .map((f) => f.replace(/\.sql$/, ''))
+    .sort();
+  let applied: string[];
+  try {
+    applied = (await db.query('SELECT version FROM schema_migrations ORDER BY version')).rows.map(
+      (r) => r.version,
+    );
+  } catch {
+    throw new Error('database schema is not initialised: run `npm run migrate`');
+  }
+  const missing = expected.filter((v) => !applied.includes(v));
+  const unknown = applied.filter((v) => !expected.includes(v));
+  if (missing.length)
+    throw new Error(
+      `database is missing migrations: ${missing.join(', ')} (run \`npm run migrate\`)`,
+    );
+  if (unknown.length)
+    throw new Error(`database has migrations unknown to this build: ${unknown.join(', ')}`);
+}
+
+export const MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations', import.meta.url));

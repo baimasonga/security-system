@@ -3,6 +3,7 @@ import { buildApp, type AppOptions } from '../src/app.ts';
 import { loadConfig, type PlatformConfig } from '../src/config.ts';
 import { createContainer, type Container } from '../src/container.ts';
 import type { LicensingConfig } from '@trust/licensing';
+import { createSchemaPool, pgTestEnabled } from '../../../tests/support/pg.ts';
 
 export const DAY = 86_400_000;
 export const PW = 'correct horse battery staple';
@@ -19,6 +20,8 @@ export interface Env {
   register: (email: string) => Promise<{ userId: string; orgId: string; token: string }>;
   login: (email: string) => Promise<string>;
   operatorToken: () => Promise<string>;
+  /** Security signals recorded so far, from whichever backend is active. */
+  signals: () => Promise<Array<{ kind: string; severity: string }>>;
   /** Operator creates the standard catalog + a subscription-backed license for `orgId`. */
   provision: (
     orgId: string,
@@ -55,9 +58,11 @@ export async function makeEnv(over?: {
     },
     ...over?.config,
   };
-  const c = createContainer(config, {
+  const pool = pgTestEnabled() ? createSchemaPool() : undefined;
+  const c = await createContainer(config, {
     clock,
     ...(over?.licensing ? { licensing: over.licensing } : {}),
+    ...(pool ? { pool } : {}),
   });
   const app = await buildApp(c, over?.app);
   await app.ready();
@@ -147,5 +152,16 @@ export async function makeEnv(over?: {
     };
   };
 
-  return { app, c, clock, call, register, login, operatorToken, provision };
+  const signals: Env['signals'] = async () => {
+    const sink = c.telemetrySink as unknown as {
+      security?: Array<{ kind: string; severity: string }>;
+    };
+    if (sink.security) return sink.security;
+    const r = await pool!.query(
+      'SELECT kind, severity FROM security_events ORDER BY occurred_at, id',
+    );
+    return r.rows as Array<{ kind: string; severity: string }>;
+  };
+
+  return { app, c, clock, call, register, login, operatorToken, provision, signals };
 }

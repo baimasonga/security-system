@@ -337,8 +337,7 @@ describe('abuse resistance', () => {
       body: first.body,
     });
     expect(replay).toMatchObject({ status: 403, body: { code: 'invalid_challenge' } });
-    const sink = env.c.telemetrySink as unknown as { security: Array<{ kind: string }> };
-    expect(sink.security.map((x) => x.kind)).toContain('challenge_replay');
+    expect((await env.signals()).map((x) => x.kind)).toContain('challenge_replay');
   });
 
   it('a canary license looks exactly like an unknown key to the caller, and alerts operators', async () => {
@@ -357,10 +356,7 @@ describe('abuse resistance', () => {
     const viaCanary = await activateVia(alice.token, canary.body.license_key);
     const viaGhost = await activateVia(alice.token, 'LK-BBBBB-BBBBB-BBBBB-BBBBB-BBBBB');
     expect(shape(viaCanary.res)).toEqual(shape(viaGhost.res));
-    const sink = env.c.telemetrySink as unknown as {
-      security: Array<{ kind: string; severity: string }>;
-    };
-    expect(sink.security.find((s) => s.kind === 'canary_license_activated')).toMatchObject({
+    expect((await env.signals()).find((s) => s.kind === 'canary_license_activated')).toMatchObject({
       severity: 'high',
     });
     // customers never see canaries

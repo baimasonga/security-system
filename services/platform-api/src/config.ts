@@ -11,7 +11,11 @@ export interface PlatformConfig {
   pseudonymKey: string;
   /** PKCS#8 PEM of the license-signing key. Required in production; ephemeral in dev/test. */
   signingKeyPem: string | undefined;
-  persistence: 'memory';
+  persistence: 'memory' | 'postgres';
+  /** Required when persistence is postgres. Never logged. */
+  databaseUrl: string | undefined;
+  /** Pool size for the PostgreSQL adapters. */
+  dbPoolMax: number;
   scrypt?: ScryptParams;
   rateLimits: {
     global: number;
@@ -49,15 +53,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const licenseKeyPepper = need('LICENSE_KEY_PEPPER', 'pepper');
   const pseudonymKey = need('PSEUDONYM_KEY', 'pseudonym');
 
-  const persistence = (env['PERSISTENCE'] ?? 'memory') as string;
-  if (persistence !== 'memory') throw new Error(`unsupported PERSISTENCE=${persistence}`);
-  if (prod) {
-    // Honest guard, kept after the secret checks so configuration errors are reported first:
-    // durable PostgreSQL adapters are the next slice. Never run production on volatile storage.
-    throw new Error(
-      'production requires the PostgreSQL persistence adapters, which are not implemented yet',
-    );
+  const persistence = (env['PERSISTENCE'] ?? (prod ? 'postgres' : 'memory')) as string;
+  if (persistence !== 'memory' && persistence !== 'postgres') {
+    throw new Error(`unsupported PERSISTENCE=${persistence}`);
   }
+  const databaseUrl = env['DATABASE_URL'];
+  if (persistence === 'postgres' && !databaseUrl) {
+    throw new Error('DATABASE_URL is required when PERSISTENCE=postgres');
+  }
+  if (prod && persistence !== 'postgres') {
+    // Volatile storage must never serve production traffic.
+    throw new Error('production requires PERSISTENCE=postgres');
+  }
+  const dbPoolMax = Number(env['DB_POOL_MAX'] ?? 10);
+  if (!Number.isInteger(dbPoolMax) || dbPoolMax < 1 || dbPoolMax > 200)
+    throw new Error('invalid DB_POOL_MAX');
 
   const port = Number(env['PORT'] ?? 8080);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('invalid PORT');
@@ -70,7 +80,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     licenseKeyPepper,
     pseudonymKey,
     signingKeyPem,
-    persistence: 'memory',
+    persistence,
+    databaseUrl,
+    dbPoolMax,
     rateLimits: { global: 300, login: 10, register: 5, challenge: 60, activate: 20 },
   };
 }

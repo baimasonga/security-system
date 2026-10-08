@@ -20,6 +20,7 @@
     "test:db": "node tools/with-postgres.mjs vitest run --project db",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
     "dev": "node services/platform-api/src/main.ts",
+    "migrate": "node tools/migrate.ts",
     "audit:deps": "npm audit --omit=dev --audit-level=high"
   },
   "devDependencies": {

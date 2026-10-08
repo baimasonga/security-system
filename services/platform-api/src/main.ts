@@ -3,7 +3,7 @@ import { loadConfig } from './config.ts';
 import { createContainer } from './container.ts';
 
 const config = loadConfig();
-const container = createContainer(config);
+const container = await createContainer(config);
 const app = await buildApp(container, { logger: true });
 
 if (
@@ -17,6 +17,13 @@ if (
 }
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(sig, () => void app.close().then(() => process.exit(0)));
+  process.on(
+    sig,
+    () =>
+      void app
+        .close()
+        .then(() => container.close())
+        .then(() => process.exit(0)),
+  );
 }
 await app.listen({ host: config.host, port: config.port });

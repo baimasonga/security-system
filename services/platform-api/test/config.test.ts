@@ -19,17 +19,24 @@ describe('loadConfig — fail closed', () => {
     ).toThrow(/SIGNING_KEY/);
   });
 
-  it('production refuses volatile in-memory persistence even when fully configured', () => {
-    expect(() =>
-      loadConfig(
-        env({
-          NODE_ENV: 'production',
-          LICENSE_KEY_PEPPER: STRONG,
-          PSEUDONYM_KEY: STRONG,
-          LICENSE_SIGNING_KEY_PEM: 'pem',
-        }),
-      ),
-    ).toThrow(/PostgreSQL persistence adapters/);
+  it('production requires PostgreSQL persistence and a database URL; volatile storage is refused', () => {
+    const base = {
+      NODE_ENV: 'production',
+      LICENSE_KEY_PEPPER: STRONG,
+      PSEUDONYM_KEY: STRONG,
+      LICENSE_SIGNING_KEY_PEM: 'pem',
+    };
+    expect(() => loadConfig(env({ ...base, PERSISTENCE: 'memory' }))).toThrow(
+      /requires PERSISTENCE=postgres/,
+    );
+    expect(() => loadConfig(env(base))).toThrow(/DATABASE_URL is required/); // postgres is the production default
+    const ok = loadConfig(env({ ...base, DATABASE_URL: 'postgres://u:p@db/trust' }));
+    expect(ok).toMatchObject({ persistence: 'postgres', env: 'production' });
+  });
+
+  it('validates the pool size', () => {
+    expect(() => loadConfig(env({ DB_POOL_MAX: '0' }))).toThrow(/DB_POOL_MAX/);
+    expect(() => loadConfig(env({ DB_POOL_MAX: '1000' }))).toThrow(/DB_POOL_MAX/);
   });
 
   it('rejects unknown modes, persistence kinds and bad ports', () => {

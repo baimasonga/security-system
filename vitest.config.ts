@@ -21,12 +21,21 @@ export default defineConfig({
       },
       {
         // Requires PostgreSQL: `npm run test:db` (spins up a throwaway cluster) or DATABASE_URL in CI.
+        // Runs the PostgreSQL-specific tests AND re-runs the behavioural suites against the PG adapters
+        // (each test gets its own migrated schema, see tests/support/pg.ts).
         extends: true,
         test: {
           ...common,
           name: 'db',
-          include: ['**/*.db.test.ts'],
+          include: [
+            '**/*.db.test.ts',
+            'packages/licensing/test/activation.test.ts',
+            'services/platform-api/test/api.test.ts',
+            'tests/security/**/*.test.ts',
+            'tests/integration/**/*.test.ts',
+          ],
           exclude: ['**/node_modules/**'],
+          env: { TRUST_TEST_PERSISTENCE: 'postgres' },
           fileParallelism: false,
         },
       },
