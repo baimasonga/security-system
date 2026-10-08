@@ -381,19 +381,23 @@ const scenarios: Record<string, () => Promise<void>> = {
         const url = new URL(dbUrl);
         if (proxy) url.port = String(proxy.port);
         const pool = new pg.Pool({ connectionString: url.toString(), max: conc });
-        const log_ = new PgAuditLog(pool, { now: () => new Date() });
+        const orgs = num('orgs', 0); // 0 = org-less events (all on the `system` chain = the old global-chain behaviour)
+        const log_ = new PgAuditLog(pool, { now: () => new Date() }, { shards: num('shards', 1) });
         const lat: number[] = [];
         let stop = false,
           n = 0;
         setTimeout(() => (stop = true), num('seconds', 6) * 1000);
         const t0 = performance.now();
         await Promise.all(
-          Array.from({ length: conc }, async () => {
+          Array.from({ length: conc }, async (_, w) => {
+            let k = 0;
             while (!stop) {
               const s = performance.now();
               await log_.append({
                 actor: { type: 'system' },
                 action: 'bench.event',
+                ...(orgs > 0 ? { orgId: `org_bench_${w % orgs}` } : {}),
+                target: { type: 'device', id: `dev_${w}_${k++ % 64}` },
                 metadata: { n: 1 },
               });
               lat.push(performance.now() - s);
@@ -404,6 +408,8 @@ const scenarios: Record<string, () => Promise<void>> = {
         const secs = (performance.now() - t0) / 1000;
         const row = {
           rttMs: oneWay * 2,
+          orgs,
+          shards: num('shards', 1),
           concurrency: conc,
           eventsPerSec: round(n / secs, 0),
           latencyMs: percentiles(lat, [50, 99]),

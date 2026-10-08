@@ -13,24 +13,24 @@ PostgreSQL), all passing. Also passing: `tsc`, ESLint
 (+ security plugin), Prettier, the architecture-boundary check, `npm audit`
 (0 vulnerabilities), and a clean `npm ci --omit=dev` start-up.
 
-| Area                                             | State                                                                                                                                                    |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity (register, login, sessions, orgs, RBAC) | Minimal V1: password (scrypt) + opaque revocable session; personal + team orgs; owner/admin/member                                                       |
-| Catalog (products, versioned plans)              | Done; plan edits bump version and reach devices on refresh without a client release                                                                      |
-| Subscriptions                                    | Operator-managed state machine incl. dunning window; billing-provider webhooks are a later seam                                                          |
-| Licenses                                         | subscription / trial / perpetual / canary; suspend / reinstate / revoke; effective status computed (no cron needed)                                      |
-| Entitlements                                     | Pure resolver (plan version + per-license overrides) → entitlements, capabilities, device limit                                                          |
-| Device activation                                | Session + license key + single-use challenge proof-of-possession; idempotent re-activation; race-free device limit; deactivate by device / owner / admin |
-| Signed offline leases                            | Compact JWS, EdDSA only, bound to product + installation + device key; TTL from policy per tier; capped by entitlement end                               |
-| Validation / refresh                             | Device-signature authenticated; reflects revocation, suspension, subscription lapse, plan version, key rotation                                          |
-| Trials                                           | One per (product, org) and (product, user), server-side                                                                                                  |
-| Canary licenses                                  | Indistinguishable from unknown keys; high-severity signal; denied twice (activation path + policy)                                                       |
-| Audit                                            | Hash-chained, tamper-evident, verified by test and by endpoint; DB triggers make it append-only                                                          |
-| Telemetry / security signals                     | Allow-listed attributes, pseudonymized subjects, redaction safety net                                                                                    |
-| Key management                                   | Full lifecycle state machine; trust bundle; fail-closed signing; KMS-ready `KeyCustody` seam                                                             |
-| Client SDK (`sdk-core`)                          | Device key, lease verifier (skew/rollback aware), API client with offline `getEntitlements`; verification-only crypto import enforced                    |
-| API contract                                     | OpenAPI 3.1 with a drift test (code ⇄ spec) and cross-language lease test vectors                                                                        |
-| Docs                                             | Context, bounded contexts, trust boundaries, domain model, state machine, DB model, threat model, ADR-001…004, key management, runbooks                  |
+| Area                                             | State                                                                                                                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity (register, login, sessions, orgs, RBAC) | Minimal V1: password (scrypt) + opaque revocable session; personal + team orgs; owner/admin/member                                                                              |
+| Catalog (products, versioned plans)              | Done; plan edits bump version and reach devices on refresh without a client release                                                                                             |
+| Subscriptions                                    | Operator-managed state machine incl. dunning window; billing-provider webhooks are a later seam                                                                                 |
+| Licenses                                         | subscription / trial / perpetual / canary; suspend / reinstate / revoke; effective status computed (no cron needed)                                                             |
+| Entitlements                                     | Pure resolver (plan version + per-license overrides) → entitlements, capabilities, device limit                                                                                 |
+| Device activation                                | Session + license key + single-use challenge proof-of-possession; idempotent re-activation; race-free device limit; deactivate by device / owner / admin                        |
+| Signed offline leases                            | Compact JWS, EdDSA only, bound to product + installation + device key; TTL from policy per tier; capped by entitlement end                                                      |
+| Validation / refresh                             | Device-signature authenticated; reflects revocation, suspension, subscription lapse, plan version, key rotation                                                                 |
+| Trials                                           | One per (product, org) and (product, user), server-side                                                                                                                         |
+| Canary licenses                                  | Indistinguishable from unknown keys; high-severity signal; denied twice (activation path + policy)                                                                              |
+| Audit                                            | Per-organization hash chains (ADR-008) with guarded head rows and an external-witness anchor, tamper-evident, verified by test and by endpoint; DB triggers make it append-only |
+| Telemetry / security signals                     | Allow-listed attributes, pseudonymized subjects, redaction safety net                                                                                                           |
+| Key management                                   | Full lifecycle state machine; trust bundle; fail-closed signing; KMS-ready `KeyCustody` seam                                                                                    |
+| Client SDK (`sdk-core`)                          | Device key, lease verifier (skew/rollback aware), API client with offline `getEntitlements`; verification-only crypto import enforced                                           |
+| API contract                                     | OpenAPI 3.1 with a drift test (code ⇄ spec) and cross-language lease test vectors                                                                                               |
+| Docs                                             | Context, bounded contexts, trust boundaries, domain model, state machine, DB model, threat model, ADR-001…004, key management, runbooks                                         |
 
 ## 2. What is explicitly NOT done (do not assume otherwise)
 
@@ -45,7 +45,7 @@ PostgreSQL), all passing. Also passing: `tsc`, ESLint
 
 ## 3. Recommended next steps (in order)
 
-1. **Act on the load-test findings** ([report](../performance/load-test-v1.md) §7): make audit appends cheaper to serialize (per-tenant chains or a database-side append — the single chain's ceiling falls with round-trip time to PostgreSQL), cut database round trips per flow, then validate scale-out and run a ≥ 24 h soak on production-like hardware; run the first backup-restore drill.
+1. **Act on the load-test findings** ([report](../performance/load-test-v1.md) §7): cut database round trips per flow, then validate scale-out and run a ≥ 24 h soak on production-like hardware; run the first backup-restore drill.
 2. First CI run on GitHub; fix fallout; pin actions by SHA; enable branch protection + required checks + CODEOWNERS teams.
 3. KMS/HSM `KeyCustody` implementation and a rehearsed rotation + compromise drill (closes the main gap in key-management §5).
 4. Identity hardening: email verification, password reset, MFA/passkeys (operators first), refresh rotation.

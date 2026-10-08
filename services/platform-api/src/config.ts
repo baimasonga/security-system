@@ -21,6 +21,8 @@ export interface PlatformConfig {
   challengeRetentionSeconds: number | undefined;
   leaseRetentionSeconds: number | undefined;
   maintenanceIntervalSeconds: number;
+  /** Audit chains per organization (ADR-008). 1 = one chain per organization. */
+  auditChainShards: number;
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
   scrypt?: ScryptParams;
   rateLimits: {
@@ -96,6 +98,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const leaseRetentionSeconds = optInt('LEASE_RETENTION_SECONDS', 0, 3650 * 86400);
   const maintenanceIntervalSeconds = optInt('MAINTENANCE_INTERVAL_SECONDS', 1, 86400) ?? 60;
 
+  const auditChainShards = optInt('AUDIT_CHAIN_SHARDS', 1, 64) ?? 1;
+
   const logLevel = (env['LOG_LEVEL'] ?? 'info') as PlatformConfig['logLevel'];
   if (!['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'].includes(logLevel)) {
     throw new Error('invalid LOG_LEVEL');
@@ -119,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     challengeRetentionSeconds,
     leaseRetentionSeconds,
     maintenanceIntervalSeconds,
+    auditChainShards,
     logLevel,
     rateLimits: {
       global: limit(env, 'RATE_LIMIT_GLOBAL', 300),

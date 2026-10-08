@@ -31,3 +31,4 @@ Architecture decision records:
 5. [ADR-005 — PostgreSQL adapters](adr/ADR-005-postgresql-adapters.md)
 6. [ADR-006 — Atomic audit and transaction retry](adr/ADR-006-atomic-audit-and-transaction-retry.md)
 7. [ADR-007 — Shared license lock; retention off the request path](adr/ADR-007-locking-and-retention-under-load.md)
+8. [ADR-008 — Partitioned audit chains](adr/ADR-008-partitioned-audit-chains.md)

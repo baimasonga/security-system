@@ -44,9 +44,16 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
 
   it('applies from an empty database, then is idempotent', async () => {
     const first = await applyMigrations(db, migrationsDir);
-    expect(first.applied).toEqual(['0001_init', '0002_retention_indexes']);
+    expect(first.applied).toEqual([
+      '0001_init',
+      '0002_retention_indexes',
+      '0003_partitioned_audit',
+    ]);
     const second = await applyMigrations(db, migrationsDir);
-    expect(second).toEqual({ applied: [], skipped: ['0001_init', '0002_retention_indexes'] });
+    expect(second).toEqual({
+      applied: [],
+      skipped: ['0001_init', '0002_retention_indexes', '0003_partitioned_audit'],
+    });
   });
 
   it('refuses to run when an applied migration file has been modified (immutable history)', async () => {
@@ -272,7 +279,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
   describe('audit log is append-only', () => {
     const ev = (seq: number) =>
       q(
-        `INSERT INTO audit_events (seq,id,occurred_at,actor_type,action,prev_hash,hash) VALUES ($1,$2,now(),'system','x',$3,$4)`,
+        `INSERT INTO audit_events (chain_id,seq,id,occurred_at,actor_type,action,prev_hash,hash) VALUES ('c',$1,$2,now(),'system','x',$3,$4)`,
         [seq, `aud_${seq}`, 'p', 'h'],
       );
 

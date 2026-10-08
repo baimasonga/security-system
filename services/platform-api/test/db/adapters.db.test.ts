@@ -21,14 +21,14 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
   // ---- the same contracts the in-memory adapters satisfy -------------------------------------
   const clock = { now: () => new Date('2026-01-01T00:00:00Z') };
   const auditedOf = (pool: PgPool) => async () =>
-    (await pool.query('SELECT action FROM audit_events ORDER BY seq')).rows.map(
+    (await pool.query('SELECT action FROM audit_events ORDER BY gseq')).rows.map(
       (r) => r.action as string,
     );
   authStoreContract('postgres', () => {
     const pool = createSchemaPool();
     return { store: new PgAuthStore(pool, clock), audited: auditedOf(pool) };
   });
-  auditLogContract('postgres', (clock) => new PgAuditLog(createSchemaPool(), clock));
+  auditLogContract('postgres', (clock, opts) => new PgAuditLog(createSchemaPool(), clock, opts));
   licensingStoreContract('postgres', () => {
     const pool = createSchemaPool();
     return {
@@ -336,7 +336,7 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
       expect(res.sort()).toEqual(['a', 'b']);
       expect(attempts.a + attempts.b).toBeGreaterThanOrEqual(3); // the deadlock victim ran again
       // Audit from the aborted attempt did not leak: exactly one event per transaction.
-      const audited = (await pool.query('SELECT action FROM audit_events ORDER BY seq')).rows
+      const audited = (await pool.query('SELECT action FROM audit_events ORDER BY gseq')).rows
         .map((r) => r.action)
         .sort();
       expect(audited).toEqual(['tx.a', 'tx.b']);
@@ -442,12 +442,12 @@ describe.skipIf(!url)(
           ),
         );
         expect(await logs[0]!.verifyChain()).toMatchObject({ ok: true, count: 480 });
-        const seqs = (await first.query('SELECT seq FROM audit_events ORDER BY seq')).rows.map(
+        const seqs = (await first.query('SELECT seq FROM audit_events ORDER BY gseq')).rows.map(
           (r) => Number(r.seq),
         );
         expect(seqs).toEqual(Array.from({ length: 480 }, (_, i) => i + 1));
         // each appendMany run stayed contiguous
-        const acts = (await first.query('SELECT action FROM audit_events ORDER BY seq')).rows.map(
+        const acts = (await first.query('SELECT action FROM audit_events ORDER BY gseq')).rows.map(
           (r) => r.action as string,
         );
         for (let i = 0; i < 240; i++) expect(acts[acts.indexOf(`e${i}.a`) + 1]).toBe(`e${i}.b`);

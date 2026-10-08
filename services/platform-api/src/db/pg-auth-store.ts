@@ -175,10 +175,12 @@ class PgAuthRepo implements AuthRepo {
 export class PgAuthStore extends PgAuthRepo implements AuthStore {
   readonly #pool: PgPool;
   readonly #clock: Clock;
-  constructor(pool: PgPool, clock: Clock) {
+  readonly #auditShards: number;
+  constructor(pool: PgPool, clock: Clock, opts?: { auditShards?: number }) {
     super(pool);
     this.#pool = pool;
     this.#clock = clock;
+    this.#auditShards = opts?.auditShards ?? 1;
   }
 
   transaction<T>(fn: (tx: AuthTx) => Promise<T>): Promise<T> {
@@ -188,7 +190,7 @@ export class PgAuthStore extends PgAuthRepo implements AuthStore {
         audit: buffer,
       }) as unknown as AuthTx;
       const out = await fn(tx);
-      await appendAuditInTx(client, this.#clock, buffer.drain());
+      await appendAuditInTx(client, this.#clock, buffer.drain(), this.#auditShards);
       return out;
     });
   }

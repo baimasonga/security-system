@@ -3,6 +3,7 @@ import type { Container } from '../container.ts';
 import { operator, parse, principalOf, toWire } from '../http.ts';
 import {
   auditQuery,
+  auditVerifyQuery,
   metricsQuery,
   issueLicenseBody,
   licenseParams,
@@ -170,5 +171,9 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
     return c.metrics.snapshot();
   });
 
-  app.get('/v1/admin/audit/verify', pre, async () => toWire(await c.audit.verifyChain()));
+  // Verifies every chain and head (or one organization's chains with ?org_id=). Read-only.
+  app.get('/v1/admin/audit/verify', pre, async (req) => {
+    const q = parse(auditVerifyQuery, req.query);
+    return toWire(await c.audit.verifyChain(q.org_id ? { orgId: q.org_id } : undefined));
+  });
 }

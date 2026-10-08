@@ -1,6 +1,7 @@
 # ADR-006 — Audit is atomic with the change; transactions are retried on deadlock
 
 - Status: Accepted · Date: 2026-10-08 · Affects trust boundaries: **yes** (audit integrity, availability under contention)
+- Superseded in part by [ADR-008](ADR-008-partitioned-audit-chains.md): the single global audit chain and its advisory lock are replaced by per-organization chains.
 - Closes: threat-model risks **R-10** and **R-14**. Builds on [ADR-005](ADR-005-postgresql-adapters.md).
 
 ## Context

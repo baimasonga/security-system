@@ -313,6 +313,13 @@ describe('privilege escalation', () => {
     expect((await env.call('GET', '/v1/admin/audit/verify', { token: op })).body).toMatchObject({
       ok: true,
     });
+    const scoped = await env.call('GET', `/v1/admin/audit/verify?org_id=${alice.orgId}`, {
+      token: op,
+    });
+    expect(scoped.body).toMatchObject({ ok: true, chains: 1 });
+    expect((await env.call('GET', '/v1/admin/audit/verify?bogus=1', { token: op })).status).toBe(
+      400,
+    );
   });
 
   it('login/registration cannot be abused to set privileged fields', async () => {

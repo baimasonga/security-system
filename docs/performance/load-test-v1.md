@@ -161,6 +161,29 @@ the old 1 h retention (~390k rows) that is ≈ 40 ms of database CPU per request
 service would have collapsed after roughly an hour of sustained load**, something neither the 12-minute baseline soak
 (table only 67k rows → ~7 ms per request, visible only as the upward p99 drift in §3.8) nor any short ramp could reveal.
 
+### 3.10 After ADR-008: partitioned audit chains (same box, 2 ms injected RTT, `audit-micro --oneway 1`)
+
+Events/s for direct audited appends; each worker repeatedly appends one event. "system" = all events on one chain,
+i.e. the old global-chain behaviour; the first run uses the same code path as before the change.
+
+| Workload                            | 8 workers: events/s (p99) | 32 workers: events/s (p99) |
+| ----------------------------------- | ------------------------- | -------------------------- |
+| One chain (`system`, old behaviour) | 144 (875 ms)              | 147 (6,055 ms)             |
+| 16 organizations, one chain each    | **584 (20 ms)**           | **1,680 (28 ms)**          |
+| One hot organization, 1 shard       | 148 (802 ms)              | 150 (6,121 ms)             |
+| One hot organization, 8 shards      | 502 (33 ms)               | 904 (209 ms)               |
+
+Reading: with unrelated tenants the 2 ms-RTT ceiling moved from ≈ 147/s to ≈ 1,680/s (≈ 11×, now limited by CPU and
+the pool rather than a lock), and p99 under 32-way contention fell from 6 s to 28 ms. A single hot tenant still
+serializes at ≈ 150/s unless sharded (`AUDIT_CHAIN_SHARDS`), which bought ≈ 6× at 32 workers. Verification of the
+final logs succeeded in every run (all chains and heads).
+
+Regression check of the full-service scenarios after the change (same box; the load generator and a test run briefly
+shared the CPU during the first step, so only the shape is claimed): activation ramp clean to 300 flows/s (p99 112 ms),
+389 flows/s achieved at 400 offered; refresh ramp clean to 300 (p99 39 ms), 399 achieved at 400 offered; hot-license and
+300-way stampede still correct (exactly 5 activations, 0 deadlocks); 5-minute soak at 100 flows/s: 30,000 flows, 0 errors,
+p99 27.9 ms, flat per-minute p99 (27–29 ms) and flat memory. Not re-run: the 20-minute soak and multi-instance runs.
+
 ## 4. Findings and dispositions
 
 | ID    | Severity      | Finding                                                                                                                                                                      | Evidence                                        | Status                                                                                                                                                                                         |
@@ -168,7 +191,7 @@ service would have collapsed after roughly an hour of sustained load**, somethin
 | LT-1  | **High**      | Retention `DELETE` on every challenge, with no index: cost grows with table size → latent total slowdown at sustained load                                                   | §3.9, §3.8 drift & growth                       | **Fixed**: removed from request path; background batched job; migration `0002` indexes; metrics; tests incl. query-plan test                                                                   |
 | LT-2  | Medium        | Refresh took an exclusive license lock → hot licenses serialized                                                                                                             | §3.4                                            | **Fixed**: shared lock (`FOR SHARE`); semantics tested on PostgreSQL; service test asserts which lock each path takes                                                                          |
 | LT-3  | Medium        | Concurrent statements issued on one transaction connection (works today, removed in `pg@9`)                                                                                  | driver deprecation warning during load          | **Fixed**: explicit per-connection serialization + test                                                                                                                                        |
-| LT-4  | **High**      | Audit-chain throughput is bounded by ≈ 1/(4·RTT): hundreds/s at same-AZ latency, ~100/s cross-AZ; bursts can hit it                                                          | §3.1, §3.7                                      | **Partly mitigated** (one fewer round trip, +19–43 %); **open** — structural fix recommended (§7)                                                                                              |
+| LT-4  | **High**      | Audit-chain throughput is bounded by ≈ 1/(4·RTT): hundreds/s at same-AZ latency, ~100/s cross-AZ; bursts can hit it                                                          | §3.1, §3.7                                      | **Fixed structurally (ADR-008)**: independent per-organization chains (optionally sharded); §3.10. Residual per-chain ceiling remains                                                          |
 | LT-5  | Info          | Per-box capacity ≈ 200–300 flows/s, ~22 round trips and ~6.7 ms CPU per refresh flow                                                                                         | §3.3, §3.6                                      | Documented; round-trip reduction recommended                                                                                                                                                   |
 | LT-6  | Info          | Pool > 10 reduces throughput (audit-lock convoy)                                                                                                                             | §3.6                                            | Documented; default kept                                                                                                                                                                       |
 | LT-7  | Info          | Single-license stampede of 300 ≈ 2 s                                                                                                                                         | §3.5                                            | Documented (correct; clients should back off)                                                                                                                                                  |
@@ -197,12 +220,8 @@ case; tables stayed small (≤ 130k audit rows) — the audit index and verifica
 
 ## 7. Recommendations (ordered by evidence)
 
-1. **Make audit appends cheaper to serialize (LT-4).** Options, in increasing ambition: (a) append events with a single
-   multi-row `INSERT` (helps multi-event transactions); (b) a PL/pgSQL `append_audit()` that takes the lock, reads the head
-   and inserts in one round trip, with the hash computed in the database (needs a canonical-JSON-compatible SQL
-   implementation and a cross-check against `computeEventHash`) — halves the hold time; (c) **per-tenant audit chains**
-   (plus a small system chain): removes the global bottleneck entirely, at the price of losing one global total order
-   (needs an ADR; verification becomes per chain). Re-run `latency-sweep` and `audit-micro --oneway` after any of these.
+1. **Audit chain ceiling (LT-4): done (ADR-008).** Remaining: set `AUDIT_CHAIN_SHARDS` only for tenants that show
+   `audit_lock_wait_ms` growth; publish the verify `anchor` externally (R-13); re-run `latency-sweep` on real hardware.
 2. **Cut round trips per flow** (≈ 22 → ≈ 12): the refresh path loads license/plan/product/subscription twice
    (pre-check and in-transaction) and issues three separately-committed statements (challenge insert, challenge consume,
    the transaction). Expected gain 15–25 % CPU and a proportional latency win at real RTT. Needs care: failure auditing

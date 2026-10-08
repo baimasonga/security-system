@@ -1,23 +1,30 @@
 import {
   ChainVerifier,
   GENESIS_HASH,
-  buildEvent,
+  LEGACY_CHAIN,
+  buildRun,
+  checkHead,
+  orgChainPrefix,
+  planAppend,
+  summarize,
   type AuditEvent,
   type AuditEventInput,
   type AuditLog,
+  type ChainHead,
   type ChainVerification,
+  type VerifyOptions,
 } from '@trust/audit';
 import type { Clock, Json } from '@trust/shared-types';
 import { observer, withTransaction, type PgPool, type Queryable } from './pg.ts';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-// Serializes appends so the hash chain cannot fork. Transaction-scoped: released on commit/rollback.
-const AUDIT_APPEND_LOCK = 727275;
 const PAGE = 1000;
 
 function toEvent(r: Row): AuditEvent {
   return {
+    // Legacy (pre-partitioning) events hash WITHOUT a chain field; keep them byte-identical.
+    ...(r.chain_id === LEGACY_CHAIN ? {} : { chain: r.chain_id as string }),
     seq: Number(r.seq), // bigint arrives as string
     id: r.id,
     occurredAt: (r.occurred_at as Date).toISOString(),
@@ -32,65 +39,112 @@ function toEvent(r: Row): AuditEvent {
   };
 }
 
+const headOf = (r: Row): ChainHead => ({ seq: Number(r.head_seq), hash: r.head_hash as string });
+
 /**
- * Appends events to the chain using the CALLER's transaction. Takes the chain lock last (call it
- * right before COMMIT) so the lock is held as briefly as possible; it is released automatically at
- * commit/rollback. Used both by `PgAuditLog` and by store transactions (change + audit are atomic).
+ * Locks the head rows of `chains` (sorted => deterministic lock order across transactions) and returns the
+ * current heads, all in ONE round trip. `FOR UPDATE` re-reads the newest committed version after any wait, so
+ * the head we get is the one the previous holder committed. Chains that do not exist yet are created.
+ */
+async function lockHeads(q: Queryable, chains: readonly string[]): Promise<Map<string, ChainHead>> {
+  const res = await q.query(
+    'SELECT chain_id, head_seq, head_hash FROM audit_chains WHERE chain_id = ANY($1::text[]) ORDER BY chain_id FOR UPDATE',
+    [chains],
+  );
+  const heads = new Map<string, ChainHead>(res.rows.map((r) => [r.chain_id as string, headOf(r)]));
+  for (const chain of chains) {
+    if (heads.has(chain)) continue;
+    const ins = await q.query(
+      'INSERT INTO audit_chains (chain_id, head_seq, head_hash) VALUES ($1, 0, $2) ON CONFLICT (chain_id) DO NOTHING RETURNING chain_id',
+      [chain, GENESIS_HASH],
+    );
+    if (ins.rowCount === 1) {
+      heads.set(chain, { seq: 0, hash: GENESIS_HASH }); // we created (and therefore hold) it
+    } else {
+      // Lost a creation race; the winner has committed by now. Lock the real row.
+      const r = await q.query(
+        'SELECT chain_id, head_seq, head_hash FROM audit_chains WHERE chain_id = $1 FOR UPDATE',
+        [chain],
+      );
+      heads.set(chain, headOf(r.rows[0]!));
+    }
+  }
+  return heads;
+}
+
+/** One statement: insert every event and advance every touched head. */
+const WRITE_RUN = `
+WITH ins AS (
+  INSERT INTO audit_events (chain_id, seq, id, occurred_at, actor_type, actor_id, action, target_type,
+                            target_id, org_id, reason, metadata, prev_hash, hash)
+  SELECT chain_id, seq, id, occurred_at::timestamptz, actor_type, actor_id, action, target_type,
+         target_id, org_id, reason, metadata::jsonb, prev_hash, hash
+  FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[],
+              $8::text[], $9::text[], $10::text[], $11::text[], $12::text[], $13::text[], $14::text[])
+       AS t(chain_id, seq, id, occurred_at, actor_type, actor_id, action, target_type, target_id,
+            org_id, reason, metadata, prev_hash, hash)
+  RETURNING 1
+)
+UPDATE audit_chains c
+   SET head_seq = h.seq, head_hash = h.hash, updated_at = $18::timestamptz
+  FROM unnest($15::text[], $16::bigint[], $17::text[]) AS h(chain_id, seq, hash)
+ WHERE c.chain_id = h.chain_id`;
+
+/**
+ * Appends events to their chains using the CALLER's transaction (ADR-006/ADR-008). Call it right before COMMIT:
+ * the chain locks are held only from here to the end of the transaction, and only appenders to the SAME chain
+ * wait for each other. Unrelated organizations proceed in parallel.
  */
 export async function appendAuditInTx(
   q: Queryable,
   clock: Clock,
   inputs: readonly AuditEventInput[],
+  shards = 1,
 ): Promise<AuditEvent[]> {
   if (inputs.length === 0) return [];
+  const plan = planAppend(inputs, shards); // validates before any lock is taken
+  const chains = [...new Set(plan.map((p) => p.chain))].sort();
+
   const waitStart = performance.now();
-  // ONE round trip for "take the chain lock, then read the head". They must stay two separate STATEMENTS:
-  // in READ COMMITTED each statement gets its own snapshot, so the head read happens after the lock is
-  // granted and sees whatever the previous lock holder committed. Folding them into a single statement
-  // would read a snapshot taken BEFORE the wait and fork the chain. (No parameters => simple-query
-  // protocol, which allows several statements per message; the lock key is a module constant.)
-  const [, head] = (await q.query(
-    `SELECT pg_advisory_xact_lock(${AUDIT_APPEND_LOCK}); SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1`,
-  )) as unknown as [unknown, { rows: Array<{ seq: string; hash: string }> }];
+  const heads = await lockHeads(q, chains);
   observer.onAuditLockWait?.(performance.now() - waitStart);
-  const last = head.rows[0];
-  let prev = last
-    ? { seq: Number(last.seq), hash: last.hash as string }
-    : { seq: 0, hash: GENESIS_HASH };
-  const out: AuditEvent[] = [];
-  for (const input of inputs) {
-    const ev = buildEvent(input, prev, clock.now());
-    await q.query(
-      `INSERT INTO audit_events (seq, id, occurred_at, actor_type, actor_id, action, target_type, target_id, org_id, reason, metadata, prev_hash, hash)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        ev.seq,
-        ev.id,
-        ev.occurredAt,
-        ev.actor.type,
-        ev.actor.id,
-        ev.action,
-        ev.target?.type ?? null,
-        ev.target?.id ?? null,
-        ev.orgId,
-        ev.reason,
-        ev.metadata,
-        ev.prevHash,
-        ev.hash,
-      ],
-    );
-    prev = { seq: ev.seq, hash: ev.hash };
-    out.push(ev);
-  }
-  return out;
+
+  const at = clock.now();
+  const { events, newHeads } = buildRun(plan, heads, at);
+  const col = <T>(f: (e: AuditEvent) => T) => events.map(f);
+  const headChains = [...newHeads.keys()];
+  const res = await q.query(WRITE_RUN, [
+    col((e) => e.chain!),
+    col((e) => e.seq),
+    col((e) => e.id),
+    col((e) => e.occurredAt),
+    col((e) => e.actor.type),
+    col((e) => e.actor.id),
+    col((e) => e.action),
+    col((e) => e.target?.type ?? null),
+    col((e) => e.target?.id ?? null),
+    col((e) => e.orgId),
+    col((e) => e.reason),
+    col((e) => JSON.stringify(e.metadata)),
+    col((e) => e.prevHash),
+    col((e) => e.hash),
+    headChains,
+    headChains.map((c) => newHeads.get(c)!.seq),
+    headChains.map((c) => newHeads.get(c)!.hash),
+    at.toISOString(),
+  ]);
+  if (res.rowCount !== headChains.length) throw new Error('audit head update failed');
+  return events;
 }
 
 export class PgAuditLog implements AuditLog {
   readonly #pool: PgPool;
   readonly #clock: Clock;
-  constructor(pool: PgPool, clock: Clock) {
+  readonly #shards: number;
+  constructor(pool: PgPool, clock: Clock, opts?: { shards?: number }) {
     this.#pool = pool;
     this.#clock = clock;
+    this.#shards = opts?.shards ?? 1;
   }
 
   async append(input: AuditEventInput): Promise<AuditEvent> {
@@ -98,7 +152,9 @@ export class PgAuditLog implements AuditLog {
   }
 
   appendMany(inputs: readonly AuditEventInput[]): Promise<AuditEvent[]> {
-    return withTransaction(this.#pool, (c) => appendAuditInTx(c, this.#clock, inputs));
+    return withTransaction(this.#pool, (c) =>
+      appendAuditInTx(c, this.#clock, inputs, this.#shards),
+    );
   }
 
   async list(filter?: { orgId?: string; action?: string; limit?: number }): Promise<AuditEvent[]> {
@@ -107,28 +163,70 @@ export class PgAuditLog implements AuditLog {
     if (filter?.orgId !== undefined) where.push(`org_id = $${params.push(filter.orgId)}`);
     if (filter?.action !== undefined) where.push(`action = $${params.push(filter.action)}`);
     const limit = Math.min(Math.max(filter?.limit ?? 10_000, 1), 10_000);
-    // Newest `limit` events, returned oldest-first (same contract as the in-memory adapter).
-    const sql = `SELECT * FROM (SELECT * FROM audit_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY seq DESC LIMIT ${limit}) t ORDER BY seq`;
+    // Newest `limit` events, returned oldest-first, in global insertion order (same contract as in-memory).
+    const sql = `SELECT * FROM (SELECT * FROM audit_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY gseq DESC LIMIT ${limit}) t ORDER BY gseq`;
     return (await this.#pool.query(sql, params)).rows.map(toEvent);
   }
 
-  /** Streams the whole chain in pages; memory use is bounded regardless of log size. */
-  async verifyChain(): Promise<ChainVerification> {
-    const v = new ChainVerifier();
-    let after = 0;
-    for (;;) {
-      const rows = (
-        await this.#pool.query('SELECT * FROM audit_events WHERE seq > $1 ORDER BY seq LIMIT $2', [
-          after,
-          PAGE,
-        ])
-      ).rows;
-      for (const r of rows) {
-        const failure = v.push(toEvent(r));
-        if (failure) return failure;
+  /**
+   * Verifies every chain (or one organization's) AND that each chain's tail equals its stored head.
+   * Runs in one REPEATABLE READ snapshot: heads and events must be read consistently while writers continue,
+   * otherwise an append landing between the two reads would look like tampering. Streams in pages.
+   */
+  async verifyChain(opts?: VerifyOptions): Promise<ChainVerification> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      let scopeSql = '';
+      const scopeParams: unknown[] = [];
+      if (opts?.orgId !== undefined) {
+        const base = orgChainPrefix(opts.orgId);
+        scopeSql = 'WHERE (chain_id = $1 OR starts_with(chain_id, $2))';
+        scopeParams.push(base, `${base}#`);
       }
-      if (rows.length < PAGE) return v.result();
-      after = Number(rows[rows.length - 1]!.seq);
+      const headRows = (
+        await client.query(
+          `SELECT chain_id, head_seq, head_hash FROM audit_chains ${scopeSql}`,
+          scopeParams,
+        )
+      ).rows;
+      const heads = new Map<string, ChainHead>(
+        headRows.map((r) => [r.chain_id as string, headOf(r)]),
+      );
+      const present = (
+        await client.query(
+          `SELECT chain_id FROM audit_events ${scopeSql} GROUP BY chain_id`,
+          scopeParams,
+        )
+      ).rows.map((r) => r.chain_id as string);
+      const chains = [...new Set([...heads.keys(), ...present])].sort();
+
+      const verified: Array<{ chain: string; seq: number; hash: string }> = [];
+      for (const chain of chains) {
+        const v = new ChainVerifier(chain);
+        let after = 0;
+        for (;;) {
+          const rows = (
+            await client.query(
+              'SELECT * FROM audit_events WHERE chain_id = $1 AND seq > $2 ORDER BY seq LIMIT $3',
+              [chain, after, PAGE],
+            )
+          ).rows;
+          for (const r of rows) {
+            const f = v.push(toEvent(r));
+            if (f) return { ok: false, ...f };
+          }
+          if (rows.length < PAGE) break;
+          after = Number(rows[rows.length - 1]!.seq);
+        }
+        const bad = checkHead(chain, v.tail, heads.get(chain));
+        if (bad) return { ok: false, ...bad };
+        verified.push({ chain, ...v.tail });
+      }
+      return summarize(verified);
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
     }
   }
 }

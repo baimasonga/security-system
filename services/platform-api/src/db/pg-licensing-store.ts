@@ -467,10 +467,12 @@ class PgRepo implements LicensingRepo {
 export class PgLicensingStore extends PgRepo implements LicensingStore {
   readonly #pool: PgPool;
   readonly #clock: Clock;
-  constructor(pool: PgPool, clock: Clock) {
+  readonly #auditShards: number;
+  constructor(pool: PgPool, clock: Clock, opts?: { auditShards?: number }) {
     super(pool, false);
     this.#pool = pool;
     this.#clock = clock;
+    this.#auditShards = opts?.auditShards ?? 1;
   }
 
   transaction<T>(fn: (tx: LicensingTx) => Promise<T>): Promise<T> {
@@ -482,7 +484,7 @@ export class PgLicensingStore extends PgRepo implements LicensingStore {
       }) as unknown as LicensingTx;
       const out = await fn(tx);
       // Last statement before COMMIT, so the chain lock is held only briefly.
-      await appendAuditInTx(client, this.#clock, buffer.drain());
+      await appendAuditInTx(client, this.#clock, buffer.drain(), this.#auditShards);
       return out;
     });
   }

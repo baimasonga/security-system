@@ -98,7 +98,10 @@ export async function createContainer(
     metrics.gauge('db_pool_waiting', () => p.waitingCount);
   }
 
-  const audit: AuditLog = pool ? new PgAuditLog(pool, clock) : new InMemoryAuditLog(clock);
+  const shards = config.auditChainShards;
+  const audit: AuditLog = pool
+    ? new PgAuditLog(pool, clock, { shards })
+    : new InMemoryAuditLog(clock, { shards });
   const telemetrySink: TelemetrySink = pool
     ? new PgTelemetrySink(pool)
     : new InMemoryTelemetrySink();
@@ -108,10 +111,10 @@ export async function createContainer(
     pseudonymKey: config.pseudonymKey,
   });
   const authStore: AuthStore = pool
-    ? new PgAuthStore(pool, clock)
+    ? new PgAuthStore(pool, clock, { auditShards: shards })
     : new InMemoryAuthStore({ audit });
   const licensingStore: LicensingStore = pool
-    ? new PgLicensingStore(pool, clock)
+    ? new PgLicensingStore(pool, clock, { auditShards: shards })
     : new InMemoryLicensingStore({ audit });
   const keyStore = pool ? new PgKeyStore(pool) : undefined;
 

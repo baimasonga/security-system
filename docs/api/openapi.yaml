@@ -385,12 +385,14 @@ paths:
     get:
       tags: [admin]
       security: [{ bearer: [] }]
-      summary: Verify the audit hash chain end to end
+      summary: Verify the partitioned audit hash chains and their heads (ADR-008); optionally only one organization's chains
+      parameters:
+        - { name: org_id, in: query, schema: { type: string } }
       responses:
         {
           '200':
             {
-              description: '{ ok: true, count, head_hash } or { ok: false, broken_at_seq, reason }',
+              description: '{ ok: true, count, chains, anchor } or { ok: false, chain, broken_at_seq, reason }. anchor is a digest of the verified chain heads, to be witnessed externally.',
             },
         }
 

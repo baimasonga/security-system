@@ -119,6 +119,7 @@ export const auditQuery = z
     limit: z.coerce.number().int().min(1).max(500).default(100),
   })
   .strict();
+export const auditVerifyQuery = z.object({ org_id: id.optional() }).strict();
 export const planParams = z.object({ planId: id }).strict();
 export const productParams = z.object({ productId: id }).strict();
 export const subParams = z.object({ orgId: id, subscriptionId: id }).strict();
