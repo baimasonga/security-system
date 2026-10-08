@@ -32,8 +32,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ['services/platform-api/src/config.ts'],
-    rules: { 'security/detect-non-literal-fs-filename': 'off' }, // path comes from operator-controlled env, by design
+    files: ['services/platform-api/src/config.ts', 'services/platform-api/src/db/migrate.ts'],
+    rules: { 'security/detect-non-literal-fs-filename': 'off' }, // paths come from operator-controlled env/CLI arguments, by design
   },
   {
     files: ['**/*.mjs', 'tools/**'],
