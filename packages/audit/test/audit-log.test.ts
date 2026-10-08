@@ -5,6 +5,7 @@ import {
   chainFor,
   computeAnchor,
   computeEventHash,
+  createAnchor,
   isOrgChain,
   verifyEvents,
 } from '../src/index.ts';
@@ -238,5 +239,60 @@ describe('chain assignment and anchor', () => {
     expect(computeAnchor([{ ...heads[0]!, seq: 4 }, heads[1]!])).not.toBe(a);
     expect(computeAnchor([{ ...heads[0]!, hash: 'hx' }, heads[1]!])).not.toBe(a);
     expect(computeAnchor([...heads, { chain: 'org:b', seq: 1, hash: 'x' }])).not.toBe(a);
+  });
+});
+
+describe('external anchoring (ADR-010): what the witness adds', () => {
+  const at = new Date('2026-02-02T00:00:00Z');
+  const ev = (n: number) => ({
+    actor: { type: 'system' as const },
+    action: `a${n}`,
+    orgId: 'org_a',
+  });
+
+  it('a log that fails verification is never anchored', async () => {
+    const log = new InMemoryAuditLog(clock);
+    for (let i = 0; i < 3; i++) await log.append(ev(i));
+    log.unsafeReplaceForTest(1, { ...(await log.list())[1]!, reason: 'edited' });
+    expect(await createAnchor(log, at)).toMatchObject({ ok: false, chain: 'org:org_a' });
+  });
+
+  it('a complete, internally consistent rewrite of a chain verifies on its own but NOT against the witnessed anchor', async () => {
+    const log = new InMemoryAuditLog(clock);
+    for (let i = 0; i < 4; i++) await log.append(ev(i));
+    const r = await createAnchor(log, at);
+    if (!r.ok) throw new Error('expected an anchor');
+    const original = await log.list();
+
+    // The attacker rewrites event 2 and recomputes every later hash and the stored head: a perfect forgery.
+    let prev = original[0]!.hash;
+    for (let i = 1; i < original.length; i++) {
+      const { hash: _h, ...rest } = {
+        ...original[i]!,
+        prevHash: prev,
+        ...(i === 1 ? { reason: 'forged' } : {}),
+      };
+      void _h;
+      const forged = { ...rest, hash: computeEventHash(rest) };
+      log.unsafeReplaceForTest(i, forged);
+      prev = forged.hash;
+    }
+    log.unsafeSetHeadForTest('org:org_a', { seq: 4, hash: prev });
+
+    expect(await log.verifyChain()).toMatchObject({ ok: true }); // undetectable without a witness...
+    expect(await log.checkAnchor(r.manifest)).toMatchObject({ ok: false, chain: 'org:org_a' }); // ...detected with one
+  });
+
+  it('removing a whole chain together with its head is detected only by the witness', async () => {
+    const log = new InMemoryAuditLog(clock);
+    await log.append(ev(0));
+    await log.append({ actor: { type: 'system' }, action: 'b', orgId: 'org_b' });
+    const r = await createAnchor(log, at);
+    if (!r.ok) throw new Error('expected an anchor');
+    const all = await log.list();
+    log.unsafeDeleteForTest(all.findIndex((e) => e.chain === 'org:org_b'));
+    log.unsafeSetHeadForTest('org:org_b', undefined);
+    expect(await log.verifyChain()).toMatchObject({ ok: true });
+    expect(await log.checkAnchor(r.manifest)).toMatchObject({ ok: false, chain: 'org:org_b' });
   });
 });

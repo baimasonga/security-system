@@ -423,7 +423,9 @@ const scenarios: Record<string, () => Promise<void>> = {
     const verify = await new PgAuditLog(new pg.Pool({ connectionString: dbUrl }), {
       now: () => new Date(),
     }).verifyChain();
-    result['verifyChain'] = { ...verify, ms: round(performance.now() - v0, 0) };
+    const { heads: _heads, ...verifySummary } = verify as typeof verify & { heads?: unknown };
+    void _heads;
+    result['verifyChain'] = { ...verifySummary, ms: round(performance.now() - v0, 0) };
     result['rows'] = rows;
   },
 

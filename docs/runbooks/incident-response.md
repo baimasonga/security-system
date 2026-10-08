@@ -44,6 +44,11 @@ Indicator: `GET /v1/admin/audit/verify` returns `ok: false`; signal `audit_chain
 1. SEV2. Do not "repair" rows. Snapshot the database.
 2. Identify `broken_at_seq`; compare with backups/WAL to find the first divergence; determine whether it is corruption or tampering (database triggers reject UPDATE/DELETE, so tampering implies DB-superuser access → escalate to SEV1).
 3. Restore the chain from a verified backup into a forensic copy; document the gap; resume appending only after the commander approves.
+4. **Use the external witness** (ADR-010): fetch the witness's stored manifests from a separate machine and run `DATABASE_URL=… node tools/verify-anchor.ts witness.jsonl` against the suspect database and against the restored copy. The first manifest that no longer holds (`chain@seq`) dates the rewrite; every manifest before it vouches for the history older than that. Anchoring refuses to publish a log that fails verification, so a gap in witnessed anchors begins when tampering began.
+
+### D2. Anchor publication failing (`audit_anchor_publish_total{outcome="failed"}`)
+
+The witness is unreachable or rejecting. Nothing is wrong with the log, but the detection window is growing. Check `GET /v1/admin/audit/anchors` for the recorded `error` (`witness unreachable|timed out|responded <status>`), the URL/token configuration and the witness's own health; after fixing, `POST /v1/admin/audit/anchors` (reason required) publishes immediately.
 
 ## E. Cross-tenant exposure suspected
 

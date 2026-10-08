@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { generateEd25519 } from '@trust/crypto';
 import { Telemetry } from '@trust/telemetry';
+import { anchorStoreContract } from '../anchor-store-contract.ts';
+import { PgAnchorStore } from '../../src/db/pg-anchor-store.ts';
 import { auditLogContract } from '../../../../packages/audit/test/log-contract.ts';
 import { authStoreContract } from '../../../../packages/auth/test/store-contract.ts';
 import { licensingStoreContract } from '../../../../packages/licensing/test/store-contract.ts';
@@ -28,6 +30,7 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
     const pool = createSchemaPool();
     return { store: new PgAuthStore(pool, clock), audited: auditedOf(pool) };
   });
+  anchorStoreContract('postgres', () => new PgAnchorStore(createSchemaPool()));
   auditLogContract('postgres', (clock, opts) => new PgAuditLog(createSchemaPool(), clock, opts));
   licensingStoreContract('postgres', () => {
     const pool = createSchemaPool();
@@ -99,6 +102,32 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
       );
       await expect(pool.query('DELETE FROM audit_events')).rejects.toThrow(/append-only/);
     });
+  });
+
+  it('audit_anchors is append-only at the database level', async () => {
+    const pool = createSchemaPool();
+    const store = new PgAnchorStore(pool);
+    await store.record({
+      id: 'anc_1',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      anchor: 'a'.repeat(64),
+      chains: 1,
+      events: 3,
+      destination: 'https://w.example/a',
+      status: 'published',
+      receipt: null,
+      error: null,
+    });
+    await expect(pool.query("UPDATE audit_anchors SET status = 'failed'")).rejects.toThrow(
+      /append-only/,
+    );
+    await expect(pool.query('DELETE FROM audit_anchors')).rejects.toThrow(/append-only/);
+    await expect(pool.query('TRUNCATE audit_anchors')).rejects.toThrow(/append-only/);
+    await expect(
+      pool.query(
+        "INSERT INTO audit_anchors (id, created_at, anchor, chains, events, destination, status) VALUES ('x', now(), 'not-hex', 0, 0, 'd', 'published')",
+      ),
+    ).rejects.toThrow();
   });
 
   // ---- telemetry --------------------------------------------------------------------------

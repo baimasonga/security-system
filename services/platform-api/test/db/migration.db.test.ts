@@ -34,6 +34,9 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
     const u = new URL(url!);
     u.pathname = `/${dbName}`;
     db = new pg.Client({ connectionString: u.toString() });
+    // DROP DATABASE … WITH (FORCE) in afterAll terminates sessions; a late FATAL 57P01 on a client that is
+    // already closing is expected teardown noise, not a failure.
+    db.on('error', () => undefined);
     await db.connect();
   });
   afterAll(async () => {
@@ -48,11 +51,17 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0001_init',
       '0002_retention_indexes',
       '0003_partitioned_audit',
+      '0004_audit_anchors',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
       applied: [],
-      skipped: ['0001_init', '0002_retention_indexes', '0003_partitioned_audit'],
+      skipped: [
+        '0001_init',
+        '0002_retention_indexes',
+        '0003_partitioned_audit',
+        '0004_audit_anchors',
+      ],
     });
   });
 
@@ -302,6 +311,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         connectionString: new URL(`/${dbName}`, url!).toString(),
         max: 12,
       });
+      pool.on('error', () => undefined); // teardown noise, see afterAll
       const LIMIT = 3;
       const attempt = async (i: number): Promise<'ok' | 'limit'> => {
         const c = await pool.connect();
@@ -352,6 +362,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         connectionString: new URL(`/${dbName}`, url!).toString(),
         max: 10,
       });
+      pool.on('error', () => undefined);
       const consume = () =>
         pool.query(
           `UPDATE challenges SET consumed_at=now() WHERE nonce_hash='nh_race' AND consumed_at IS NULL AND expires_at > now() RETURNING nonce_hash`,

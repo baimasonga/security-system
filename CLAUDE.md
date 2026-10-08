@@ -7,6 +7,7 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 - `npm run check` — format check, lint + architecture boundaries, typecheck, unit/integration/security tests (must pass before any push)
 - `npm run test:db` — PostgreSQL tests against a throwaway cluster (or `DATABASE_URL`); also re-runs the behavioural suites on PG
 - `npm run loadtest -- --scenario <name> …` — open-loop load/soak tool against a real server + PostgreSQL (`--assert-clean` exits non-zero on any error)
+- `DATABASE_URL=… node tools/verify-anchor.ts <manifest|witness.jsonl>` — check the live audit log against anchors held by the external witness (ADR-010)
 - `npm run migrate` — apply SQL migrations (`DATABASE_URL` required)
 - `npm run format` — Prettier write
 - `node tools/gen-lease-vectors.ts > docs/api/lease-test-vectors.json` — only when the lease wire format changes (ADR required)

@@ -33,3 +33,4 @@ Architecture decision records:
 7. [ADR-007 — Shared license lock; retention off the request path](adr/ADR-007-locking-and-retention-under-load.md)
 8. [ADR-008 — Partitioned audit chains](adr/ADR-008-partitioned-audit-chains.md)
 9. [ADR-009 — Fewer database round trips per device flow](adr/ADR-009-fewer-database-round-trips.md)
+10. [ADR-010 — External audit anchor](adr/ADR-010-external-audit-anchor.md)

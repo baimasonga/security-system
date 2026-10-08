@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import { DomainError } from '@trust/shared-types';
 import type { Container } from '../container.ts';
 import { operator, parse, principalOf, toWire } from '../http.ts';
 import {
   auditQuery,
+  anchorManifestBody,
+  anchorsQuery,
   auditVerifyQuery,
   metricsQuery,
   issueLicenseBody,
@@ -174,6 +177,55 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   // Verifies every chain and head (or one organization's chains with ?org_id=). Read-only.
   app.get('/v1/admin/audit/verify', pre, async (req) => {
     const q = parse(auditVerifyQuery, req.query);
-    return toWire(await c.audit.verifyChain(q.org_id ? { orgId: q.org_id } : undefined));
+    const v = await c.audit.verifyChain(q.org_id ? { orgId: q.org_id } : undefined);
+    if (v.ok) {
+      const { heads: _heads, ...summary } = v; // the per-chain list can be huge; it goes to the witness, not here
+      void _heads;
+      return toWire(summary);
+    }
+    return toWire(v);
+  });
+
+  // ---- external anchoring (ADR-010) ----
+  app.get('/v1/admin/audit/anchors', pre, async (req) => {
+    const q = parse(anchorsQuery, req.query);
+    return {
+      configured: c.anchors !== undefined,
+      destination: c.anchors?.destination ?? null,
+      items: toWire(await c.anchorStore.list(q.limit)),
+    };
+  });
+
+  // Publish now (also when nothing changed). Verifies first; a log that fails verification is never anchored.
+  app.post('/v1/admin/audit/anchors', pre, async (req) => {
+    const b = parse(reasonBody, req.body);
+    if (!c.anchors) throw new DomainError('conflict', 'external anchoring is not configured');
+    const out = await c.anchors.publish({ force: true });
+    await c.audit.append({
+      actor: { type: 'operator', id: principalOf(req).userId },
+      action:
+        out.status === 'published'
+          ? 'audit.anchor_published'
+          : out.status === 'failed'
+            ? 'audit.anchor_failed'
+            : 'audit.anchor_refused',
+      reason: b.reason,
+      metadata:
+        out.status === 'published' || out.status === 'failed'
+          ? { anchor: out.record.anchor, chains: out.record.chains, status: out.status }
+          : out.status === 'chain_invalid'
+            ? { chain_invalid: true, broken_at_seq: out.brokenAtSeq }
+            : { status: out.status },
+    });
+    return toWire(out.status === 'published' || out.status === 'failed' ? { ...out.record } : out);
+  });
+
+  // Is the live log consistent with a manifest the witness holds? Read-only (no state change, no reason needed).
+  app.post('/v1/admin/audit/anchors/check', pre, async (req) => {
+    const { manifest } = parse(anchorManifestBody, req.body);
+    const log = await c.audit.verifyChain();
+    if (!log.ok) return toWire({ stage: 'log', ...log });
+    const w = await c.audit.checkAnchor(manifest);
+    return toWire(w.ok ? w : { stage: 'witness', ...w });
   });
 }

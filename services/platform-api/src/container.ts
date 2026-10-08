@@ -14,7 +14,16 @@ import pg from 'pg';
 import type { PlatformConfig } from './config.ts';
 import { MIGRATIONS_DIR, assertSchemaCurrent } from './db/migrate.ts';
 import { setTransactionObserver, type PgPool } from './db/pg.ts';
+import {
+  AnchorPublisher,
+  HttpsAnchorSink,
+  InMemoryAnchorStore,
+  validateAnchorUrl,
+  type AnchorSink,
+  type AnchorStore,
+} from './anchors.ts';
 import { Metrics } from './metrics.ts';
+import { PgAnchorStore } from './db/pg-anchor-store.ts';
 import { PgAuditLog } from './db/pg-audit-log.ts';
 import { PgAuthStore } from './db/pg-auth-store.ts';
 import { PgKeyStore } from './db/pg-key-store.ts';
@@ -31,6 +40,10 @@ export interface Container {
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
   metrics: Metrics;
+  /** Index of published audit anchors (ADR-010). */
+  anchorStore: AnchorStore;
+  /** Present only when an external witness is configured. */
+  anchors: AnchorPublisher | undefined;
   /** Releases pooled resources. Idempotent. */
   close(): Promise<void>;
 }
@@ -40,6 +53,8 @@ export interface ContainerOverrides {
   licensing?: Partial<LicensingConfig>;
   /** Test seam: a ready-made pool (e.g. schema-scoped). Implies postgres persistence. */
   pool?: PgPool;
+  /** Test seam: replaces the HTTPS witness. */
+  anchorSink?: AnchorSink;
 }
 
 /** Serializes background writes (key persistence, key audit) and surfaces failures at `flush()`. */
@@ -204,6 +219,33 @@ export async function createContainer(
     orgExists: (id) => auth.orgExists(id),
   });
 
+  const anchorStore: AnchorStore = pool ? new PgAnchorStore(pool) : new InMemoryAnchorStore();
+  const sink =
+    overrides?.anchorSink ??
+    (config.auditAnchor
+      ? new HttpsAnchorSink(
+          validateAnchorUrl(config.auditAnchor.url, config.env === 'production'),
+          {
+            token: config.auditAnchor.token,
+          },
+        )
+      : undefined);
+  const anchors = sink
+    ? new AnchorPublisher({
+        audit,
+        store: anchorStore,
+        sink,
+        clock,
+        metrics,
+        // A log that fails verification is never witnessed; it is a critical security signal instead.
+        onChainInvalid: (f) =>
+          telemetry.signal('audit_chain_broken', {
+            attributes: { broken_at_seq: f.brokenAtSeq, reason: f.reason },
+          }),
+      })
+    : undefined;
+  await anchors?.init();
+
   let closed = false;
   return {
     config,
@@ -215,6 +257,8 @@ export async function createContainer(
     telemetry,
     telemetrySink,
     metrics,
+    anchorStore,
+    anchors,
     async close() {
       if (closed) return;
       closed = true;

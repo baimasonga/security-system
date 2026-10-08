@@ -1,6 +1,7 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createContainer } from './container.ts';
+import { startAnchoring } from './anchors.ts';
 import { startMaintenance } from './maintenance.ts';
 
 const config = loadConfig();
@@ -36,4 +37,28 @@ const maintenance = startMaintenance(container, {
     ),
 });
 app.addHook('onClose', async () => maintenance.stop());
+if (container.anchors && config.auditAnchor) {
+  const anchoring = startAnchoring(container.anchors, {
+    everyMs: config.auditAnchor.intervalSeconds * 1000,
+    onError: (e) =>
+      app.log.error(
+        { err: { name: (e as Error)?.name, message: (e as Error)?.message } },
+        'audit anchoring failed',
+      ),
+    onOutcome: (o) => {
+      if (o.status === 'chain_invalid')
+        app.log.error(
+          { chain: o.chain, brokenAtSeq: o.brokenAtSeq, reason: o.reason },
+          'AUDIT LOG FAILED VERIFICATION: not anchored',
+        );
+      else if (o.status === 'failed')
+        app.log.warn({ error: o.record.error }, 'audit anchor not published');
+    },
+  });
+  app.addHook('onClose', async () => anchoring.stop());
+} else if (config.env === 'production') {
+  app.log.warn(
+    'audit anchoring is DISABLED: a database superuser could rewrite history undetected (R-13)',
+  );
+}
 await app.listen({ host: config.host, port: config.port });

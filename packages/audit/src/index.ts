@@ -44,9 +44,30 @@ export interface ChainHead {
   hash: string;
 }
 
+export interface ChainTail {
+  chain: string;
+  seq: number;
+  hash: string;
+}
+
 export type ChainVerification =
-  | { ok: true; count: number; chains: number; anchor: string }
+  | { ok: true; count: number; chains: number; anchor: string; heads: ChainTail[] }
   | { ok: false; chain: string; brokenAtSeq: number; reason: string };
+
+/**
+ * What is published to an external append-only witness (ADR-010). Snake_case on purpose: this is a wire format
+ * that outlives the process. `anchor` is a digest of `chains` (see `computeAnchor`).
+ */
+export interface AnchorManifest {
+  v: 1;
+  created_at: string;
+  anchor: string;
+  chains: ChainTail[];
+}
+
+export type AnchorCheck =
+  | { ok: true; chains: number }
+  | { ok: false; chain: string | null; seq: number | null; reason: string };
 
 export interface VerifyOptions {
   /** Verify only this organization's chains (all of its shards). The `system`/`legacy` chains are skipped. */
@@ -87,6 +108,12 @@ export interface AuditLog {
   list(filter?: { orgId?: string; action?: string; limit?: number }): Promise<AuditEvent[]>;
   /** Verifies every chain (or one organization's) including that each chain's tail equals its stored head. */
   verifyChain(opts?: VerifyOptions): Promise<ChainVerification>;
+  /**
+   * Checks a manifest that was witnessed earlier: every `(chain, seq, hash)` in it must still be the event stored
+   * at that position. Together with a successful `verifyChain` (which proves each chain is internally linked)
+   * this proves nothing up to the witnessed position was rewritten, removed, or re-created.
+   */
+  checkAnchor(manifest: AnchorManifest): Promise<AnchorCheck>;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -270,15 +297,84 @@ export function computeAnchor(
   return sha256Hex(canonicalJson(sorted.map((h) => [h.chain, h.seq, h.hash])));
 }
 
-export function summarize(
-  chains: ReadonlyArray<{ chain: string; seq: number; hash: string }>,
-): ChainVerification {
+export function summarize(chains: ReadonlyArray<ChainTail>): ChainVerification {
+  const heads = [...chains].sort((a, b) => (a.chain < b.chain ? -1 : a.chain > b.chain ? 1 : 0));
   return {
     ok: true,
-    count: chains.reduce((n, c) => n + c.seq, 0),
-    chains: chains.length,
-    anchor: computeAnchor(chains),
+    count: heads.reduce((n, c) => n + c.seq, 0),
+    chains: heads.length,
+    anchor: computeAnchor(heads),
+    heads,
   };
+}
+
+export function buildManifest(
+  v: Extract<ChainVerification, { ok: true }>,
+  at: Date,
+): AnchorManifest {
+  return { v: 1, created_at: at.toISOString(), anchor: v.anchor, chains: v.heads };
+}
+
+/**
+ * Verifies the log and, only if it is intact, returns the manifest to witness. A log that fails verification
+ * is never anchored: witnessing a broken log would bless the tampering.
+ */
+export async function createAnchor(
+  log: Pick<AuditLog, 'verifyChain'>,
+  at: Date,
+): Promise<{ ok: true; manifest: AnchorManifest } | Extract<ChainVerification, { ok: false }>> {
+  const v = await log.verifyChain();
+  return v.ok ? { ok: true, manifest: buildManifest(v, at) } : v;
+}
+
+/** Structural checks on a manifest (independent of any log). Returns a reason, or undefined if well-formed. */
+export function manifestProblem(m: AnchorManifest): string | undefined {
+  if (m.v !== 1) return 'unsupported manifest version';
+  if (!Array.isArray(m.chains)) return 'chains missing';
+  const seen = new Set<string>();
+  for (const c of m.chains) {
+    if (
+      typeof c.chain !== 'string' ||
+      !Number.isInteger(c.seq) ||
+      c.seq < 1 ||
+      typeof c.hash !== 'string'
+    )
+      return 'malformed chain entry';
+    if (seen.has(c.chain)) return 'duplicate chain entry';
+    seen.add(c.chain);
+  }
+  // Public values; constant-time comparison is not required.
+  // eslint-disable-next-line security/detect-possible-timing-attacks
+  if (computeAnchor(m.chains) !== m.anchor) return 'anchor does not match the listed chains';
+  return undefined;
+}
+
+/** Shared comparison: `lookup` returns the stored hash at (chain, seq) or undefined when no such event exists. */
+export function checkManifest(
+  m: AnchorManifest,
+  lookup: (chain: string, seq: number) => string | undefined,
+): AnchorCheck {
+  const bad = manifestProblem(m);
+  if (bad) return { ok: false, chain: null, seq: null, reason: bad };
+  for (const c of m.chains) {
+    const stored = lookup(c.chain, c.seq);
+    if (stored === undefined)
+      return {
+        ok: false,
+        chain: c.chain,
+        seq: c.seq,
+        reason: 'witnessed event is missing (removed or truncated)',
+      };
+    // eslint-disable-next-line security/detect-possible-timing-attacks
+    if (stored !== c.hash)
+      return {
+        ok: false,
+        chain: c.chain,
+        seq: c.seq,
+        reason: 'witnessed event was altered or replaced',
+      };
+  }
+  return { ok: true, chains: m.chains.length };
 }
 
 /** Pure verification of an in-memory event list plus its heads (used by the in-memory adapter and tests). */
@@ -363,6 +459,14 @@ export class InMemoryAuditLog implements AuditLog {
 
   async verifyChain(opts?: VerifyOptions): Promise<ChainVerification> {
     return verifyEvents(this.#events, this.#heads, opts);
+  }
+
+  async checkAnchor(manifest: AnchorManifest): Promise<AnchorCheck> {
+    return checkManifest(
+      manifest,
+      (chain, seq) =>
+        this.#events.find((e) => (e.chain ?? LEGACY_CHAIN) === chain && e.seq === seq)?.hash,
+    );
   }
 
   /** Test seams: simulate an attacker with direct storage access. Not part of the port. */

@@ -4,9 +4,13 @@ import {
   LEGACY_CHAIN,
   buildRun,
   checkHead,
+  checkManifest,
+  manifestProblem,
   orgChainPrefix,
   planAppend,
   summarize,
+  type AnchorCheck,
+  type AnchorManifest,
   type AuditEvent,
   type AuditEventInput,
   type AuditLog,
@@ -166,6 +170,24 @@ export class PgAuditLog implements AuditLog {
     // Newest `limit` events, returned oldest-first, in global insertion order (same contract as in-memory).
     const sql = `SELECT * FROM (SELECT * FROM audit_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY gseq DESC LIMIT ${limit}) t ORDER BY gseq`;
     return (await this.#pool.query(sql, params)).rows.map(toEvent);
+  }
+
+  /** One indexed lookup per witnessed `(chain, seq)` (primary key), done in a single statement. */
+  async checkAnchor(manifest: AnchorManifest): Promise<AnchorCheck> {
+    const bad = manifestProblem(manifest);
+    if (bad) return { ok: false, chain: null, seq: null, reason: bad };
+    const rows = (
+      await this.#pool.query(
+        `SELECT e.chain_id, e.seq, e.hash
+           FROM unnest($1::text[], $2::bigint[]) AS w(chain_id, seq)
+           JOIN audit_events e ON e.chain_id = w.chain_id AND e.seq = w.seq`,
+        [manifest.chains.map((c) => c.chain), manifest.chains.map((c) => c.seq)],
+      )
+    ).rows;
+    const stored = new Map<string, string>(
+      rows.map((r) => [`${r.chain_id}\u0000${Number(r.seq)}`, r.hash as string]),
+    );
+    return checkManifest(manifest, (chain, seq) => stored.get(`${chain}\u0000${seq}`));
   }
 
   /**

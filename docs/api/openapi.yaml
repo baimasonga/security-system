@@ -396,6 +396,86 @@ paths:
             },
         }
 
+  /v1/admin/audit/anchors:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Recent audit anchors published to the external witness (metadata only; ADR-010)
+      parameters:
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 20 },
+          }
+      responses:
+        {
+          '200':
+            {
+              description: '{ configured, destination, items[] } newest first; each item has anchor, chains, events, status, receipt, error',
+            },
+        }
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Verify the whole audit log and publish its anchor to the witness now (operator, reason required, audited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [reason],
+                additionalProperties: false,
+                properties: { reason: { type: string } },
+              }
+      responses:
+        {
+          '200':
+            {
+              description: 'The anchor record (status published or failed), or { status: chain_invalid, chain, broken_at_seq, reason } when the log failed verification and was NOT anchored',
+            },
+          '409': { description: External anchoring is not configured },
+        }
+  /v1/admin/audit/anchors/check:
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Check the live log against a manifest held by the witness (read-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [manifest],
+                additionalProperties: false,
+                properties:
+                  {
+                    manifest:
+                      {
+                        type: object,
+                        required: [v, created_at, anchor, chains],
+                        additionalProperties: false,
+                        properties:
+                          {
+                            v: { type: integer, enum: [1] },
+                            created_at: { type: string },
+                            anchor: { type: string },
+                            chains: { type: array, maxItems: 5000, items: { type: object } },
+                          },
+                      },
+                  },
+              }
+      responses:
+        {
+          '200':
+            {
+              description: '{ ok: true, chains } or { ok: false, stage: log|witness, chain, seq, reason }',
+            },
+        }
+
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }

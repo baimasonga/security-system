@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { GENESIS_HASH, computeEventHash } from '@trust/audit';
+import { GENESIS_HASH, computeEventHash, createAnchor } from '@trust/audit';
 import { createSchemaPool } from '../../../../tests/support/pg.ts';
 import { applyMigrations } from '../../src/db/migrate.ts';
 import { PgAuditLog } from '../../src/db/pg-audit-log.ts';
@@ -153,6 +153,88 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
     });
   });
 
+  describe('external anchor (ADR-010)', () => {
+    const at = new Date('2026-02-02T00:00:00Z');
+
+    it('a perfect, self-consistent rewrite passes verifyChain but fails the witnessed anchor; growth does not', async () => {
+      const pool = createSchemaPool();
+      const log = new PgAuditLog(pool, clock);
+      for (let i = 0; i < 4; i++) await log.append({ actor: sys, action: `a${i}`, orgId: 'org_a' });
+      await log.append({ actor: sys, action: 'b', orgId: 'org_b' });
+      const r = await createAnchor(log, at);
+      if (!r.ok) throw new Error('expected an anchor');
+      expect(r.manifest.chains.map((c) => [c.chain, c.seq])).toEqual([
+        ['org:org_a', 4],
+        ['org:org_b', 1],
+      ]);
+
+      await log.append({ actor: sys, action: 'later', orgId: 'org_a' });
+      expect(await log.checkAnchor(r.manifest)).toEqual({ ok: true, chains: 2 });
+
+      // A superuser disables the triggers and rewrites event 2 of org_a, recomputing every later hash and the head.
+      const evs = (await log.list({ orgId: 'org_a' })).filter((e) => e.chain === 'org:org_a');
+      await pool.query('ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update');
+      let prev = evs[0]!.hash;
+      for (const e of evs.slice(1)) {
+        const { hash: _h, ...rest } = {
+          ...e,
+          prevHash: prev,
+          reason: e.seq === 2 ? 'forged' : e.reason,
+        };
+        void _h;
+        const hash = computeEventHash(rest);
+        await pool.query(
+          'UPDATE audit_events SET reason = $3, prev_hash = $4, hash = $5 WHERE chain_id = $1 AND seq = $2',
+          ['org:org_a', e.seq, rest.reason, prev, hash],
+        );
+        prev = hash;
+      }
+      await pool.query('ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_update');
+      await pool.query("UPDATE audit_chains SET head_hash = $1 WHERE chain_id = 'org:org_a'", [
+        prev,
+      ]);
+
+      expect(await log.verifyChain()).toMatchObject({ ok: true }); // self-consistent: only a witness can tell
+      expect(await log.checkAnchor(r.manifest)).toMatchObject({ ok: false, chain: 'org:org_a' });
+    });
+
+    it('detects a chain removed together with its head row, and a rolled-back log', async () => {
+      const pool = createSchemaPool();
+      const log = new PgAuditLog(pool, clock);
+      await log.append({ actor: sys, action: 'a', orgId: 'org_a' });
+      await log.append({ actor: sys, action: 'b', orgId: 'org_b' });
+      await log.append({ actor: sys, action: 'b2', orgId: 'org_b' });
+      const r = await createAnchor(log, at);
+      if (!r.ok) throw new Error('expected an anchor');
+      await pool.query('ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update');
+      await pool.query('ALTER TABLE audit_chains DISABLE TRIGGER audit_chains_no_regress');
+      await pool.query("DELETE FROM audit_events WHERE chain_id = 'org:org_a'");
+      await pool.query("DELETE FROM audit_chains WHERE chain_id = 'org:org_a'");
+      expect(await log.verifyChain()).toMatchObject({ ok: true });
+      expect(await log.checkAnchor(r.manifest)).toMatchObject({ ok: false, chain: 'org:org_a' });
+      // roll org_b back to its first event (events and head)
+      await pool.query("DELETE FROM audit_events WHERE chain_id = 'org:org_b' AND seq = 2");
+      const first = (
+        await pool.query("SELECT hash FROM audit_events WHERE chain_id='org:org_b' AND seq=1")
+      ).rows[0]!.hash;
+      await pool.query(
+        "UPDATE audit_chains SET head_seq = 1, head_hash = $1 WHERE chain_id = 'org:org_b'",
+        [first],
+      );
+      expect(await log.verifyChain()).toMatchObject({ ok: true });
+      const only_b = {
+        ...r.manifest,
+        chains: r.manifest.chains.filter((c) => c.chain === 'org:org_b'),
+      };
+      only_b.anchor = (await import('@trust/audit')).computeAnchor(only_b.chains);
+      expect(await log.checkAnchor(only_b)).toMatchObject({
+        ok: false,
+        chain: 'org:org_b',
+        seq: 2,
+      });
+    });
+  });
+
   describe('upgrade from the single global chain (0001+0002 → 0003)', () => {
     let admin: pg.Client;
     let db: pg.Client;
@@ -207,6 +289,7 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
 
       expect((await applyMigrations(db, migrationsDir)).applied).toEqual([
         '0003_partitioned_audit',
+        '0004_audit_anchors',
       ]);
       const head = (
         await db.query("SELECT head_seq, head_hash FROM audit_chains WHERE chain_id='legacy'")
@@ -233,4 +316,90 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
       ).rejects.toThrow(/append-only/);
     });
   });
+});
+
+describe.skipIf(!url)('anchor publication and the offline checker on PostgreSQL (ADR-010)', () => {
+  it('publishes through the real container wiring, records it, and tools/verify-anchor.ts agrees — then catches a forgery', async () => {
+    const { createContainer } = await import('../../src/container.ts');
+    const { loadConfig } = await import('../../src/config.ts');
+    const { spawnSync } = await import('node:child_process');
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { computeAnchor } = await import('@trust/audit');
+    const { generateEd25519 } = await import('@trust/crypto');
+
+    const pool = createSchemaPool();
+    await pool.query('SELECT 1');
+    const schema = (await pool.query('SHOW search_path')).rows[0]!.search_path as string;
+    const witnessed: unknown[] = [];
+    const c = await createContainer(
+      {
+        ...loadConfig({ NODE_ENV: 'test' } as NodeJS.ProcessEnv),
+        signingKeyPem: generateEd25519()
+          .privateKey.export({ type: 'pkcs8', format: 'pem' })
+          .toString(),
+        scrypt: { N: 1024, r: 8, p: 1 },
+      },
+      {
+        pool,
+        anchorSink: {
+          destination: 'https://witness.example/anchors',
+          publish: async (m) => (witnessed.push(m), { receipt: 'rcpt-1' }),
+        },
+      },
+    );
+    try {
+      await c.auth.register({ email: 'a@example.test', password: 'correct horse battery' });
+      await c.auth.register({ email: 'b@example.test', password: 'correct horse battery' });
+      const out = await c.anchors!.publish();
+      expect(out).toMatchObject({ status: 'published', record: { receipt: 'rcpt-1' } });
+      expect(
+        (await pool.query('SELECT status, chains, events, destination FROM audit_anchors')).rows,
+      ).toEqual([
+        {
+          status: 'published',
+          chains: expect.any(Number),
+          events: expect.stringMatching(/^\d+$/),
+          destination: 'https://witness.example/anchors',
+        },
+      ]);
+      const manifest = witnessed[0] as {
+        anchor: string;
+        chains: Array<{ chain: string; seq: number; hash: string }>;
+      };
+      expect(manifest.chains.length).toBeGreaterThanOrEqual(2);
+
+      const dir = mkdtempSync(join(tmpdir(), 'anchor-'));
+      const file = join(dir, 'manifest.json');
+      writeFileSync(file, JSON.stringify(manifest));
+      const run = (path: string) =>
+        spawnSync('node', ['tools/verify-anchor.ts', path], {
+          env: { ...process.env, DATABASE_URL: url!, PGOPTIONS: `-c search_path=${schema}` },
+          encoding: 'utf8',
+        });
+      const ok = run(file);
+      expect(ok.status, ok.stderr).toBe(0);
+      expect(ok.stdout).toMatch(/OK: .* 1 witnessed anchor/);
+
+      // A forged manifest (as if the history had been replaced) must fail the checker.
+      const forged = {
+        ...manifest,
+        chains: manifest.chains.map((x, i) => (i === 0 ? { ...x, hash: 'c'.repeat(64) } : x)),
+      };
+      forged.anchor = computeAnchor(forged.chains);
+      writeFileSync(file, JSON.stringify(forged));
+      const bad = run(file);
+      expect(bad.status).toBe(1);
+      expect(bad.stderr).toMatch(/FAIL anchor #1/);
+
+      // JSON Lines (as the reference witness writes it): every manifest in the file is checked.
+      writeFileSync(
+        file,
+        [JSON.stringify({ manifest }), JSON.stringify({ manifest: forged })].join('\n'),
+      );
+      expect(run(file).status).toBe(1);
+      expect(run(join(dir, 'missing.json')).status).toBe(2);
+    } finally {
+      await c.close();
+    }
+  }, 60_000);
 });

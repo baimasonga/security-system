@@ -120,6 +120,33 @@ export const auditQuery = z
   })
   .strict();
 export const auditVerifyQuery = z.object({ org_id: id.optional() }).strict();
+export const anchorsQuery = z
+  .object({ limit: z.coerce.number().int().min(1).max(200).default(20) })
+  .strict();
+const hex64 = z.string().regex(/^[0-9a-f]{64}$/);
+/** A manifest as published to the witness. Large logs: check with tools/verify-anchor.ts instead. */
+export const anchorManifestBody = z
+  .object({
+    manifest: z
+      .object({
+        v: z.literal(1),
+        created_at: z.string().max(40),
+        anchor: hex64,
+        chains: z
+          .array(
+            z
+              .object({
+                chain: z.string().min(1).max(300),
+                seq: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+                hash: hex64,
+              })
+              .strict(),
+          )
+          .max(5000),
+      })
+      .strict(),
+  })
+  .strict();
 export const planParams = z.object({ planId: id }).strict();
 export const productParams = z.object({ productId: id }).strict();
 export const subParams = z.object({ orgId: id, subscriptionId: id }).strict();

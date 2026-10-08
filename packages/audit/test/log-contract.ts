@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GENESIS_HASH, type AuditLog } from '../src/index.ts';
+import { GENESIS_HASH, computeAnchor, createAnchor, type AuditLog } from '../src/index.ts';
 
 const clock = { now: () => new Date('2026-01-01T00:00:00.123Z') };
 
@@ -225,6 +225,95 @@ export function auditLogContract(
           count: 60,
           chains: chains.size,
         });
+      });
+    });
+
+    describe('external anchoring (ADR-010)', () => {
+      const ev = (orgId: string | undefined, n: number) => ({
+        actor: { type: 'system' as const },
+        action: `a${n}`,
+        ...(orgId ? { orgId } : {}),
+      });
+      const at = new Date('2026-02-02T00:00:00Z');
+
+      it('anchors an empty log and a populated one; the manifest lists every chain head and its digest', async () => {
+        const log = await make(clock);
+        const empty = await createAnchor(log, at);
+        expect(empty).toMatchObject({
+          ok: true,
+          manifest: { v: 1, chains: [], created_at: at.toISOString() },
+        });
+        for (let i = 0; i < 3; i++) await log.append(ev('org_a', i));
+        await log.append(ev('org_b', 0));
+        await log.append(ev(undefined, 0));
+        const r = await createAnchor(log, at);
+        if (!r.ok) throw new Error('expected an anchor');
+        expect(r.manifest.chains.map((c) => [c.chain, c.seq])).toEqual([
+          ['org:org_a', 3],
+          ['org:org_b', 1],
+          ['system', 1],
+        ]);
+        expect(r.manifest.anchor).toBe(computeAnchor(r.manifest.chains));
+        expect((await log.verifyChain()) as { anchor: string }).toMatchObject({
+          anchor: r.manifest.anchor,
+        });
+      });
+
+      it('a witnessed manifest keeps checking out while the log grows, and fails if a witnessed event is not there', async () => {
+        const log = await make(clock);
+        for (let i = 0; i < 3; i++) await log.append(ev('org_a', i));
+        const r = await createAnchor(log, at);
+        if (!r.ok) throw new Error('expected an anchor');
+        expect(await log.checkAnchor(r.manifest)).toEqual({ ok: true, chains: 1 });
+        for (let i = 0; i < 5; i++) await log.append(ev('org_a', 10 + i)); // growth is fine
+        await log.append(ev('org_new', 0));
+        expect(await log.checkAnchor(r.manifest)).toEqual({ ok: true, chains: 1 });
+
+        const m = r.manifest;
+        // a witnessed position beyond what the log has (the log was rolled back to an older state)
+        const longer = { ...m, chains: [{ ...m.chains[0]!, seq: 99 }] };
+        longer.anchor = computeAnchor(longer.chains);
+        expect(await log.checkAnchor(longer)).toMatchObject({
+          ok: false,
+          chain: 'org:org_a',
+          seq: 99,
+        });
+        // a witnessed hash that differs from the stored event (the history was replaced)
+        const other = { ...m, chains: [{ ...m.chains[0]!, hash: 'f'.repeat(64) }] };
+        other.anchor = computeAnchor(other.chains);
+        expect(await log.checkAnchor(other)).toMatchObject({
+          ok: false,
+          reason: expect.stringContaining('altered'),
+        });
+        // a witnessed chain that no longer exists at all
+        const gone = { ...m, chains: [{ chain: 'org:org_gone', seq: 1, hash: 'a'.repeat(64) }] };
+        gone.anchor = computeAnchor(gone.chains);
+        expect(await log.checkAnchor(gone)).toMatchObject({ ok: false, chain: 'org:org_gone' });
+      });
+
+      it('rejects malformed or self-inconsistent manifests', async () => {
+        const log = await make(clock);
+        await log.append(ev('org_a', 0));
+        const r = await createAnchor(log, at);
+        if (!r.ok) throw new Error('expected an anchor');
+        const m = r.manifest;
+        const bad: Array<[string, unknown]> = [
+          ['wrong anchor', { ...m, anchor: '0'.repeat(64) }],
+          ['wrong version', { ...m, v: 2 }],
+          [
+            'duplicate chain',
+            {
+              ...m,
+              chains: [m.chains[0], m.chains[0]],
+              anchor: computeAnchor([m.chains[0]!, m.chains[0]!]),
+            },
+          ],
+          ['seq zero', { ...m, chains: [{ ...m.chains[0], seq: 0 }] }],
+          ['not a list', { ...m, chains: 'x' }],
+        ];
+        for (const [name, manifest] of bad) {
+          expect(await log.checkAnchor(manifest as never), name).toMatchObject({ ok: false });
+        }
       });
     });
   });

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { ScryptParams } from '@trust/auth';
+import { validateAnchorUrl } from './anchors.ts';
 
 export interface PlatformConfig {
   env: 'development' | 'test' | 'production';
@@ -23,6 +24,11 @@ export interface PlatformConfig {
   maintenanceIntervalSeconds: number;
   /** Audit chains per organization (ADR-008). 1 = one chain per organization. */
   auditChainShards: number;
+  /**
+   * External witness for the audit log (ADR-010). Undefined = anchoring off (development, or production with the
+   * risk explicitly accepted via AUDIT_ANCHOR_DISABLED=true).
+   */
+  auditAnchor: { url: string; token: string | undefined; intervalSeconds: number } | undefined;
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
   scrypt?: ScryptParams;
   rateLimits: {
@@ -100,6 +106,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
 
   const auditChainShards = optInt('AUDIT_CHAIN_SHARDS', 1, 64) ?? 1;
 
+  // Audit anchoring: production must either witness the log externally or say, explicitly, that it does not.
+  const anchorUrl = env['AUDIT_ANCHOR_URL'];
+  const anchorToken = env['AUDIT_ANCHOR_TOKEN'];
+  if (anchorToken !== undefined && anchorToken.length < 16)
+    throw new Error('AUDIT_ANCHOR_TOKEN must be at least 16 characters');
+  if (anchorToken !== undefined && !anchorUrl)
+    throw new Error('AUDIT_ANCHOR_TOKEN is set without AUDIT_ANCHOR_URL');
+  if (prod && !anchorUrl && env['AUDIT_ANCHOR_DISABLED'] !== 'true')
+    throw new Error(
+      'AUDIT_ANCHOR_URL is required in production (set AUDIT_ANCHOR_DISABLED=true to accept that history rewrites by a database superuser go undetected)',
+    );
+  const auditAnchor = anchorUrl
+    ? {
+        url: validateAnchorUrl(anchorUrl, prod).toString(),
+        token: anchorToken,
+        intervalSeconds: optInt('AUDIT_ANCHOR_INTERVAL_SECONDS', 60, 86400) ?? 3600,
+      }
+    : undefined;
+
   const logLevel = (env['LOG_LEVEL'] ?? 'info') as PlatformConfig['logLevel'];
   if (!['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'].includes(logLevel)) {
     throw new Error('invalid LOG_LEVEL');
@@ -124,6 +149,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     leaseRetentionSeconds,
     maintenanceIntervalSeconds,
     auditChainShards,
+    auditAnchor,
     logLevel,
     rateLimits: {
       global: limit(env, 'RATE_LIMIT_GLOBAL', 300),

@@ -30,7 +30,13 @@ describe('loadConfig — fail closed', () => {
       /requires PERSISTENCE=postgres/,
     );
     expect(() => loadConfig(env(base))).toThrow(/DATABASE_URL is required/); // postgres is the production default
-    const ok = loadConfig(env({ ...base, DATABASE_URL: 'postgres://u:p@db/trust' }));
+    const ok = loadConfig(
+      env({
+        ...base,
+        DATABASE_URL: 'postgres://u:p@db/trust',
+        AUDIT_ANCHOR_URL: 'https://witness.example/anchors',
+      }),
+    );
     expect(ok).toMatchObject({ persistence: 'postgres', env: 'production' });
   });
 
@@ -88,5 +94,57 @@ describe('loadConfig — operational knobs', () => {
     for (const bad of bads) {
       expect(() => loadConfig(env(bad)), JSON.stringify(bad)).toThrow();
     }
+  });
+});
+
+describe('loadConfig — audit anchoring (ADR-010)', () => {
+  const prod = {
+    NODE_ENV: 'production',
+    LICENSE_KEY_PEPPER: STRONG,
+    PSEUDONYM_KEY: STRONG,
+    LICENSE_SIGNING_KEY_PEM: 'pem',
+    DATABASE_URL: 'postgres://u:p@db/trust',
+  };
+
+  it('production must name a witness or explicitly accept the risk; development defaults to off', () => {
+    expect(() => loadConfig(env(prod))).toThrow(/AUDIT_ANCHOR_URL is required/);
+    expect(loadConfig(env({ ...prod, AUDIT_ANCHOR_DISABLED: 'true' })).auditAnchor).toBeUndefined();
+    expect(() => loadConfig(env({ ...prod, AUDIT_ANCHOR_DISABLED: 'yes' }))).toThrow(
+      /AUDIT_ANCHOR_URL is required/,
+    );
+    expect(loadConfig(env({})).auditAnchor).toBeUndefined();
+  });
+
+  it('accepts a validated https witness with an optional token and interval; refuses weak or inconsistent settings', () => {
+    const c = loadConfig(
+      env({
+        ...prod,
+        AUDIT_ANCHOR_URL: 'https://w.example/a',
+        AUDIT_ANCHOR_TOKEN: 't'.repeat(20),
+        AUDIT_ANCHOR_INTERVAL_SECONDS: '600',
+      }),
+    );
+    expect(c.auditAnchor).toEqual({
+      url: 'https://w.example/a',
+      token: 't'.repeat(20),
+      intervalSeconds: 600,
+    });
+    expect(
+      loadConfig(env({ ...prod, AUDIT_ANCHOR_URL: 'https://w.example/a' })).auditAnchor
+        ?.intervalSeconds,
+    ).toBe(3600);
+    const bads: Array<Record<string, string>> = [
+      { ...prod, AUDIT_ANCHOR_URL: 'http://w.example/a' },
+      { ...prod, AUDIT_ANCHOR_URL: 'http://127.0.0.1:9/a' }, // loopback http is for development only
+      { ...prod, AUDIT_ANCHOR_URL: 'https://u:p@w.example/a' },
+      { ...prod, AUDIT_ANCHOR_URL: 'https://w.example/a', AUDIT_ANCHOR_TOKEN: 'short' },
+      { ...prod, AUDIT_ANCHOR_URL: 'https://w.example/a', AUDIT_ANCHOR_INTERVAL_SECONDS: '5' },
+      { ...prod, AUDIT_ANCHOR_URL: 'https://w.example/a', AUDIT_ANCHOR_INTERVAL_SECONDS: '999999' },
+      { AUDIT_ANCHOR_TOKEN: 't'.repeat(20) }, // token without a URL
+    ];
+    for (const bad of bads) expect(() => loadConfig(env(bad)), JSON.stringify(bad)).toThrow();
+    expect(loadConfig(env({ AUDIT_ANCHOR_URL: 'http://127.0.0.1:9/a' })).auditAnchor?.url).toBe(
+      'http://127.0.0.1:9/a',
+    );
   });
 });
