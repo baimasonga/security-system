@@ -1,4 +1,4 @@
--- Run ONCE as the project owner (the `postgres` role in the Supabase SQL editor). See docs/deploy/supabase.md.
+-- Run as the project owner (the `postgres` role in the Supabase SQL editor). See docs/deploy/supabase.md.
 -- (Written for Supabase, where the roles anon, authenticated and service_role exist; on other platforms drop section 4.)
 -- Replace the password; generate it with a password manager (>= 24 random characters). Do not commit the result.
 
@@ -6,7 +6,16 @@
 CREATE SCHEMA IF NOT EXISTS trust;
 
 -- 2. The application's role. It owns nothing; `npm run db:grants` gives it exactly the privileges it needs.
-CREATE ROLE trust_app LOGIN PASSWORD 'CHANGE-ME-generate-a-long-random-password' CONNECTION LIMIT 40;
+--    This whole script can be run again safely.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'trust_app') THEN
+    CREATE ROLE trust_app LOGIN;
+  END IF;
+END
+$$;
+-- Safe to re-run: this also (re)sets the password of an existing role.
+ALTER ROLE trust_app WITH LOGIN CONNECTION LIMIT 40 PASSWORD 'CHANGE-ME-generate-a-long-random-password';
 
 -- 3. Role-level settings travel through connection poolers (startup options do not).
 ALTER ROLE trust_app SET search_path = trust;
