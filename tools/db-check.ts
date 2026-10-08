@@ -2,7 +2,7 @@
 // encrypted, tables in a private schema, no superuser/owner/DDL rights, audit tables append-only for the role,
 // API roles locked out. Exit 0 = no failures (warnings allowed), 1 = at least one failure, 2 = usage.
 import pg from 'pg';
-import { poolSettings } from '../services/platform-api/src/db/connection.ts';
+import { poolSettings, readCaPem } from '../services/platform-api/src/db/connection.ts';
 import { MIGRATIONS_DIR } from '../services/platform-api/src/db/migrate.ts';
 import { evaluate, gatherFacts } from '../services/platform-api/src/db/profile-check.ts';
 import { readFileSync } from 'node:fs';
@@ -12,10 +12,8 @@ if (!url) {
   console.error('DATABASE_URL (the application connection) is required');
   process.exit(2);
 }
-const ca = process.env['DATABASE_CA_FILE'];
-const pool = new pg.Pool(
-  poolSettings({ databaseUrl: url, max: 1, caPem: ca ? readFileSync(ca, 'utf8') : undefined }),
-);
+const ca = readCaPem(process.env, (p) => readFileSync(p, 'utf8'));
+const pool = new pg.Pool(poolSettings({ databaseUrl: url, max: 1, caPem: ca }));
 try {
   const facts = await gatherFacts(pool, {
     host: new URL(url).hostname,

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { ScryptParams } from '@trust/auth';
 import { validateAnchorUrl } from './anchors.ts';
-import { assertSchemaName, tlsProblem } from './db/connection.ts';
+import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 
 export interface PlatformConfig {
   env: 'development' | 'test' | 'production';
@@ -108,8 +108,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       throw new Error('invalid DB_SCHEMA (lowercase letters, digits, underscore)');
     }
   }
-  const caFile = env['DATABASE_CA_FILE'];
-  const databaseCaPem = caFile ? readFileSync(caFile, 'utf8') : undefined;
+  const databaseCaPem = readCaPem(env, (p) => readFileSync(p, 'utf8'));
   if (persistence === 'postgres' && databaseUrl && !databaseCaPem) {
     // A managed database is reached over the internet: credentials and data must not cross it in clear text.
     const problem = tlsProblem(databaseUrl);

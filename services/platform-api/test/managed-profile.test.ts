@@ -4,6 +4,7 @@ import {
   assertSchemaName,
   judgeRole,
   poolSettings,
+  readCaPem,
   tlsProblem,
   type RoleFacts,
 } from '../src/db/connection.ts';
@@ -268,6 +269,28 @@ describe('configuration', () => {
     );
     expect(withCa.databaseCaPem).toContain('BEGIN CERTIFICATE'); // verified TLS configured => URL sslmode not required
     expect(() => loadConfig(env({ DATABASE_CA_FILE: join(f, 'missing') }))).toThrow();
+  });
+
+  it('DATABASE_CA_PEM supplies the CA inline (including flattened newlines); both forms together or garbage are refused', () => {
+    const cert = '-----BEGIN CERTIFICATE-----\nMIIBabc\n-----END CERTIFICATE-----';
+    const url = 'postgres://u:p@db.example.com/postgres';
+    const inline = loadConfig(env({ ...prod, DATABASE_URL: url, DATABASE_CA_PEM: cert }));
+    expect(inline.databaseCaPem).toBe(cert);
+    // verified TLS is configured, so the URL does not need sslmode
+    expect(inline.env).toBe('production');
+    const flattened = loadConfig(
+      env({ ...prod, DATABASE_URL: url, DATABASE_CA_PEM: cert.replace(/\n/g, '\\n') }),
+    );
+    expect(flattened.databaseCaPem).toBe(cert);
+    expect(() =>
+      loadConfig(
+        env({ ...prod, DATABASE_URL: url, DATABASE_CA_PEM: cert, DATABASE_CA_FILE: '/x' }),
+      ),
+    ).toThrow(/only one/);
+    expect(() =>
+      loadConfig(env({ ...prod, DATABASE_URL: url, DATABASE_CA_PEM: 'not a certificate' })),
+    ).toThrow(/PEM certificate/);
+    expect(readCaPem(env({}), () => 'x')).toBeUndefined();
   });
 
   it('DB_ALLOW_SUPERUSER is opt-in', () => {

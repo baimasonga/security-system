@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { AuthService } from '@trust/auth';
 import { systemClock } from '@trust/shared-types';
-import { poolSettings } from '../services/platform-api/src/db/connection.ts';
+import { poolSettings, readCaPem } from '../services/platform-api/src/db/connection.ts';
 import { PgAuditLog } from '../services/platform-api/src/db/pg-audit-log.ts';
 import { PgAuthStore } from '../services/platform-api/src/db/pg-auth-store.ts';
 
@@ -26,10 +26,8 @@ if (!email || !reason || !url) {
   );
   process.exit(2);
 }
-const ca = process.env['DATABASE_CA_FILE'];
-const pool = new pg.Pool(
-  poolSettings({ databaseUrl: url, max: 1, caPem: ca ? readFileSync(ca, 'utf8') : undefined }),
-);
+const ca = readCaPem(process.env, (p) => readFileSync(p, 'utf8'));
+const pool = new pg.Pool(poolSettings({ databaseUrl: url, max: 1, caPem: ca }));
 try {
   const shards = Number(process.env['AUDIT_CHAIN_SHARDS'] ?? 1);
   const audit = new PgAuditLog(pool, systemClock, { shards });

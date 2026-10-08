@@ -40,6 +40,24 @@ export function tlsProblem(databaseUrl: string): string | undefined {
     : 'DATABASE_URL must require TLS (add ?sslmode=require or verify-full) for a non-local database';
 }
 
+/**
+ * The CA certificate used to VERIFY the database server, from `DATABASE_CA_PEM` (the certificate text itself, handy
+ * for hosts that only offer environment variables) or `DATABASE_CA_FILE` (a path). Undefined when neither is set.
+ * Escaped newlines (`\\n`) are accepted because some dashboards flatten multi-line values.
+ */
+export function readCaPem(
+  env: NodeJS.ProcessEnv,
+  readFile: (path: string) => string,
+): string | undefined {
+  const inline = env['DATABASE_CA_PEM'];
+  const file = env['DATABASE_CA_FILE'];
+  if (inline && file) throw new Error('set only one of DATABASE_CA_PEM and DATABASE_CA_FILE');
+  const pem = inline ? inline.replace(/\\n/g, '\n') : file ? readFile(file) : undefined;
+  if (pem !== undefined && !/-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/.test(pem))
+    throw new Error('the database CA must be a PEM certificate (-----BEGIN CERTIFICATE-----)');
+  return pem;
+}
+
 export interface PoolSettings {
   connectionString: string;
   max: number;
