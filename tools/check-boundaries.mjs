@@ -4,7 +4,7 @@
 //  2. sdk-core (ships to untrusted clients) may import ONLY the verification entrypoint of crypto
 //  3. shared-types (kernel) stays free of node:* imports
 //  4. no private key material is committed
-//  5. deployment templates keep placeholder credentials
+//  5. deployment templates contain no credentials
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -111,17 +111,16 @@ for (const f of walk(root)) {
   if (PRIV.test(text)) errors.push(`${relative(root, f)}: contains private key material`);
 }
 
-// --- 5: deployment templates keep placeholders, never real credentials ---------------------
-// docs/deploy/supabase-setup.sql is pasted into a SQL editor after editing a COPY; the committed file must keep the
-// placeholder password (a real one in git history is a leaked credential).
+// --- 5: deployment templates never contain credentials ----------------------------------------
+// docs/deploy/supabase-setup.sql is pasted into a SQL editor; the password is set in a separate statement. A password
+// literal in the committed file would be a leaked credential in git history.
 {
   const f = join(root, 'docs/deploy/supabase-setup.sql');
   const text = readFileSync(f, 'utf8');
-  for (const m of text.matchAll(/PASSWORD\s+'([^']*)'/gi))
-    if (!/^CHANGE-ME/.test(m[1]))
-      errors.push(
-        'docs/deploy/supabase-setup.sql: contains a real-looking password; keep the CHANGE-ME placeholder',
-      );
+  if (/PASSWORD\s+'/i.test(text))
+    errors.push(
+      'docs/deploy/supabase-setup.sql: contains a password literal; set the password in a separate statement, never in the file',
+    );
 }
 
 if (errors.length) {

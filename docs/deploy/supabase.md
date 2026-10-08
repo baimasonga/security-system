@@ -25,7 +25,7 @@ someone later enables it.
    per device call, so the round trip to the database sets your throughput (≈ 200 flows/s per instance at 2 ms).
 2. **Data API:** leave `trust` out of "Exposed schemas" (or disable the Data API for this project). Do not use the
    project's `anon`/`service_role` keys anywhere in this system.
-3. **Create the schema and role:** run [`supabase-setup.sql`](supabase-setup.sql) in the SQL editor, after replacing the password.
+3. **Create the schema and role:** run [`supabase-setup.sql`](supabase-setup.sql) in the SQL editor exactly as it is (it is safe to re-run and contains no password). Then, in a **separate** query, set the app role's password: `ALTER ROLE trust_app PASSWORD '<your generated password>';`. Generate the password in a password manager; never type it into the file or commit it.
 4. **Migrate** with the owner's _direct_ connection (migrations use session state and an advisory lock):
    ```sh
    DATABASE_MIGRATE_URL='postgresql://postgres:<owner-password>@db.<ref>.supabase.co:5432/postgres?sslmode=require' \
