@@ -1,9 +1,14 @@
 import { createPrivateKey, createPublicKey, type KeyObject } from 'node:crypto';
 import { newId } from './hash.ts';
-import { generateEd25519, normalizePublicJwk, type PublicJwk } from './jwk.ts';
+import { generateEd25519, jwkThumbprint, normalizePublicJwk, type PublicJwk } from './jwk.ts';
 import { SoftwareKeyCustody, type KeyCustody } from './signing.ts';
 
 export type KeyPurpose = 'license';
+
+/** Stable key id derived from the public key. */
+export function kidForPublicKey(jwk: PublicJwk): string {
+  return `lk_${jwkThumbprint(jwk).slice(0, 22)}`;
+}
 export type KeyState = 'generated' | 'active' | 'deprecated' | 'revoked' | 'archived' | 'destroyed';
 
 export interface KeyRecord {
@@ -83,7 +88,36 @@ export class KeyRing {
     const privateKey = createPrivateKey(pem);
     if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error('only Ed25519 keys supported');
     const publicJwk = normalizePublicJwk(createPublicKey(privateKey).export({ format: 'jwk' }));
-    return this.#register(purpose, publicJwk, privateKey, 'import', kid);
+    // Deterministic kid: the same key material always maps to the same kid across restarts.
+    return this.#register(
+      purpose,
+      publicJwk,
+      privateKey,
+      'import',
+      kid ?? kidForPublicKey(publicJwk),
+    );
+  }
+
+  /**
+   * Re-load persisted key metadata after a restart. Records are verify-only until private material
+   * is attached; no lifecycle events are emitted (nothing changed).
+   */
+  restore(records: readonly KeyRecord[]): void {
+    for (const r of records) {
+      if (this.#records.has(r.kid)) throw new Error(`kid ${r.kid} already exists`);
+      this.#records.set(r.kid, { ...r, publicJwk: normalizePublicJwk(r.publicJwk) });
+    }
+  }
+
+  /** Attach private material to a restored record; it must match the recorded public key. */
+  attachPrivateKeyPem(kid: string, pem: string): void {
+    const rec = this.#must(kid);
+    const privateKey = createPrivateKey(pem);
+    if (privateKey.asymmetricKeyType !== 'ed25519') throw new Error('only Ed25519 keys supported');
+    const pub = normalizePublicJwk(createPublicKey(privateKey).export({ format: 'jwk' }));
+    if (pub.x !== rec.publicJwk.x)
+      throw new Error(`private key does not match recorded key ${kid}`);
+    this.#custody.add(kid, privateKey);
   }
 
   #register(

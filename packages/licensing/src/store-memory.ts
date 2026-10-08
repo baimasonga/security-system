@@ -117,6 +117,9 @@ class Repo implements LicensingRepo {
     const l = this.s.licenses.get(id);
     return l && l.orgId === orgId ? clone(l) : undefined;
   }
+  async findLicenseForUpdate(orgId: string, id: string) {
+    return this.findLicense(orgId, id);
+  }
   async listLicenses(orgId: string) {
     return clone([...this.s.licenses.values()].filter((l) => l.orgId === orgId));
   }
@@ -142,10 +145,11 @@ class Repo implements LicensingRepo {
     const d = this.s.devices.get(id);
     return d && d.orgId === orgId ? clone(d) : undefined;
   }
-  async insertDevice(d: Device) {
-    if ([...this.s.devices.values()].some((x) => x.thumbprint === d.thumbprint))
-      throw new Error('duplicate_thumbprint');
+  async insertDevice(d: Device): Promise<Device> {
+    const existing = [...this.s.devices.values()].find((x) => x.thumbprint === d.thumbprint);
+    if (existing) return clone(existing);
     this.s.devices.set(d.id, clone(d));
+    return clone(d);
   }
 
   async insertActivation(a: Activation) {
@@ -191,6 +195,8 @@ class Repo implements LicensingRepo {
   }
 
   async insertLease(r: LeaseRecord) {
+    const a = this.s.activations.get(r.activationId);
+    if (!a || a.orgId !== r.orgId) throw new Error('cross_tenant_reference');
     this.s.leases.set(r.jti, clone(r));
   }
 

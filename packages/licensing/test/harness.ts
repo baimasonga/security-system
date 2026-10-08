@@ -11,12 +11,15 @@ import {
 import { buildProofMessage, verifyJws, type ProofPurpose } from '@trust/crypto/verify';
 import { DomainError, LEASE_TYP, type LeaseClaims, type UserPrincipal } from '@trust/shared-types';
 import { InMemoryTelemetrySink, Telemetry } from '@trust/telemetry';
+import { createSchemaPool, pgTestEnabled } from '../../../tests/support/pg.ts';
+import { PgLicensingStore } from '../../../services/platform-api/src/db/pg-licensing-store.ts';
 import {
   InMemoryLicensingStore,
   LicensingService,
   defaultLicensingConfig,
   type Authorizer,
   type LicensingConfig,
+  type LicensingStore,
   type OperatorActor,
 } from '../src/index.ts';
 
@@ -25,7 +28,7 @@ export const PEPPER = 'test-pepper-test-pepper-test-pepper-0123456789';
 
 export interface World {
   svc: LicensingService;
-  store: InMemoryLicensingStore;
+  store: LicensingStore;
   audit: InMemoryAuditLog;
   sink: InMemoryTelemetrySink;
   keyring: KeyRing;
@@ -39,6 +42,10 @@ export interface World {
 
 export function world(cfg?: Partial<LicensingConfig>): World {
   let t = new Date('2026-03-01T00:00:00Z');
+  // PostgreSQL enforces foreign keys, so fixture orgs/users need real rows (in-memory does not care).
+  const pool = pgTestEnabled() ? createSchemaPool() : undefined;
+  const fixtures: Promise<unknown>[] = [];
+  const settle = () => Promise.all(fixtures.splice(0));
   const clock = {
     now: () => t,
     set: (d: Date) => void (t = d),
@@ -49,9 +56,11 @@ export function world(cfg?: Partial<LicensingConfig>): World {
   const telemetry = new Telemetry({ sink, clock, pseudonymKey: 'pk' });
   const keyring = new KeyRing({ now: clock.now });
   keyring.activate(keyring.generate('license').kid);
-  const store = new InMemoryLicensingStore();
+  const store: LicensingStore = pool ? new PgLicensingStore(pool) : new InMemoryLicensingStore();
   const members = new Map<string, 'owner' | 'admin' | 'member'>();
+
   const authorize: Authorizer = async (p, orgId, perm) => {
+    await settle();
     const role = members.get(`${orgId}|${p.userId}`);
     if (!role) throw new DomainError('not_found', 'not found');
     if (perm === 'device:deactivate' && role === 'member') throw new DomainError('forbidden', 'no');
@@ -65,7 +74,11 @@ export function world(cfg?: Partial<LicensingConfig>): World {
     keyring,
     config,
     authorize,
-    orgExists: async (id) => id.startsWith('org_'),
+    orgExists: async (id) => {
+      await settle();
+      if (!pool) return id.startsWith('org_');
+      return (await pool.query('SELECT 1 FROM organizations WHERE id = $1', [id])).rowCount === 1;
+    },
   });
   return {
     svc,
@@ -78,7 +91,21 @@ export function world(cfg?: Partial<LicensingConfig>): World {
     members,
     op: { id: 'usr_operator', reason: 'test setup' },
     user: (userId) => ({ kind: 'user', userId, sessionId: `ses_${userId}`, platformRole: 'none' }),
-    join: (orgId, userId, role = 'member') => void members.set(`${orgId}|${userId}`, role),
+    join: (orgId, userId, role = 'member') => {
+      members.set(`${orgId}|${userId}`, role);
+      if (pool) {
+        fixtures.push(
+          pool.query(
+            "INSERT INTO organizations (id, name, kind) VALUES ($1, $1, 'team') ON CONFLICT DO NOTHING",
+            [orgId],
+          ),
+          pool.query(
+            "INSERT INTO users (id, email, password_hash) VALUES ($1, $1 || '@fixture.test', 'x') ON CONFLICT DO NOTHING",
+            [userId],
+          ),
+        );
+      }
+    },
   };
 }
 

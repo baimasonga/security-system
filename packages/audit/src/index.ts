@@ -44,25 +44,42 @@ export function computeEventHash(e: Omit<AuditEvent, 'hash'>): string {
   return sha256Hex(canonicalJson(e));
 }
 
-/** Pure chain verifier, shared by every storage adapter. */
-export function verifyEvents(events: readonly AuditEvent[]): ChainVerification {
-  let prev = GENESIS_HASH;
-  let expectedSeq = 1;
-  for (const e of events) {
-    if (e.seq !== expectedSeq) {
-      return { ok: false, brokenAtSeq: e.seq, reason: 'sequence gap or reorder' };
-    }
-    if (e.prevHash !== prev) return { ok: false, brokenAtSeq: e.seq, reason: 'prev_hash mismatch' };
+/**
+ * Incremental chain verifier: feed events in `seq` order, in batches if the log is large.
+ * Shared by every storage adapter so "valid chain" has exactly one definition.
+ */
+export class ChainVerifier {
+  #prev = GENESIS_HASH;
+  #expectedSeq = 1;
+  #count = 0;
+  #failure: Extract<ChainVerification, { ok: false }> | undefined;
+
+  /** Returns the failure as soon as one is found (and keeps returning it). */
+  push(e: AuditEvent): Extract<ChainVerification, { ok: false }> | undefined {
+    if (this.#failure) return this.#failure;
+    const fail = (reason: string) => (this.#failure = { ok: false, brokenAtSeq: e.seq, reason });
+    if (e.seq !== this.#expectedSeq) return fail('sequence gap or reorder');
+    if (e.prevHash !== this.#prev) return fail('prev_hash mismatch');
     const { hash, ...rest } = e;
     // Public, non-secret chain values: constant-time comparison is not required here.
     // eslint-disable-next-line security/detect-possible-timing-attacks
-    if (computeEventHash(rest) !== hash) {
-      return { ok: false, brokenAtSeq: e.seq, reason: 'hash mismatch (content altered)' };
-    }
-    prev = hash;
-    expectedSeq++;
+    if (computeEventHash(rest) !== hash) return fail('hash mismatch (content altered)');
+    this.#prev = hash;
+    this.#expectedSeq++;
+    this.#count++;
+    return undefined;
   }
-  return { ok: true, count: events.length, headHash: prev };
+
+  result(): ChainVerification {
+    return this.#failure ?? { ok: true, count: this.#count, headHash: this.#prev };
+  }
+}
+
+/** Pure chain verifier for an in-memory list. */
+export function verifyEvents(events: readonly AuditEvent[]): ChainVerification {
+  const v = new ChainVerifier();
+  for (const e of events) if (v.push(e)) break;
+  return v.result();
 }
 
 export function buildEvent(

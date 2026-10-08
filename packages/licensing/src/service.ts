@@ -432,7 +432,7 @@ export class LicensingService {
   ): Promise<LicenseView> {
     const reason = requireReason(op.reason);
     const next = await this.#d.store.transaction(async (tx) => {
-      const lic = await tx.findLicense(orgId, licenseId);
+      const lic = await tx.findLicenseForUpdate(orgId, licenseId);
       if (!lic) throw new DomainError('not_found', 'license not found');
       const allowed: Record<typeof action, License['state'][]> = {
         suspend: ['active'],
@@ -557,13 +557,6 @@ export class LicensingService {
     };
     try {
       await this.#d.store.transaction(async (tx) => {
-        await tx.insertTrialClaim({
-          productId: product.id,
-          orgId: input.orgId,
-          userId: p.userId,
-          licenseId: license.id,
-          createdAt: now,
-        });
         const sub: Subscription = {
           id: newId('sub'),
           orgId: input.orgId,
@@ -576,6 +569,14 @@ export class LicensingService {
         await tx.insertSubscription(sub);
         license.subscriptionId = sub.id;
         await tx.insertLicense(license);
+        // Last, because the claim references the license; a duplicate rolls the whole trial back.
+        await tx.insertTrialClaim({
+          productId: product.id,
+          orgId: input.orgId,
+          userId: p.userId,
+          licenseId: license.id,
+          createdAt: now,
+        });
       });
     } catch (e) {
       if (e instanceof Error && e.message === 'trial_exists') {
@@ -722,7 +723,7 @@ export class LicensingService {
     const now = this.#d.clock.now();
     const result = await this.#d.store
       .transaction(async (tx) => {
-        const lic = await tx.findLicense(found.orgId, found.id);
+        const lic = await tx.findLicenseForUpdate(found.orgId, found.id);
         if (!lic) throw new DomainError('invalid_license', UNIFORM_INVALID);
         const ctx = await this.#loadContext(tx, lic);
         const ev = this.#evaluate(lic, ctx.sub);
@@ -735,15 +736,19 @@ export class LicensingService {
           throw new DomainError('device_key_conflict', 'device key is registered elsewhere');
         }
         if (!device) {
-          device = {
+          const candidate: Device = {
             id: newId('dev'),
             orgId: lic.orgId,
             thumbprint,
             publicKey: devicePublicKey,
             createdAt: now,
-          } satisfies Device;
-          await tx.insertDevice(device);
-          newDevice = true;
+          };
+          // A concurrent activation may have registered this key between our read and write.
+          device = await tx.insertDevice(candidate);
+          if (device.orgId !== lic.orgId) {
+            throw new DomainError('device_key_conflict', 'device key is registered elsewhere');
+          }
+          newDevice = device.id === candidate.id;
         }
 
         const resolved = resolveEntitlements(ctx.plan, lic.overrides);

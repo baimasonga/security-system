@@ -25,7 +25,9 @@ export function redact(value: unknown, depth = 0): Json {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'string') {
     if (SENSITIVE_VALUE.some((r) => r.test(value))) return REDACTED;
-    return value.length > MAX_STRING ? `${value.slice(0, MAX_STRING)}…` : value;
+    // NUL cannot be stored in PostgreSQL text/jsonb; strip it so audit writes can never fail on it.
+    const clean = value.replaceAll('\u0000', '');
+    return clean.length > MAX_STRING ? `${clean.slice(0, MAX_STRING)}…` : clean;
   }
   if (depth >= MAX_DEPTH) return REDACTED;
   if (Array.isArray(value)) return value.slice(0, 100).map((v) => redact(v, depth + 1));

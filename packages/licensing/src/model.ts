@@ -131,6 +131,12 @@ export interface LicensingRepo {
   insertLicense(l: License): Promise<void>;
   updateLicense(l: License): Promise<void>;
   findLicense(orgId: string, id: string): Promise<License | undefined>;
+  /**
+   * Same as `findLicense` but takes a row lock held until the transaction ends. Everything that
+   * counts or changes a license's activations must call this first so they serialize per license.
+   * (Meaningful inside `transaction`; equivalent to `findLicense` for the in-memory adapter.)
+   */
+  findLicenseForUpdate(orgId: string, id: string): Promise<License | undefined>;
   listLicenses(orgId: string): Promise<License[]>;
   findLicenseByKeyDigest(digest: string): Promise<License | undefined>;
 
@@ -139,11 +145,17 @@ export interface LicensingRepo {
 
   findDeviceByThumbprint(thumbprint: string): Promise<Device | undefined>;
   findDevice(orgId: string, id: string): Promise<Device | undefined>;
-  insertDevice(d: Device): Promise<void>;
+  /**
+   * Idempotent on the device key: if a device with this thumbprint already exists (even created by
+   * a concurrent transaction) the existing row is returned instead of failing. Callers must compare
+   * `orgId` of the result.
+   */
+  insertDevice(d: Device): Promise<Device>;
 
   insertActivation(a: Activation): Promise<void>;
   updateActivation(a: Activation): Promise<void>;
   findActivation(orgId: string, id: string): Promise<Activation | undefined>;
+  /** Inside a transaction this also locks the activation row (PostgreSQL adapter). */
   findActivationForDeviceAuth(id: string): Promise<Activation | undefined>;
   findActiveActivation(licenseId: string, deviceId: string): Promise<Activation | undefined>;
   countActiveActivations(licenseId: string): Promise<number>;
