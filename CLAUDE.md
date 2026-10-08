@@ -10,6 +10,7 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 - `DATABASE_URL=… node tools/verify-anchor.ts <manifest|witness.jsonl>` — check the live audit log against anchors held by the external witness (ADR-010)
 - `npm run migrate` — apply SQL migrations (`DATABASE_MIGRATE_URL` or `DATABASE_URL`; `DB_SCHEMA` for a private schema)
 - `npm run db:grants` / `npm run db:check` — least-privilege grants for the app role / verify a connection against the managed-database profile (ADR-012); run `db:grants` after every migration, and add every new table to `TABLE_PRIVILEGES` (`db/grants.ts`)
+- `npm run bootstrap:operator -- --email … --reason …` — promote an existing user to platform operator (deployment tooling, audited; the only way to create the first operator)
 - `npm run format` — Prettier write
 - `node tools/gen-lease-vectors.ts > docs/api/lease-test-vectors.json` — only when the lease wire format changes (ADR required)
 

@@ -281,6 +281,46 @@ describe.skipIf(!url)('managed-database profile (ADR-012)', () => {
     }
   }, 120_000);
 
+  it('tools/bootstrap-operator.ts promotes an existing user using only the least-privilege role, with a mandatory reason', async () => {
+    const { spawnSync } = await import('node:child_process');
+    await applyAppGrants(owner, { schema: SCHEMA, role: APP });
+    await owner.query(
+      `INSERT INTO ${SCHEMA}.users (id, email, password_hash) VALUES ('usr_boot', 'boss@example.test', 'x')`,
+    );
+    const run = (...args: string[]) =>
+      spawnSync('node', ['tools/bootstrap-operator.ts', ...args], {
+        env: { ...process.env, DATABASE_URL: as(APP) }, // role-level search_path supplies the schema
+        encoding: 'utf8',
+      });
+    expect(run('--email', 'boss@example.test').status).toBe(2); // no reason
+    expect(run('--reason', 'initial operator').status).toBe(2); // no email
+    const tooShort = run('--email', 'boss@example.test', '--reason', 'x');
+    expect(tooShort.status).toBe(1);
+    expect(tooShort.stderr).toMatch(/reason is required/);
+    const ghost = run('--email', 'nobody@example.test', '--reason', 'initial operator');
+    expect(ghost.status).toBe(1);
+    expect(ghost.stderr).toMatch(/user not found/);
+    expect(
+      (await owner.query(`SELECT platform_role FROM ${SCHEMA}.users WHERE id = 'usr_boot'`))
+        .rows[0]!.platform_role,
+    ).toBe('none');
+
+    const ok = run('--email', ' Boss@Example.test ', '--reason', 'initial operator');
+    expect(ok.status, ok.stderr).toBe(0);
+    expect(
+      (await owner.query(`SELECT platform_role FROM ${SCHEMA}.users WHERE id = 'usr_boot'`))
+        .rows[0]!.platform_role,
+    ).toBe('platform_admin');
+    const ev = (
+      await owner.query(
+        `SELECT actor_type, reason, target_id FROM ${SCHEMA}.audit_events WHERE action = 'operator.bootstrapped'`,
+      )
+    ).rows;
+    expect(ev).toEqual([
+      { actor_type: 'system', reason: 'initial operator', target_id: 'usr_boot' },
+    ]);
+  });
+
   describe('startup guards (production)', () => {
     const pem = generateEd25519().privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
     const prod = (databaseUrl: string, over: Record<string, string> = {}) => ({

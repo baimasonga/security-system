@@ -149,6 +149,25 @@ describe('registration and login', () => {
   });
 });
 
+describe('operator bootstrap', () => {
+  it('requires a reason, records it in the audit log, and refuses unknown users', async () => {
+    const { auth, audit, store } = make();
+    await auth.register({ email: 'op@b.co', password: PW });
+    await expect(auth.bootstrapPlatformAdmin('op@b.co', '  ')).rejects.toThrow(
+      /reason is required/,
+    );
+    await expect(auth.bootstrapPlatformAdmin('ghost@b.co', 'initial operator')).rejects.toThrow(
+      /user not found/,
+    );
+    expect((await store.findUserByEmail('op@b.co'))!.platformRole).toBe('none');
+    await auth.bootstrapPlatformAdmin('Op@B.co', 'initial operator');
+    expect((await store.findUserByEmail('op@b.co'))!.platformRole).toBe('platform_admin');
+    expect((await audit.list({ action: 'operator.bootstrapped' }))[0]).toMatchObject({
+      reason: 'initial operator',
+    });
+  });
+});
+
 describe('atomic audit', () => {
   it('if auditing fails, registration leaves nothing behind (no user, no org, no membership)', async () => {
     const audit = new InMemoryAuditLog(clock);
@@ -236,7 +255,7 @@ describe('organizations and RBAC', () => {
   it('platform admin must be bootstrapped out-of-band and is re-checked on each use', async () => {
     const { auth, pa } = await twoUsers();
     expect(await code(auth.requirePlatformAdmin(pa))).toBe('forbidden');
-    await auth.bootstrapPlatformAdmin('a@b.co');
+    await auth.bootstrapPlatformAdmin('a@b.co', 'test operator');
     expect(await code(auth.requirePlatformAdmin(pa))).toBe('ok');
   });
 

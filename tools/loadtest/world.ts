@@ -65,7 +65,7 @@ export async function seedWorld(
   const PW = 'load-test-password-1';
   try {
     await c.auth.register({ email: 'operator@load.test', password: PW });
-    await c.auth.bootstrapPlatformAdmin('operator@load.test');
+    await c.auth.bootstrapPlatformAdmin('operator@load.test', 'load test operator');
     const operatorToken = (await c.auth.login({ email: 'operator@load.test', password: PW })).token;
     const op = { id: 'seed', reason: 'load test seeding' };
     const product = await c.licensing.createProduct({ code: 'load-product', name: 'Load' }, op);

@@ -98,7 +98,7 @@ export async function makeEnv(over?: {
   const operatorToken = async () => {
     if (opToken) return opToken;
     await register('operator@example.test');
-    await c.auth.bootstrapPlatformAdmin('operator@example.test');
+    await c.auth.bootstrapPlatformAdmin('operator@example.test', 'test operator');
     return (opToken = await login('operator@example.test'));
   };
 

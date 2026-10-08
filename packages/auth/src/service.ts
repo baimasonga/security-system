@@ -303,7 +303,8 @@ export class AuthService {
   }
 
   /** Operator bootstrap. Deliberately NOT exposed over HTTP: invoked by deployment tooling only. */
-  async bootstrapPlatformAdmin(email: string): Promise<void> {
+  async bootstrapPlatformAdmin(email: string, reason: string): Promise<void> {
+    if (reason.trim().length < 3) throw new Error('a reason is required');
     const u = await this.#store.findUserByEmail(email.trim().toLowerCase());
     if (!u) throw new Error('user not found');
     await this.#store.transaction(async (tx) => {
@@ -312,6 +313,7 @@ export class AuthService {
         actor: { type: 'system' },
         action: 'operator.bootstrapped',
         target: { type: 'user', id: u.id },
+        reason: reason.trim(),
       });
     });
   }
