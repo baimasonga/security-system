@@ -4,6 +4,7 @@
 //  2. sdk-core (ships to untrusted clients) may import ONLY the verification entrypoint of crypto
 //  3. shared-types (kernel) stays free of node:* imports
 //  4. no private key material is committed
+//  5. deployment templates keep placeholder credentials
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,6 +109,19 @@ for (const f of walk(root)) {
     continue;
   }
   if (PRIV.test(text)) errors.push(`${relative(root, f)}: contains private key material`);
+}
+
+// --- 5: deployment templates keep placeholders, never real credentials ---------------------
+// docs/deploy/supabase-setup.sql is pasted into a SQL editor after editing a COPY; the committed file must keep the
+// placeholder password (a real one in git history is a leaked credential).
+{
+  const f = join(root, 'docs/deploy/supabase-setup.sql');
+  const text = readFileSync(f, 'utf8');
+  for (const m of text.matchAll(/PASSWORD\s+'([^']*)'/gi))
+    if (!/^CHANGE-ME/.test(m[1]))
+      errors.push(
+        'docs/deploy/supabase-setup.sql: contains a real-looking password; keep the CHANGE-ME placeholder',
+      );
 }
 
 if (errors.length) {
