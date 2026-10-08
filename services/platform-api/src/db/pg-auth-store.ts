@@ -1,6 +1,16 @@
-import type { AuthStore, Membership, Organization, Session, User } from '@trust/auth';
-import type { OrgRole, PlatformRole } from '@trust/shared-types';
-import { UNIQUE_VIOLATION, pgErr, type PgPool } from './pg.ts';
+import { AuditBuffer } from '@trust/audit';
+import type {
+  AuthRepo,
+  AuthStore,
+  AuthTx,
+  Membership,
+  Organization,
+  Session,
+  User,
+} from '@trust/auth';
+import type { Clock, OrgRole, PlatformRole } from '@trust/shared-types';
+import { appendAuditInTx } from './pg-audit-log.ts';
+import { UNIQUE_VIOLATION, pgErr, withTransaction, type PgPool, type Queryable } from './pg.ts';
 
 interface UserRow {
   id: string;
@@ -60,9 +70,9 @@ const session = (r: SessionRow): Session => ({
   revokedAt: r.revoked_at,
 });
 
-export class PgAuthStore implements AuthStore {
-  readonly #db: PgPool;
-  constructor(db: PgPool) {
+class PgAuthRepo implements AuthRepo {
+  readonly #db: Queryable;
+  constructor(db: Queryable) {
     this.#db = db;
   }
 
@@ -152,5 +162,25 @@ export class PgAuthStore implements AuthStore {
       'UPDATE sessions SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL',
       [id, at],
     );
+  }
+}
+
+export class PgAuthStore extends PgAuthRepo implements AuthStore {
+  readonly #pool: PgPool;
+  readonly #clock: Clock;
+  constructor(pool: PgPool, clock: Clock) {
+    super(pool);
+    this.#pool = pool;
+    this.#clock = clock;
+  }
+
+  transaction<T>(fn: (tx: AuthTx) => Promise<T>): Promise<T> {
+    return withTransaction(this.#pool, async (client) => {
+      const buffer = new AuditBuffer(); // fresh per attempt (see withTransaction retry contract)
+      const tx = Object.assign(new PgAuthRepo(client), { audit: buffer }) as unknown as AuthTx;
+      const out = await fn(tx);
+      await appendAuditInTx(client, this.#clock, buffer.drain());
+      return out;
+    });
   }
 }

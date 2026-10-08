@@ -87,10 +87,12 @@ export async function createContainer(
     clock,
     pseudonymKey: config.pseudonymKey,
   });
-  const authStore: AuthStore = pool ? new PgAuthStore(pool) : new InMemoryAuthStore();
+  const authStore: AuthStore = pool
+    ? new PgAuthStore(pool, clock)
+    : new InMemoryAuthStore({ audit });
   const licensingStore: LicensingStore = pool
-    ? new PgLicensingStore(pool)
-    : new InMemoryLicensingStore();
+    ? new PgLicensingStore(pool, clock)
+    : new InMemoryLicensingStore({ audit });
   const keyStore = pool ? new PgKeyStore(pool) : undefined;
 
   // ---- signing keys: restore persisted metadata, attach configured private key, persist changes ----

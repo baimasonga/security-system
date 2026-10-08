@@ -8,7 +8,7 @@ import {
   type ChainVerification,
 } from '@trust/audit';
 import type { Clock, Json } from '@trust/shared-types';
-import { withTransaction, type PgPool } from './pg.ts';
+import { withTransaction, type PgPool, type Queryable } from './pg.ts';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -32,6 +32,51 @@ function toEvent(r: Row): AuditEvent {
   };
 }
 
+/**
+ * Appends events to the chain using the CALLER's transaction. Takes the chain lock last (call it
+ * right before COMMIT) so the lock is held as briefly as possible; it is released automatically at
+ * commit/rollback. Used both by `PgAuditLog` and by store transactions (change + audit are atomic).
+ */
+export async function appendAuditInTx(
+  q: Queryable,
+  clock: Clock,
+  inputs: readonly AuditEventInput[],
+): Promise<AuditEvent[]> {
+  if (inputs.length === 0) return [];
+  await q.query('SELECT pg_advisory_xact_lock($1)', [AUDIT_APPEND_LOCK]);
+  const last = (await q.query('SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1'))
+    .rows[0];
+  let prev = last
+    ? { seq: Number(last.seq), hash: last.hash as string }
+    : { seq: 0, hash: GENESIS_HASH };
+  const out: AuditEvent[] = [];
+  for (const input of inputs) {
+    const ev = buildEvent(input, prev, clock.now());
+    await q.query(
+      `INSERT INTO audit_events (seq, id, occurred_at, actor_type, actor_id, action, target_type, target_id, org_id, reason, metadata, prev_hash, hash)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [
+        ev.seq,
+        ev.id,
+        ev.occurredAt,
+        ev.actor.type,
+        ev.actor.id,
+        ev.action,
+        ev.target?.type ?? null,
+        ev.target?.id ?? null,
+        ev.orgId,
+        ev.reason,
+        ev.metadata,
+        ev.prevHash,
+        ev.hash,
+      ],
+    );
+    prev = { seq: ev.seq, hash: ev.hash };
+    out.push(ev);
+  }
+  return out;
+}
+
 export class PgAuditLog implements AuditLog {
   readonly #pool: PgPool;
   readonly #clock: Clock;
@@ -40,37 +85,12 @@ export class PgAuditLog implements AuditLog {
     this.#clock = clock;
   }
 
-  append(input: AuditEventInput): Promise<AuditEvent> {
-    return withTransaction(this.#pool, async (c) => {
-      await c.query('SELECT pg_advisory_xact_lock($1)', [AUDIT_APPEND_LOCK]);
-      const last = (await c.query('SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1'))
-        .rows[0];
-      const ev = buildEvent(
-        input,
-        last ? { seq: Number(last.seq), hash: last.hash } : { seq: 0, hash: GENESIS_HASH },
-        this.#clock.now(),
-      );
-      await c.query(
-        `INSERT INTO audit_events (seq, id, occurred_at, actor_type, actor_id, action, target_type, target_id, org_id, reason, metadata, prev_hash, hash)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [
-          ev.seq,
-          ev.id,
-          ev.occurredAt,
-          ev.actor.type,
-          ev.actor.id,
-          ev.action,
-          ev.target?.type ?? null,
-          ev.target?.id ?? null,
-          ev.orgId,
-          ev.reason,
-          ev.metadata,
-          ev.prevHash,
-          ev.hash,
-        ],
-      );
-      return ev;
-    });
+  async append(input: AuditEventInput): Promise<AuditEvent> {
+    return (await this.appendMany([input]))[0]!;
+  }
+
+  appendMany(inputs: readonly AuditEventInput[]): Promise<AuditEvent[]> {
+    return withTransaction(this.#pool, (c) => appendAuditInTx(c, this.#clock, inputs));
   }
 
   async list(filter?: { orgId?: string; action?: string; limit?: number }): Promise<AuditEvent[]> {

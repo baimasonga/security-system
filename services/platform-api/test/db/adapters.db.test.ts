@@ -8,6 +8,7 @@ import { licensingStoreContract } from '../../../../packages/licensing/test/stor
 import { createSchemaPool } from '../../../../tests/support/pg.ts';
 import { loadConfig } from '../../src/config.ts';
 import { createContainer } from '../../src/container.ts';
+import type { PgPool } from '../../src/db/pg.ts';
 import { PgAuditLog } from '../../src/db/pg-audit-log.ts';
 import { PgAuthStore } from '../../src/db/pg-auth-store.ts';
 import { PgKeyStore } from '../../src/db/pg-key-store.ts';
@@ -18,12 +19,21 @@ const url = process.env['DATABASE_URL'];
 
 describe.skipIf(!url)('PostgreSQL adapters', () => {
   // ---- the same contracts the in-memory adapters satisfy -------------------------------------
-  authStoreContract('postgres', () => new PgAuthStore(createSchemaPool()));
+  const clock = { now: () => new Date('2026-01-01T00:00:00Z') };
+  const auditedOf = (pool: PgPool) => async () =>
+    (await pool.query('SELECT action FROM audit_events ORDER BY seq')).rows.map(
+      (r) => r.action as string,
+    );
+  authStoreContract('postgres', () => {
+    const pool = createSchemaPool();
+    return { store: new PgAuthStore(pool, clock), audited: auditedOf(pool) };
+  });
   auditLogContract('postgres', (clock) => new PgAuditLog(createSchemaPool(), clock));
   licensingStoreContract('postgres', () => {
     const pool = createSchemaPool();
     return {
-      store: new PgLicensingStore(pool),
+      store: new PgLicensingStore(pool, clock),
+      audited: auditedOf(pool),
       seedOrg: async (id) =>
         void (await pool.query("INSERT INTO organizations (id, name, kind) VALUES ($1,$1,'team')", [
           id,
@@ -205,6 +215,134 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
         ).rejects.toThrow(/migrat/);
       } finally {
         await bare.end();
+      }
+    });
+  });
+
+  // ---- R-14: deadlocks are retried; R-10: audit is atomic with the change -------------------------------
+  describe('deadlock retry and atomic audit', () => {
+    const NOW = new Date('2026-01-01T00:00:00Z');
+    const clock2 = { now: () => NOW };
+
+    async function twoLicenses() {
+      const pool = createSchemaPool();
+      const store = new PgLicensingStore(pool, clock2);
+      await pool.query("INSERT INTO organizations (id,name,kind) VALUES ('org_d','D','team')");
+      await pool.query("INSERT INTO products (id,code,name) VALUES ('prd_d','prod-d','P')");
+      await pool.query(
+        "INSERT INTO plans (id,product_id,code,tier,device_limit) VALUES ('pln_d','prd_d','plan-d','professional',3)",
+      );
+      for (const id of ['lic_d1', 'lic_d2']) {
+        await pool.query(
+          "INSERT INTO licenses (id,org_id,product_id,plan_id,kind,key_hash) VALUES ($1,'org_d','prd_d','pln_d','perpetual',$1)",
+          [id],
+        );
+      }
+      return { pool, store };
+    }
+
+    it('a real PostgreSQL deadlock (opposite lock order) is retried and BOTH transactions succeed', async () => {
+      const { pool, store } = await twoLicenses();
+      let arrived = 0;
+      let release!: () => void;
+      const bothHoldFirstLock = new Promise<void>((r) => (release = r));
+      const attempts = { a: 0, b: 0 };
+
+      const run = (name: 'a' | 'b', first: string, second: string) =>
+        store.transaction(async (tx) => {
+          attempts[name]++;
+          await tx.findLicenseForUpdate('org_d', first);
+          if (attempts[name] === 1) {
+            // Only on the first attempt: wait until the other side holds ITS first lock => guaranteed deadlock.
+            if (++arrived === 2) release();
+            await bothHoldFirstLock;
+          }
+          await tx.findLicenseForUpdate('org_d', second);
+          await tx.audit.append({ actor: { type: 'system' }, action: `tx.${name}` });
+          return name;
+        });
+
+      const res = await Promise.all([run('a', 'lic_d1', 'lic_d2'), run('b', 'lic_d2', 'lic_d1')]);
+      expect(res.sort()).toEqual(['a', 'b']);
+      expect(attempts.a + attempts.b).toBeGreaterThanOrEqual(3); // the deadlock victim ran again
+      // Audit from the aborted attempt did not leak: exactly one event per transaction.
+      const audited = (await pool.query('SELECT action FROM audit_events ORDER BY seq')).rows
+        .map((r) => r.action)
+        .sort();
+      expect(audited).toEqual(['tx.a', 'tx.b']);
+      expect(await new PgAuditLog(pool, clock2).verifyChain()).toMatchObject({
+        ok: true,
+        count: 2,
+      });
+    }, 30_000);
+
+    it('without retry the same scenario fails with SQLSTATE 40P01 (proves the test really deadlocks)', async () => {
+      const { pool } = await twoLicenses();
+      const a = await pool.connect();
+      const b = await pool.connect();
+      try {
+        await a.query('BEGIN');
+        await b.query('BEGIN');
+        await a.query("SELECT 1 FROM licenses WHERE id='lic_d1' FOR UPDATE");
+        await b.query("SELECT 1 FROM licenses WHERE id='lic_d2' FOR UPDATE");
+        const pa = a.query("SELECT 1 FROM licenses WHERE id='lic_d2' FOR UPDATE");
+        const pb = b.query("SELECT 1 FROM licenses WHERE id='lic_d1' FOR UPDATE");
+        const settled = await Promise.allSettled([pa, pb]);
+        const codes = settled.map((r) =>
+          r.status === 'rejected' ? (r.reason as { code?: string }).code : 'ok',
+        );
+        expect(codes).toContain('40P01');
+      } finally {
+        await a.query('ROLLBACK').catch(() => undefined);
+        await b.query('ROLLBACK').catch(() => undefined);
+        a.release();
+        b.release();
+      }
+    }, 30_000);
+
+    it('if the audit insert fails, the service-level change does not happen (no unaudited changes)', async () => {
+      const pool = createSchemaPool();
+      const c = await createContainer(
+        {
+          ...loadConfig({ NODE_ENV: 'test' } as NodeJS.ProcessEnv),
+          scrypt: { N: 1024, r: 8, p: 1 },
+        },
+        { pool },
+      );
+      try {
+        await c.auth.register({ email: 'op@example.test', password: 'correct horse battery' });
+        // Break auditing at the database level.
+        await pool.query(
+          `CREATE FUNCTION fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit unavailable'; END $$`,
+        );
+        await pool.query(
+          'CREATE TRIGGER fail_audit_t BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_audit()',
+        );
+
+        await expect(
+          c.licensing.createProduct(
+            { code: 'unaudited', name: 'X' },
+            { id: 'usr_op', reason: 'test change' },
+          ),
+        ).rejects.toThrow(/audit unavailable/);
+        expect(
+          (await pool.query("SELECT count(*)::int AS n FROM products WHERE code='unaudited'"))
+            .rows[0]!.n,
+        ).toBe(0);
+
+        const before = (await pool.query('SELECT count(*)::int AS n FROM users')).rows[0]!.n;
+        await expect(
+          c.auth.register({ email: 'new@example.test', password: 'correct horse battery' }),
+        ).rejects.toThrow(/audit unavailable/);
+        // register is atomic: no user, no personal org, no membership left behind
+        expect((await pool.query('SELECT count(*)::int AS n FROM users')).rows[0]!.n).toBe(before);
+        expect(
+          (await pool.query("SELECT count(*)::int AS n FROM organizations WHERE kind='personal'"))
+            .rows[0]!.n,
+        ).toBe(1);
+        expect((await pool.query('SELECT count(*)::int AS n FROM memberships')).rows[0]!.n).toBe(1);
+      } finally {
+        await c.close();
       }
     });
   });

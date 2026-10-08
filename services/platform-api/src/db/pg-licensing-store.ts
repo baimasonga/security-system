@@ -1,3 +1,6 @@
+import { AuditBuffer } from '@trust/audit';
+import { appendAuditInTx } from './pg-audit-log.ts';
+import type { Clock } from '@trust/shared-types';
 import type {
   Activation,
   Challenge,
@@ -6,6 +9,7 @@ import type {
   License,
   LicensingRepo,
   LicensingStore,
+  LicensingTx,
   LeaseRecord,
   Plan,
   Product,
@@ -442,11 +446,24 @@ class PgRepo implements LicensingRepo {
 
 export class PgLicensingStore extends PgRepo implements LicensingStore {
   readonly #pool: PgPool;
-  constructor(pool: PgPool) {
+  readonly #clock: Clock;
+  constructor(pool: PgPool, clock: Clock) {
     super(pool, false);
     this.#pool = pool;
+    this.#clock = clock;
   }
-  transaction<T>(fn: (tx: LicensingRepo) => Promise<T>): Promise<T> {
-    return withTransaction(this.#pool, (client) => fn(new PgRepo(client, true)));
+
+  transaction<T>(fn: (tx: LicensingTx) => Promise<T>): Promise<T> {
+    return withTransaction(this.#pool, async (client) => {
+      // A fresh buffer per attempt: if the attempt is retried, nothing from the failed one leaks.
+      const buffer = new AuditBuffer();
+      const tx = Object.assign(new PgRepo(client, true), {
+        audit: buffer,
+      }) as unknown as LicensingTx;
+      const out = await fn(tx);
+      // Last statement before COMMIT, so the chain lock is held only briefly.
+      await appendAuditInTx(client, this.#clock, buffer.drain());
+      return out;
+    });
   }
 }
