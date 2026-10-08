@@ -1,0 +1,17 @@
+# Local development stack. PostgreSQL is provisioned for schema work (`npm run test:db` does not need it);
+# the API currently uses in-memory adapters, so state is lost on restart by design.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: dev-only-password
+      POSTGRES_DB: trust
+    ports: ['127.0.0.1:5432:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+  api:
+    build: { context: ../.., dockerfile: Dockerfile }
+    environment:
+      NODE_ENV: development
+    ports: ['127.0.0.1:8080:8080']
+volumes:
+  pgdata: {}

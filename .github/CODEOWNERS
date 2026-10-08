@@ -1,0 +1,8 @@
+# Trust-boundary code requires review from the security owners (set real teams when the org is configured).
+/packages/crypto/        @baimasonga
+/packages/licensing/     @baimasonga
+/packages/auth/          @baimasonga
+/packages/sdk-core/      @baimasonga
+/services/platform-api/migrations/ @baimasonga
+/docs/adr/               @baimasonga
+/.github/                @baimasonga
