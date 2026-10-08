@@ -22,7 +22,7 @@ export function tlsProblem(databaseUrl: string): string | undefined {
   try {
     u = new URL(databaseUrl);
   } catch {
-    return 'DATABASE_URL is not a valid URL';
+    return 'DATABASE_URL is not a valid URL (never printed here): check it starts with postgresql://, has no quotes, spaces or [brackets], and that special characters in the password are percent-encoded';
   }
   const host = u.hostname;
   const params = u.searchParams;
