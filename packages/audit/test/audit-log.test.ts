@@ -62,12 +62,12 @@ describe('audit log', () => {
       metadata: {
         password: 'hunter2',
         note: 'ok',
-        nested: { access_token: 'abc' },
+        nested: { access_token: 'zz-needle-token-zz' },
         licenseKey: 'LK-AAAAA-BBBBB-CCCCC-DDDDD-EEEEE',
         innocuous: 'LK-AAAAA-BBBBB-CCCCC-DDDDD-EEEEE',
       },
     });
-    expect(JSON.stringify(e)).not.toMatch(/hunter2|abc|LK-AAAAA/);
+    expect(JSON.stringify(e)).not.toMatch(/hunter2|zz-needle-token-zz|LK-AAAAA/);
     expect(e.metadata['note']).toBe('ok');
   });
 
