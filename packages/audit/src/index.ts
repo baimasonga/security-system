@@ -344,7 +344,6 @@ export function manifestProblem(m: AnchorManifest): string | undefined {
     seen.add(c.chain);
   }
   // Public values; constant-time comparison is not required.
-  // eslint-disable-next-line security/detect-possible-timing-attacks
   if (computeAnchor(m.chains) !== m.anchor) return 'anchor does not match the listed chains';
   return undefined;
 }
@@ -365,7 +364,6 @@ export function checkManifest(
         seq: c.seq,
         reason: 'witnessed event is missing (removed or truncated)',
       };
-    // eslint-disable-next-line security/detect-possible-timing-attacks
     if (stored !== c.hash)
       return {
         ok: false,
