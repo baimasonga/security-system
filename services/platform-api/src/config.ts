@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { ScryptParams } from '@trust/auth';
 import { validateAnchorUrl } from './anchors.ts';
+import { assertSchemaName, tlsProblem } from './db/connection.ts';
 
 export interface PlatformConfig {
   env: 'development' | 'test' | 'production';
@@ -15,6 +16,12 @@ export interface PlatformConfig {
   persistence: 'memory' | 'postgres';
   /** Required when persistence is postgres. Never logged. */
   databaseUrl: string | undefined;
+  /** Schema holding the platform's tables (e.g. `trust` on a managed platform). Unset = the role's default. */
+  dbSchema: string | undefined;
+  /** PEM of the CA that signed the database server certificate; enables verified TLS. Never logged. */
+  databaseCaPem: string | undefined;
+  /** Accept a database superuser as the application role in production (not recommended). */
+  allowDbSuperuser: boolean;
   /** Pool size for the PostgreSQL adapters. */
   dbPoolMax: number;
   /** Retention and maintenance cadence (seconds). */
@@ -93,6 +100,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     // Volatile storage must never serve production traffic.
     throw new Error('production requires PERSISTENCE=postgres');
   }
+  const dbSchemaRaw = env['DB_SCHEMA'];
+  if (dbSchemaRaw !== undefined) {
+    try {
+      assertSchemaName(dbSchemaRaw);
+    } catch {
+      throw new Error('invalid DB_SCHEMA (lowercase letters, digits, underscore)');
+    }
+  }
+  const caFile = env['DATABASE_CA_FILE'];
+  const databaseCaPem = caFile ? readFileSync(caFile, 'utf8') : undefined;
+  if (persistence === 'postgres' && databaseUrl && !databaseCaPem) {
+    // A managed database is reached over the internet: credentials and data must not cross it in clear text.
+    const problem = tlsProblem(databaseUrl);
+    if (problem && prod && env['DATABASE_INSECURE_TRANSPORT'] !== 'true') throw new Error(problem);
+  }
   const dbPoolMax = Number(env['DB_POOL_MAX'] ?? 10);
   if (!Number.isInteger(dbPoolMax) || dbPoolMax < 1 || dbPoolMax > 200)
     throw new Error('invalid DB_POOL_MAX');
@@ -155,6 +177,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     persistence,
     databaseUrl,
     dbPoolMax,
+    dbSchema: dbSchemaRaw,
+    databaseCaPem,
+    allowDbSuperuser: env['DB_ALLOW_SUPERUSER'] === 'true',
     challengeTtlSeconds,
     challengeRetentionSeconds,
     leaseRetentionSeconds,

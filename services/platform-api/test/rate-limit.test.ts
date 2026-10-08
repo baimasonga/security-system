@@ -137,7 +137,7 @@ describe('RATE_LIMIT_STORE', () => {
     LICENSE_KEY_PEPPER: 'x'.repeat(40),
     PSEUDONYM_KEY: 'x'.repeat(40),
     LICENSE_SIGNING_KEY_PEM: 'pem',
-    DATABASE_URL: 'postgres://u:p@db/trust',
+    DATABASE_URL: 'postgres://u:p@db/trust?sslmode=require',
     AUDIT_ANCHOR_DISABLED: 'true',
   };
   it('defaults to shared counters in production and per-process in development; validates the value', () => {

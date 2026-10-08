@@ -39,6 +39,25 @@ export default defineConfig({
           fileParallelism: false,
         },
       },
+      {
+        // The same behavioural suites, but the application connects as the LEAST-PRIVILEGE role of the managed
+        // profile (ADR-012): it owns nothing, cannot rewrite the audit log, cannot run DDL. If any code path needs
+        // a privilege that profile withholds, this project fails.
+        extends: true,
+        test: {
+          ...common,
+          name: 'db-approle',
+          include: [
+            'packages/licensing/test/activation.test.ts',
+            'services/platform-api/test/api.test.ts',
+            'tests/security/**/*.test.ts',
+            'tests/integration/**/*.test.ts',
+          ],
+          exclude: ['**/node_modules/**'],
+          env: { TRUST_TEST_PERSISTENCE: 'postgres', TRUST_TEST_APP_ROLE: '1' },
+          fileParallelism: false,
+        },
+      },
     ],
   },
 });

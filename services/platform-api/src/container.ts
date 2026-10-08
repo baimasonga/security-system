@@ -12,6 +12,7 @@ import { systemClock, type Clock } from '@trust/shared-types';
 import { InMemoryTelemetrySink, Telemetry, type TelemetrySink } from '@trust/telemetry';
 import pg from 'pg';
 import type { PlatformConfig } from './config.ts';
+import { gatherRoleFacts, judgeRole, poolSettings } from './db/connection.ts';
 import { MIGRATIONS_DIR, assertSchemaCurrent } from './db/migrate.ts';
 import { setTransactionObserver, type PgPool } from './db/pg.ts';
 import {
@@ -52,6 +53,8 @@ export interface Container {
   anchors: AnchorPublisher | undefined;
   /** Shared HTTP rate-limit counters (R-7); undefined = the limiter's per-process default. */
   rateBackend: RateBackend | undefined;
+  /** Startup findings about the database role (logged by the entry point). */
+  dbWarnings: string[];
   /** Releases pooled resources. Idempotent. */
   close(): Promise<void>;
 }
@@ -97,10 +100,28 @@ export async function createContainer(
 
   let pool: PgPool | undefined = overrides?.pool;
   let ownPool: pg.Pool | undefined;
+  let roleWarnings: string[] = [];
   if (usePg && !pool) {
-    ownPool = new pg.Pool({ connectionString: config.databaseUrl, max: config.dbPoolMax });
+    ownPool = new pg.Pool(
+      poolSettings({
+        databaseUrl: config.databaseUrl!,
+        max: config.dbPoolMax,
+        caPem: config.databaseCaPem,
+      }),
+    );
     pool = ownPool;
-    await assertSchemaCurrent(pool, MIGRATIONS_DIR);
+    try {
+      // Judge the role BEFORE trusting the schema: wrong schema or an over-privileged role is a deployment error.
+      roleWarnings = judgeRole(await gatherRoleFacts(pool), {
+        production: config.env === 'production',
+        expectedSchema: config.dbSchema,
+        allowSuperuser: config.allowDbSuperuser,
+      });
+      await assertSchemaCurrent(pool, MIGRATIONS_DIR);
+    } catch (e) {
+      await ownPool.end().catch(() => undefined);
+      throw e;
+    }
   }
 
   const metrics = new Metrics();
@@ -276,6 +297,7 @@ export async function createContainer(
     anchorStore,
     anchors,
     rateBackend,
+    dbWarnings: roleWarnings,
     async close() {
       if (closed) return;
       closed = true;

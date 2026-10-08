@@ -17,10 +17,12 @@
     "format:check": "prettier --check .",
     "test": "vitest run --project unit",
     "test:watch": "vitest",
-    "test:db": "node tools/with-postgres.mjs vitest run --project db",
+    "test:db": "node tools/with-postgres.mjs vitest run --project db --project db-approle",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
     "dev": "node services/platform-api/src/main.ts",
     "migrate": "node tools/migrate.ts",
+    "db:grants": "node tools/db-grants.ts",
+    "db:check": "node tools/db-check.ts",
     "loadtest": "PG_FSYNC=on node tools/with-postgres.mjs node tools/loadtest/run.ts",
     "audit:deps": "npm audit --omit=dev --audit-level=high"
   },

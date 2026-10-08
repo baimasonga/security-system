@@ -18,6 +18,8 @@ if (
   );
 }
 
+for (const w of container.dbWarnings) app.log.warn(`database role: ${w}`);
+
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(
     sig,

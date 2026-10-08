@@ -1,14 +1,26 @@
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { afterAll } from 'vitest';
+import { applyAppGrants } from '../../services/platform-api/src/db/grants.ts';
 import { MIGRATIONS_DIR, applyMigrations } from '../../services/platform-api/src/db/migrate.ts';
 import type { PgPool } from '../../services/platform-api/src/db/pg.ts';
 
 /** True when the suite should run against PostgreSQL instead of the in-memory adapters. */
 export const pgTestEnabled = (): boolean => process.env['TRUST_TEST_PERSISTENCE'] === 'postgres';
 
+/** True when the application must connect as the least-privilege role (the `db-approle` project). */
+export const appRoleMode = (): boolean => process.env['TRUST_TEST_APP_ROLE'] === '1';
+export const TEST_APP_ROLE = 'trust_test_app';
+
 let admin: pg.Client | undefined;
 const created: Array<{ schema: string; pool: pg.Pool }> = [];
+
+function urlAs(role: string): string {
+  const u = new URL(url());
+  u.username = role;
+  u.password = '';
+  return u.toString();
+}
 
 function url(): string {
   const u = process.env['DATABASE_URL'];
@@ -24,7 +36,7 @@ function url(): string {
 export function createSchemaPool(): PgPool {
   const schema = `t_${randomBytes(6).toString('hex')}`;
   const pool = new pg.Pool({
-    connectionString: url(),
+    connectionString: appRoleMode() ? urlAs(TEST_APP_ROLE) : url(),
     max: 6,
     idleTimeoutMillis: 300,
     options: `-c search_path=${schema}`,
@@ -41,6 +53,15 @@ export function createSchemaPool(): PgPool {
     await mig.connect();
     try {
       await applyMigrations(mig, MIGRATIONS_DIR);
+      if (appRoleMode()) {
+        // The schema owner (a superuser here) migrates; the application role only gets the profile's grants.
+        const exists = await mig.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [
+          TEST_APP_ROLE,
+        ]);
+        if (!exists.rows.length)
+          await mig.query(`CREATE ROLE ${TEST_APP_ROLE} LOGIN`).catch(() => undefined);
+        await applyAppGrants(mig, { schema, role: TEST_APP_ROLE });
+      }
     } finally {
       await mig.end();
     }

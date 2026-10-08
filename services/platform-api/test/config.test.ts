@@ -33,7 +33,7 @@ describe('loadConfig — fail closed', () => {
     const ok = loadConfig(
       env({
         ...base,
-        DATABASE_URL: 'postgres://u:p@db/trust',
+        DATABASE_URL: 'postgres://u:p@db/trust?sslmode=require',
         AUDIT_ANCHOR_URL: 'https://witness.example/anchors',
       }),
     );
@@ -103,7 +103,7 @@ describe('loadConfig — audit anchoring (ADR-010)', () => {
     LICENSE_KEY_PEPPER: STRONG,
     PSEUDONYM_KEY: STRONG,
     LICENSE_SIGNING_KEY_PEM: 'pem',
-    DATABASE_URL: 'postgres://u:p@db/trust',
+    DATABASE_URL: 'postgres://u:p@db/trust?sslmode=require',
   };
 
   it('production must name a witness or explicitly accept the risk; development defaults to off', () => {

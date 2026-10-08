@@ -5,10 +5,11 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 ## Commands
 
 - `npm run check` — format check, lint + architecture boundaries, typecheck, unit/integration/security tests (must pass before any push)
-- `npm run test:db` — PostgreSQL tests against a throwaway cluster (or `DATABASE_URL`); also re-runs the behavioural suites on PG
+- `npm run test:db` — PostgreSQL tests against a throwaway cluster (or `DATABASE_URL`); also re-runs the behavioural suites on PG, once as superuser (`db`) and once as the least-privilege app role (`db-approle`)
 - `npm run loadtest -- --scenario <name> …` — open-loop load/soak tool against a real server + PostgreSQL (`--assert-clean` exits non-zero on any error)
 - `DATABASE_URL=… node tools/verify-anchor.ts <manifest|witness.jsonl>` — check the live audit log against anchors held by the external witness (ADR-010)
-- `npm run migrate` — apply SQL migrations (`DATABASE_URL` required)
+- `npm run migrate` — apply SQL migrations (`DATABASE_MIGRATE_URL` or `DATABASE_URL`; `DB_SCHEMA` for a private schema)
+- `npm run db:grants` / `npm run db:check` — least-privilege grants for the app role / verify a connection against the managed-database profile (ADR-012); run `db:grants` after every migration, and add every new table to `TABLE_PRIVILEGES` (`db/grants.ts`)
 - `npm run format` — Prettier write
 - `node tools/gen-lease-vectors.ts > docs/api/lease-test-vectors.json` — only when the lease wire format changes (ADR required)
 

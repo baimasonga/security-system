@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Client } from 'pg';
+import { assertSchemaName } from './connection.ts';
 
 export interface MigrationResult {
   applied: string[];
@@ -16,7 +17,18 @@ const FILE = /^(\d{4})_[a-z0-9_]+\.sql$/;
  * `schema_migrations` records a checksum; a changed file for an already-applied version is an error —
  * history is immutable, fixes ship as a new migration.
  */
-export async function applyMigrations(client: Client, dir: string): Promise<MigrationResult> {
+export async function applyMigrations(
+  client: Client,
+  dir: string,
+  opts: { schema?: string | undefined } = {},
+): Promise<MigrationResult> {
+  if (opts.schema !== undefined) {
+    // Everything (tables, functions, the migration ledger) is created inside this schema, not `public`, so a
+    // managed platform's auto-generated API never sees it. Session-level: use a direct connection.
+    const s = assertSchemaName(opts.schema);
+    await client.query(`CREATE SCHEMA IF NOT EXISTS "${s}"`);
+    await client.query(`SET search_path TO "${s}"`);
+  }
   await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
   // Serialize concurrent deploys.
