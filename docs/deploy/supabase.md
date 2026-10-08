@@ -39,7 +39,9 @@ someone later enables it.
    ```sh
    DATABASE_URL='postgresql://trust_app.<ref>:<app-password>@<pooler-host>:5432/postgres?sslmode=require'
    DB_SCHEMA=trust            # the API refuses to start if the role does not land in this schema
-   DATABASE_CA_FILE=/etc/ssl/supabase-ca.pem   # optional but recommended: verified TLS (download from the dashboard)
+   DATABASE_CA_PEM='-----BEGIN CERTIFICATE-----…'   # the CA from the dashboard (SSL configuration), or DATABASE_CA_FILE=/path/ca.pem.
+   # The driver treats sslmode=require as full verification and Supabase's CA is not publicly trusted, so without a CA you get
+   # "self-signed certificate in certificate chain".
    PERSISTENCE=postgres  NODE_ENV=production   # plus the usual secrets, signing key and AUDIT_ANCHOR_URL
    ```
 7. **Verify:** `DATABASE_URL=… DB_SCHEMA=trust npm run db:check` must print `OK` (warnings allowed, failures not).
