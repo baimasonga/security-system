@@ -194,6 +194,8 @@ export function licensingStoreContract(
         });
         expect(await f.store.findLicense(f.orgB, l.id)).toBeUndefined();
         expect(await f.store.findLicenseForUpdate(f.orgB, l.id)).toBeUndefined();
+        expect(await f.store.findLicenseForShare(f.orgB, l.id)).toBeUndefined();
+        expect((await f.store.findLicenseForShare(f.orgA, l.id))!.id).toBe(l.id);
         expect((await f.store.listLicenses(f.orgA)).map((x) => x.id)).toEqual([l.id]);
         expect(await f.store.listLicenses(f.orgB)).toEqual([]);
         expect((await f.store.listSubscriptions(f.orgA)).map((x) => x.id)).toEqual([s.id]);
@@ -410,6 +412,37 @@ export function licensingStoreContract(
       });
     });
 
+    describe('retention', () => {
+      it('purges only lease records that expired before the cutoff, in bounded batches', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(l);
+        const d = await f.store.insertDevice(dev(f.orgA));
+        const a = act({ orgId: f.orgA, licenseId: l.id, deviceId: d.id, by: f.user });
+        await f.store.insertActivation(a);
+        for (let i = 0; i < 5; i++)
+          await f.store.insertLease({
+            jti: uid('lse'),
+            orgId: f.orgA,
+            activationId: a.id,
+            planVersion: 1,
+            issuedAt: T,
+            expiresAt: later(100 + i),
+          });
+        await f.store.insertLease({
+          jti: uid('lse'),
+          orgId: f.orgA,
+          activationId: a.id,
+          planVersion: 1,
+          issuedAt: T,
+          expiresAt: later(9_000_000),
+        });
+        expect(await f.store.purgeExpiredLeases(later(10_000), 2)).toBe(2);
+        expect(await f.store.purgeExpiredLeases(later(10_000), 10)).toBe(3);
+        expect(await f.store.purgeExpiredLeases(later(10_000), 10)).toBe(0);
+      });
+    });
+
     describe('challenges', () => {
       const ch = (hash: string, over = {}) => ({
         nonceHash: hash,
@@ -449,6 +482,18 @@ export function licensingStoreContract(
         );
         expect(res.filter((r) => r.status === 'ok')).toHaveLength(1);
         expect(res.filter((r) => r.status === 'used')).toHaveLength(24);
+      });
+
+      it('purge is batch-limited and only removes challenges that expired before the cutoff', async () => {
+        const f = await fixture();
+        for (let i = 0; i < 7; i++)
+          await f.store.insertChallenge(ch(`old${i}`, { expiresAt: later(100 + i) }));
+        await f.store.insertChallenge(ch('fresh', { expiresAt: later(900_000) }));
+        expect(await f.store.purgeExpiredChallenges(later(10_000), 3)).toBe(3);
+        expect(await f.store.purgeExpiredChallenges(later(10_000), 3)).toBe(3);
+        expect(await f.store.purgeExpiredChallenges(later(10_000), 3)).toBe(1);
+        expect(await f.store.purgeExpiredChallenges(later(10_000), 3)).toBe(0);
+        expect((await f.store.consumeChallenge('fresh', later(5))).status).toBe('ok'); // untouched
       });
 
       it('counts only unconsumed, unexpired challenges per installation; purge removes expired', async () => {

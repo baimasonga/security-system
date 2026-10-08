@@ -122,6 +122,9 @@ class Repo implements LicensingRepo {
   async findLicenseForUpdate(orgId: string, id: string) {
     return this.findLicense(orgId, id);
   }
+  async findLicenseForShare(orgId: string, id: string) {
+    return this.findLicense(orgId, id);
+  }
   async listLicenses(orgId: string) {
     return clone([...this.s.licenses.values()].filter((l) => l.orgId === orgId));
   }
@@ -219,11 +222,23 @@ class Repo implements LicensingRepo {
     if (c.expiresAt <= now) return { status: 'expired' };
     return { status: 'ok', challenge: clone(c) };
   }
-  async purgeExpiredChallenges(before: Date) {
+  async purgeExpiredChallenges(before: Date, limit = Number.MAX_SAFE_INTEGER) {
     let n = 0;
     for (const [k, c] of this.s.challenges) {
+      if (n >= limit) break;
       if (c.expiresAt < before) {
         this.s.challenges.delete(k);
+        n++;
+      }
+    }
+    return n;
+  }
+  async purgeExpiredLeases(before: Date, limit = Number.MAX_SAFE_INTEGER) {
+    let n = 0;
+    for (const [k, l] of this.s.leases) {
+      if (n >= limit) break;
+      if (l.expiresAt < before) {
+        this.s.leases.delete(k);
         n++;
       }
     }

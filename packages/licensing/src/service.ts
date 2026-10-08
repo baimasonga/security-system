@@ -678,7 +678,9 @@ export class LicensingService {
     else need(ACTIVATION_ID.test(subjectId), 'invalid activation id');
 
     const now = this.#d.clock.now();
-    await this.#d.store.purgeExpiredChallenges(new Date(now.getTime() - 3600_000));
+    // Retention is NOT done here: it ran a DELETE on every challenge and was found to scale with table
+    // size under load. See runMaintenance().
+
     if (
       (await this.#d.store.countOutstandingChallenges(input.installationId, now)) >=
       this.#d.config.maxOutstandingChallenges
@@ -911,7 +913,9 @@ export class LicensingService {
     const grant = await this.#d.store.transaction(async (tx) => {
       // Lock order is always license -> activation. Re-evaluate under the lock: the state read while
       // authenticating the device may have changed (e.g. suspension) before we got here.
-      const lic = await tx.findLicenseForUpdate(ctx.lic.orgId, ctx.lic.id);
+      // SHARED lock: keeps the license state stable while we issue, but concurrent refreshes of a hot
+      // license do not serialize (only activate / state changes take the exclusive lock).
+      const lic = await tx.findLicenseForShare(ctx.lic.orgId, ctx.lic.id);
       if (!lic) throw new DomainError('internal', 'license missing');
       const fresh = await this.#loadContext(tx, lic);
       const ev = this.#evaluate(lic, fresh.sub);
@@ -960,6 +964,33 @@ export class LicensingService {
     });
     await this.#d.telemetry.track('device.deactivated', { by: 'device' });
     return activationView(updated);
+  }
+
+  /**
+   * Retention, off the request path. Deletes spent/expired challenges and long-expired lease records in
+   * bounded batches. Safe to run concurrently from several instances (deletes are idempotent).
+   */
+  async runMaintenance(opts?: {
+    batch?: number;
+    maxBatches?: number;
+  }): Promise<{ challenges: number; leases: number }> {
+    const batch = opts?.batch ?? 5000;
+    const maxBatches = opts?.maxBatches ?? 20;
+    const now = this.#d.clock.now().getTime();
+    const out = { challenges: 0, leases: 0 };
+    const challengeCutoff = new Date(now - this.#d.config.challengeRetentionSeconds * 1000);
+    const leaseCutoff = new Date(now - this.#d.config.leaseRetentionSeconds * 1000);
+    for (let i = 0; i < maxBatches; i++) {
+      const n = await this.#d.store.purgeExpiredChallenges(challengeCutoff, batch);
+      out.challenges += n;
+      if (n < batch) break;
+    }
+    for (let i = 0; i < maxBatches; i++) {
+      const n = await this.#d.store.purgeExpiredLeases(leaseCutoff, batch);
+      out.leases += n;
+      if (n < batch) break;
+    }
+    return out;
   }
 
   trustBundle() {

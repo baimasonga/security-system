@@ -138,6 +138,13 @@ export interface LicensingRepo {
    * (Meaningful inside `transaction`; equivalent to `findLicense` for the in-memory adapter.)
    */
   findLicenseForUpdate(orgId: string, id: string): Promise<License | undefined>;
+  /**
+   * Shared row lock held until the transaction ends. Many holders may coexist, but it excludes (and is
+   * excluded by) `findLicenseForUpdate`. Use it when a transaction must keep the license's STATE from
+   * changing underneath it without needing to change activations itself (e.g. lease refresh), so hot
+   * licenses do not serialize.
+   */
+  findLicenseForShare(orgId: string, id: string): Promise<License | undefined>;
   listLicenses(orgId: string): Promise<License[]>;
   findLicenseByKeyDigest(digest: string): Promise<License | undefined>;
 
@@ -168,7 +175,10 @@ export interface LicensingRepo {
   countOutstandingChallenges(installationId: string, now: Date): Promise<number>;
   /** Atomic: exactly one concurrent caller can obtain `ok` for a given nonce. */
   consumeChallenge(nonceHash: string, now: Date): Promise<ConsumeResult>;
-  purgeExpiredChallenges(before: Date): Promise<number>;
+  /** Deletes up to `limit` challenges that expired before `before`. Returns the number deleted. */
+  purgeExpiredChallenges(before: Date, limit?: number): Promise<number>;
+  /** Deletes up to `limit` lease records that expired before `before` (forensic history, not authority). */
+  purgeExpiredLeases(before: Date, limit?: number): Promise<number>;
 }
 
 /** A transaction: every repository method, plus an audit writer that commits atomically with them. */

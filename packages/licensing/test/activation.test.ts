@@ -606,6 +606,26 @@ describe('validate / refresh / revocation / plan changes', () => {
     expect(await errCode(refresh(w, dev, g.activationId))).toBe('ok');
   });
 
+  it('refresh takes only a SHARED license lock, so hot licenses do not serialize (activation still takes the exclusive one)', async () => {
+    const s = await seed(w);
+    const dev = new FakeDevice();
+    const calls: string[] = [];
+    const orig = w.store.transaction.bind(w.store);
+    w.store.transaction = (async (fn: Parameters<typeof orig>[0]) =>
+      orig(async (tx) => {
+        const share = tx.findLicenseForShare.bind(tx);
+        const upd = tx.findLicenseForUpdate.bind(tx);
+        tx.findLicenseForShare = async (...a) => (calls.push('share'), share(...a));
+        tx.findLicenseForUpdate = async (...a) => (calls.push('update'), upd(...a));
+        return fn(tx);
+      })) as typeof w.store.transaction;
+    const g = await activate(w, s.alice, dev, s.licenseKey);
+    expect(calls).toEqual(['update']);
+    calls.length = 0;
+    await refresh(w, dev, g.activationId);
+    expect(calls).toEqual(['share']);
+  });
+
   it('a suspension that lands between device authentication and lease issuance is still honoured (no stale lease)', async () => {
     const s = await seed(w);
     const dev = new FakeDevice();
@@ -693,6 +713,61 @@ describe('validate / refresh / revocation / plan changes', () => {
     // nothing was persisted: the transaction rolled back (no activation, no device, no lease)
     expect(await w.store.countActiveActivations(s.license.id)).toBe(0);
     expect(await w.store.findDeviceByThumbprint(dev.thumbprint)).toBeUndefined();
+  });
+});
+
+describe('retention (runMaintenance)', () => {
+  it('removes spent/expired challenges and long-expired lease records, in bounded batches, and keeps live data', async () => {
+    const s = await seed(w);
+    const dev = new FakeDevice();
+    const g = await activate(w, s.alice, dev, s.licenseKey);
+    for (let i = 0; i < 6; i++) await refresh(w, dev, g.activationId); // 7 leases, 7+ spent challenges
+    // Issuing challenges no longer deletes anything on the request path:
+    const live = await w.svc.issueChallenge({
+      purpose: 'activate',
+      installationId: dev.installationId,
+    });
+    // Nothing is old enough yet.
+    expect(await w.svc.runMaintenance()).toEqual({ challenges: 0, leases: 0 });
+    // Past challenge retention (1h default) but well inside lease retention (90d):
+    w.clock.advance(2 * 3600_000);
+    const first = await w.svc.runMaintenance({ batch: 2, maxBatches: 2 }); // bounded: 2 batches x 2
+    expect(first.challenges).toBe(4);
+    expect(first.leases).toBe(0);
+    const rest = await w.svc.runMaintenance();
+    expect(rest.challenges).toBeGreaterThanOrEqual(4);
+    // The still-valid challenge from before was also past its 5 minute expiry by now; a fresh one is untouched.
+    const fresh = await w.svc.issueChallenge({
+      purpose: 'activate',
+      installationId: dev.installationId,
+    });
+    expect(await w.svc.runMaintenance()).toEqual({ challenges: 0, leases: 0 });
+    expect(live.nonce).not.toBe(fresh.nonce);
+    // Lease records only after expiry (day 30) + retention (90 days), i.e. beyond day 120
+    w.clock.advance(60 * DAY);
+    expect((await w.svc.runMaintenance()).leases).toBe(0); // day ~60: expired, but still inside retention
+    w.clock.advance(65 * DAY);
+    expect((await w.svc.runMaintenance()).leases).toBe(7);
+    expect(await errCode(refresh(w, dev, g.activationId))).not.toBe('ok'); // sub lapsed by now; data purge never grants anything
+  });
+
+  it('issuing a challenge never deletes anything (retention is not on the request path)', async () => {
+    const dev = new FakeDevice();
+    const old = await w.svc.issueChallenge({
+      purpose: 'activate',
+      installationId: dev.installationId,
+    });
+    w.clock.advance(5 * 3600_000); // far past expiry AND retention
+    await w.svc.issueChallenge({ purpose: 'activate', installationId: dev.installationId });
+    // Still present (reported as expired, not 'missing') until maintenance runs.
+    const { createHash } = await import('node:crypto');
+    const hash = createHash('sha256').update(old.nonce).digest('hex');
+    expect((await w.store.consumeChallenge(hash, w.clock.now())).status).toBe('expired');
+  });
+
+  it('rejects invalid retention configuration', () => {
+    expect(() => world({ challengeRetentionSeconds: -1 })).toThrow(/Retention/i);
+    expect(() => world({ leaseRetentionSeconds: 1.5 })).toThrow(/Retention/i);
   });
 });
 

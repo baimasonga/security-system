@@ -23,6 +23,10 @@ export interface LicensingConfig {
   trialDays: number;
   challengeTtlSeconds: number;
   maxOutstandingChallenges: number;
+  /** How long spent/expired challenges are kept (replay detection needs them until they expire). */
+  challengeRetentionSeconds: number;
+  /** How long expired lease records are kept for forensics before maintenance deletes them. */
+  leaseRetentionSeconds: number;
 }
 
 export const DEFAULT_LEASE_TTL_SECONDS: Record<Tier, number> = {
@@ -44,6 +48,8 @@ export function defaultLicensingConfig(
     trialDays: 14,
     challengeTtlSeconds: 300,
     maxOutstandingChallenges: 10,
+    challengeRetentionSeconds: 3600,
+    leaseRetentionSeconds: 90 * DAY,
     ...overrides,
   };
   validateLicensingConfig(cfg);
@@ -53,6 +59,10 @@ export function defaultLicensingConfig(
 export function validateLicensingConfig(cfg: LicensingConfig): void {
   if (cfg.licenseKeyPepper.length < 32)
     throw new Error('licenseKeyPepper must be at least 32 characters');
+  if (!Number.isInteger(cfg.challengeRetentionSeconds) || cfg.challengeRetentionSeconds < 0)
+    throw new Error('invalid challengeRetentionSeconds');
+  if (!Number.isInteger(cfg.leaseRetentionSeconds) || cfg.leaseRetentionSeconds < 0)
+    throw new Error('invalid leaseRetentionSeconds');
   for (const t of TIERS) {
     const ttl = cfg.leaseTtlSeconds[t];
     if (!Number.isInteger(ttl) || ttl < 60 || ttl > 366 * DAY)
