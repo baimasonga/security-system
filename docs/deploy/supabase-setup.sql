@@ -6,7 +6,7 @@
 CREATE SCHEMA IF NOT EXISTS trust;
 
 -- 2. The application's role. It owns nothing; `npm run db:grants` gives it exactly the privileges it needs.
-CREATE ROLE trust_app LOGIN PASSWORD 'CHANGE-ME-generate-a-long-random-password' CONNECTION LIMIT 40;
+CREATE ROLE trust_app LOGIN PASSWORD '.Hh#Zzqbqpz31d/Mq79OF£QZ' CONNECTION LIMIT 40;
 
 -- 3. Role-level settings travel through connection poolers (startup options do not).
 ALTER ROLE trust_app SET search_path = trust;
