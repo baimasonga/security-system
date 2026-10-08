@@ -7,7 +7,7 @@ Date: 2026-10-08 (updated after the PostgreSQL adapter slice) · Branch: `claude
 The vertical slice from the brief — **Product → Plan → Subscription → License →
 Device → Activation → Signed Offline Lease → Validation** — works end to end,
 over real HTTP, with a client SDK, on **durable PostgreSQL storage** (ADR-005), and is covered by
-**218 unit/integration/security tests on the in-memory adapters plus 127 tests on PostgreSQL**
+**241 unit/integration/security tests on the in-memory adapters plus 141 tests on PostgreSQL**
 (schema, adapters, port contracts, and the licensing/API/security/end-to-end suites re-run against
 PostgreSQL), all passing. Also passing: `tsc`, ESLint
 (+ security plugin), Prettier, the architecture-boundary check, `npm audit`
@@ -34,7 +34,7 @@ PostgreSQL), all passing. Also passing: `tsc`, ESLint
 
 ## 2. What is explicitly NOT done (do not assume otherwise)
 
-1. **PostgreSQL storage is built but unproven at scale:** no load/soak test, pool and timeout tuning, failover/backup drills, or deadlock retry (R-14). Audit and business writes are still separate transactions (R-10).
+1. **PostgreSQL storage is built but unproven at scale:** no load/soak test, pool and timeout tuning, or failover/backup drills. Audit is atomic with every change and deadlocks are retried (ADR-006); the remaining storage-level risk is R-13 (a database superuser can rewrite history).
 2. **CI and the Dockerfile have never been run** on GitHub Actions / a Docker daemon (unavailable here). Equivalent local checks were run. Expect small fixes on first run.
 3. **No admin console, customer portal, or demo client app.** The HTTP API and SDK are complete enough to build them; `apps/*` directories are intentionally not scaffolded until they have content.
 4. **Identity is minimal:** no email verification, MFA, passkeys, password reset, or refresh-token rotation. Operators are a flat role (no JIT / dual control).
@@ -45,7 +45,7 @@ PostgreSQL), all passing. Also passing: `tsc`, ESLint
 
 ## 3. Recommended next steps (in order)
 
-1. **Close R-10 / R-14:** thread an audit writer through the store transactions so a change and its audit row commit atomically; add bounded retry on 40001/40P01. Then load-test activation/refresh and tune the pool.
+1. **Load-test and tune:** activation/refresh/audit-append throughput (audited writes serialize briefly on the chain lock), pool sizing, retry/exhaustion metrics; run the first backup-restore drill.
 2. First CI run on GitHub; fix fallout; pin actions by SHA; enable branch protection + required checks + CODEOWNERS teams.
 3. KMS/HSM `KeyCustody` implementation and a rehearsed rotation + compromise drill (closes the main gap in key-management §5).
 4. Identity hardening: email verification, password reset, MFA/passkeys (operators first), refresh rotation.

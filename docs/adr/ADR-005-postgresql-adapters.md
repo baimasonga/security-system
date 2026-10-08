@@ -23,5 +23,5 @@ real: tenant isolation, single-use challenges, the device limit, the audit chain
 
 - The same tests prove the same behaviour on both stores; mutation checks show the contract/concurrency tests fail if a lock, atomic guard, rollback or tenant scope is removed.
 - Restarts no longer lose accounts, licenses, activations, the audit chain, or key state.
-  − Audit and business writes are still separate transactions (risk R-10); no deadlock retry (R-14); no load testing yet.
+  − No load testing yet. Audit atomicity and deadlock retry were added in [ADR-006](ADR-006-atomic-audit-and-transaction-retry.md).
   − The in-memory adapters must be kept in step with PostgreSQL semantics by the contract suites; adding a port method requires adding it to the contract first.

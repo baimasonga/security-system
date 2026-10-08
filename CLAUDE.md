@@ -22,3 +22,5 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 - Keep `docs/api/openapi.yaml` in sync with routes (a drift test enforces it).
 - Production requires `PERSISTENCE=postgres` and fails closed on weak/missing config (`config.ts`); do not weaken those guards.
 - Adding a store-port method? Add it to the contract suite first (`packages/*/test/*contract.ts`) so every adapter must satisfy it. PostgreSQL work that counts/changes activations must lock the license row (`findLicenseForUpdate`).
+- State changes that must be audited write their audit event through `tx.audit.append(...)` inside `store.transaction(...)` — never `audit.append` after the fact (ADR-006). Only refusals/denials (no state change) use the standalone `audit.append`.
+- Store-transaction callbacks must be re-runnable (PostgreSQL retries them after deadlocks): derive state from reads inside the transaction, no irreversible side effects. Lock order is always license → activation.

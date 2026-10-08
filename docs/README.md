@@ -27,3 +27,4 @@ Architecture decision records:
 3. [ADR-003 — TypeScript on Node with native type stripping](adr/ADR-003-typescript-runtime-and-tooling.md)
 4. [ADR-004 — Authentication modes by endpoint class](adr/ADR-004-authentication-modes.md)
 5. [ADR-005 — PostgreSQL adapters](adr/ADR-005-postgresql-adapters.md)
+6. [ADR-006 — Atomic audit and transaction retry](adr/ADR-006-atomic-audit-and-transaction-retry.md)
