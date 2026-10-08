@@ -58,8 +58,8 @@ SUSPEND | DENY` + reason codes. V1 emits deterministic ALLOW/DENY; the
 - Boundaries are real (lint-enforced), so extraction later is mechanical.
   − Single process holds the signing capability in V1; mitigated by the `Signer`
   port (KMS/HSM later) and key-purpose separation. Tracked in key-management doc.
-  − In-memory adapters are not durable; production use requires the Postgres
-  adapters (explicit next step, risk R-8).
+  − The in-memory adapters are reference implementations for tests; production uses the
+  PostgreSQL adapters (ADR-005), which are held to the same contract tests.
 
 ## Rollout / rollback
 

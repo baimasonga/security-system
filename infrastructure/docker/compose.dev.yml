@@ -1,5 +1,4 @@
-# Local development stack. PostgreSQL is provisioned for schema work (`npm run test:db` does not need it);
-# the API currently uses in-memory adapters, so state is lost on restart by design.
+# Local development stack: API on PostgreSQL. Secrets here are throwaway, development-only values.
 services:
   postgres:
     image: postgres:16
@@ -8,10 +7,25 @@ services:
       POSTGRES_DB: trust
     ports: ['127.0.0.1:5432:5432']
     volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d trust']
+      interval: 3s
+      retries: 20
+  migrate:
+    build: { context: ../.., dockerfile: Dockerfile }
+    command: ['node', 'tools/migrate.ts']
+    environment:
+      DATABASE_URL: postgres://postgres:dev-only-password@postgres:5432/trust
+    depends_on: { postgres: { condition: service_healthy } }
   api:
     build: { context: ../.., dockerfile: Dockerfile }
     environment:
       NODE_ENV: development
+      PERSISTENCE: postgres
+      DATABASE_URL: postgres://postgres:dev-only-password@postgres:5432/trust
+      # Without LICENSE_SIGNING_KEY_PEM/_FILE an ephemeral key is generated per start (dev only);
+      # leases signed by it stop verifying after a restart.
     ports: ['127.0.0.1:8080:8080']
+    depends_on: { migrate: { condition: service_completed_successfully } }
 volumes:
   pgdata: {}

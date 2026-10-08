@@ -5,7 +5,8 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 ## Commands
 
 - `npm run check` — format check, lint + architecture boundaries, typecheck, unit/integration/security tests (must pass before any push)
-- `npm run test:db` — PostgreSQL tests against a throwaway cluster (or `DATABASE_URL`)
+- `npm run test:db` — PostgreSQL tests against a throwaway cluster (or `DATABASE_URL`); also re-runs the behavioural suites on PG
+- `npm run migrate` — apply SQL migrations (`DATABASE_URL` required)
 - `npm run format` — Prettier write
 - `node tools/gen-lease-vectors.ts > docs/api/lease-test-vectors.json` — only when the lease wire format changes (ADR required)
 
@@ -19,4 +20,5 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 - Every operator/admin mutation needs a mandatory `reason` and an audit event. Unknown request fields are rejected (strict zod).
 - Licensing failures degrade to states; they must never delete or lock user documents.
 - Keep `docs/api/openapi.yaml` in sync with routes (a drift test enforces it).
-- Production start-up is intentionally refused until PostgreSQL adapters exist (`config.ts`); do not weaken that guard.
+- Production requires `PERSISTENCE=postgres` and fails closed on weak/missing config (`config.ts`); do not weaken those guards.
+- Adding a store-port method? Add it to the contract suite first (`packages/*/test/*contract.ts`) so every adapter must satisfy it. PostgreSQL work that counts/changes activations must lock the license row (`findLicenseForUpdate`).

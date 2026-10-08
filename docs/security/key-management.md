@@ -66,9 +66,25 @@ Pepper compromise: rotate the pepper and re-issue license keys (digests cannot b
 recomputed without plaintext). Because keys are only shown once, this is a
 customer-visible event — hence the 125-bit key space as the primary defense.
 
+## 4a. Persistence and restarts (ADR-005)
+
+Key **metadata** (public key, state, timestamps) is stored in `signing_keys`; private
+material is never stored in the database. At start-up the key ring restores the
+records and attaches the configured private key (`LICENSE_SIGNING_KEY_FILE`/`_PEM`),
+matching it by its deterministic `kid`:
+
+| Configured key is…                   | Start-up behaviour                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| unknown                              | imported, activated; the previously active key (if any) becomes `deprecated` — this _is_ the routine rotation path |
+| the current active key               | attached, normal start                                                                                             |
+| `deprecated` (rotated out)           | **refuses to start**                                                                                               |
+| `revoked` / `archived` / `destroyed` | **refuses to start**                                                                                               |
+
+Tests: `services/platform-api/test/db/adapters.db.test.ts` ("container restart").
+
 ## 5. Gaps (tracked)
 
-- Production custody is still an in-process software key (R-8/R-11 family). The
+- Production custody is still an in-process software key loaded from a secret mount. The
   `KeyCustody` interface is the seam for KMS/HSM; implementing it is a
   prerequisite for production.
 - No offline root or key-delegation (Milestone 3). Until then the license key is a

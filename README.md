@@ -5,9 +5,9 @@ platform for all desktop and web products. Not a license-key server: the server 
 the only authority; clients receive **signed, device-bound, expiring evidence** they
 can verify offline with public keys.
 
-> **Status: V1 first slice, development-grade.** The license lifecycle works end to
-> end and is heavily tested, but persistence is in-memory and production start-up is
-> refused until the PostgreSQL adapters land. Read
+> **Status: V1 first slice with durable PostgreSQL storage.** The license lifecycle works end to
+> end and is heavily tested on both in-memory and PostgreSQL adapters. It has **not** had a
+> load test, an external security review, or a rehearsed incident drill. Read
 > [docs/architecture/05-v1-status-and-handoff.md](docs/architecture/05-v1-status-and-handoff.md)
 > before relying on anything here.
 
@@ -22,8 +22,13 @@ Requires Node ≥ 22.18 (native TypeScript type stripping; no build step).
 ```bash
 npm ci
 npm run check        # format, lint (+ architecture boundaries), typecheck, unit/integration/security tests
-npm run test:db      # PostgreSQL schema tests (spins up a throwaway local cluster; or set DATABASE_URL)
-npm run dev          # API on http://127.0.0.1:8080 with ephemeral dev-only keys and in-memory stores
+npm run test:db      # PostgreSQL: schema, adapters, contracts, and the behavioural suites re-run on PG
+                     # (spins up a throwaway local cluster; or set DATABASE_URL)
+npm run dev          # API on http://127.0.0.1:8080, in-memory stores, ephemeral dev-only keys
+
+# durable mode:
+DATABASE_URL=postgres://… npm run migrate
+PERSISTENCE=postgres DATABASE_URL=postgres://… npm run dev
 ```
 
 ## How a device is licensed
@@ -67,7 +72,7 @@ packages/
   entitlements   pure plan → entitlements/capabilities resolver
   licensing      subscriptions, licenses, devices, activations, challenges, leases, policy
   sdk-core       device key, lease verifier, API client (ships to untrusted machines)
-services/platform-api   Fastify HTTP edge, config, composition root, SQL migrations
+services/platform-api   Fastify HTTP edge, config, composition root, PostgreSQL adapters, SQL migrations
 docs/            architecture, ADRs, threat model, OpenAPI, key management, runbooks
 tests/           security (tenant isolation, privilege) and integration (real socket) suites
 tools/           boundary checker, ephemeral Postgres runner, lease-vector generator

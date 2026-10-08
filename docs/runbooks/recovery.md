@@ -1,8 +1,7 @@
 # Recovery Procedures (V1)
 
-Status: **design only for durable storage** — V1 runs on in-memory adapters
-(non-production). These procedures become executable when the PostgreSQL
-adapters land; the schema and its tests exist now.
+Status: **procedures executable; not yet rehearsed.** The PostgreSQL adapters (ADR-005) and schema
+exist; no restore drill has been run.
 
 | Scenario                                | Procedure                                                                                                                                                                                           | Recovery objective (target, to validate)           |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |

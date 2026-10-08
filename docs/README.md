@@ -26,3 +26,4 @@ Architecture decision records:
 2. [ADR-002 — Offline lease format](adr/ADR-002-signed-lease-format.md)
 3. [ADR-003 — TypeScript on Node with native type stripping](adr/ADR-003-typescript-runtime-and-tooling.md)
 4. [ADR-004 — Authentication modes by endpoint class](adr/ADR-004-authentication-modes.md)
+5. [ADR-005 — PostgreSQL adapters](adr/ADR-005-postgresql-adapters.md)

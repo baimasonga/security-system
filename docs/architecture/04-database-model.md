@@ -45,3 +45,12 @@ erDiagram
   active activation rejection, audit immutability, one-active-key).
 - Recovery: PITR/backups per `docs/runbooks/recovery.md` (written with the
   deployment milestone); schema changes ship expand→migrate→contract.
+
+## Adapters and operations
+
+- Adapters: `services/platform-api/src/db/` (see [ADR-005](../adr/ADR-005-postgresql-adapters.md)).
+- Apply schema: `DATABASE_URL=… npm run migrate` (checksummed, advisory-locked, forward-only).
+  The server refuses to start on a database that is missing a migration or has an unknown one.
+- Test: `npm run test:db` runs the migration/constraint tests, the PostgreSQL adapter tests,
+  the port contract suites, and re-runs the licensing, API, security and end-to-end suites
+  against PostgreSQL (each test in its own migrated schema).

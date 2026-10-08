@@ -1,13 +1,15 @@
 # 05 — V1 First-Slice Status and Handoff
 
-Date: 2026-10-08 · Branch: `claude/sleepy-carson-l0if1k`
+Date: 2026-10-08 (updated after the PostgreSQL adapter slice) · Branch: `claude/sleepy-carson-l0if1k`
 
 ## 1. What is built and verified
 
 The vertical slice from the brief — **Product → Plan → Subscription → License →
 Device → Activation → Signed Offline Lease → Validation** — works end to end,
-over real HTTP, with a client SDK, and is covered by **187 unit/integration/security
-tests plus 14 PostgreSQL schema tests**, all passing. Also passing: `tsc`, ESLint
+over real HTTP, with a client SDK, on **durable PostgreSQL storage** (ADR-005), and is covered by
+**218 unit/integration/security tests on the in-memory adapters plus 127 tests on PostgreSQL**
+(schema, adapters, port contracts, and the licensing/API/security/end-to-end suites re-run against
+PostgreSQL), all passing. Also passing: `tsc`, ESLint
 (+ security plugin), Prettier, the architecture-boundary check, `npm audit`
 (0 vulnerabilities), and a clean `npm ci --omit=dev` start-up.
 
@@ -32,7 +34,7 @@ tests plus 14 PostgreSQL schema tests**, all passing. Also passing: `tsc`, ESLin
 
 ## 2. What is explicitly NOT done (do not assume otherwise)
 
-1. **No PostgreSQL adapters.** All stores are in-memory; state is lost on restart. `NODE_ENV=production` is refused at start-up on purpose (tested). The schema (`migrations/0001_init.sql`) is real and tested against PostgreSQL 16, including the locking patterns the adapters must use. **This is the top-priority next slice.**
+1. **PostgreSQL storage is built but unproven at scale:** no load/soak test, pool and timeout tuning, failover/backup drills, or deadlock retry (R-14). Audit and business writes are still separate transactions (R-10).
 2. **CI and the Dockerfile have never been run** on GitHub Actions / a Docker daemon (unavailable here). Equivalent local checks were run. Expect small fixes on first run.
 3. **No admin console, customer portal, or demo client app.** The HTTP API and SDK are complete enough to build them; `apps/*` directories are intentionally not scaffolded until they have content.
 4. **Identity is minimal:** no email verification, MFA, passkeys, password reset, or refresh-token rotation. Operators are a flat role (no JIT / dual control).
@@ -43,7 +45,7 @@ tests plus 14 PostgreSQL schema tests**, all passing. Also passing: `tsc`, ESLin
 
 ## 3. Recommended next steps (in order)
 
-1. **PostgreSQL adapters** for `AuthStore`, `LicensingStore`, `AuditLog`, telemetry sinks, key metadata. Method: write a shared _contract test suite_ for each port (the in-memory tests already encode the behavior), run it against both adapters; implement `transaction()` with `SELECT … FOR UPDATE` on the license row and `consumeChallenge` as a single `UPDATE … RETURNING` (both patterns are proven in `migration.db.test.ts`); write audit rows in the same transaction as the business change (closes R-10); then lift the production guard.
+1. **Close R-10 / R-14:** thread an audit writer through the store transactions so a change and its audit row commit atomically; add bounded retry on 40001/40P01. Then load-test activation/refresh and tune the pool.
 2. First CI run on GitHub; fix fallout; pin actions by SHA; enable branch protection + required checks + CODEOWNERS teams.
 3. KMS/HSM `KeyCustody` implementation and a rehearsed rotation + compromise drill (closes the main gap in key-management §5).
 4. Identity hardening: email verification, password reset, MFA/passkeys (operators first), refresh rotation.
