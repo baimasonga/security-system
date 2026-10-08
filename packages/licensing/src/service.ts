@@ -1,4 +1,4 @@
-import type { AuditLog } from '@trust/audit';
+import type { AuditEventInput, AuditLog, AuditWriter } from '@trust/audit';
 import {
   generateLicenseKey,
   jwkThumbprint,
@@ -180,13 +180,26 @@ export class LicensingService {
       createdAt: this.#d.clock.now(),
     };
     try {
-      await this.#d.store.insertProduct(p);
-    } catch {
-      throw new DomainError('conflict', 'product code already exists');
+      await this.#d.store.transaction(async (tx) => {
+        await tx.insertProduct(p);
+        await this.#opAudit(
+          tx.audit,
+          'product.created',
+          op,
+          reason,
+          { type: 'product', id: p.id },
+          undefined,
+          {
+            code: p.code,
+          },
+        );
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === 'duplicate_product_code') {
+        throw new DomainError('conflict', 'product code already exists');
+      }
+      throw e;
     }
-    await this.#opAudit('product.created', op, reason, { type: 'product', id: p.id }, undefined, {
-      code: p.code,
-    });
     return p;
   }
 
@@ -216,14 +229,27 @@ export class LicensingService {
       updatedAt: this.#d.clock.now(),
     };
     try {
-      await this.#d.store.insertPlan(plan);
-    } catch {
-      throw new DomainError('conflict', 'plan code already exists for product');
+      await this.#d.store.transaction(async (tx) => {
+        await tx.insertPlan(plan);
+        await this.#opAudit(
+          tx.audit,
+          'plan.created',
+          op,
+          reason,
+          { type: 'plan', id: plan.id },
+          undefined,
+          {
+            version: 1,
+            tier: plan.tier,
+          },
+        );
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === 'duplicate_plan_code') {
+        throw new DomainError('conflict', 'plan code already exists for product');
+      }
+      throw e;
     }
-    await this.#opAudit('plan.created', op, reason, { type: 'plan', id: plan.id }, undefined, {
-      version: 1,
-      tier: plan.tier,
-    });
     return plan;
   }
 
@@ -238,24 +264,34 @@ export class LicensingService {
     op: OperatorActor,
   ): Promise<Plan> {
     const reason = requireReason(op.reason);
-    const cur = await this.#d.store.findPlan(planId);
-    if (!cur) throw new DomainError('not_found', 'plan not found');
-    const next: Plan = {
-      ...cur,
-      ...this.#validatePlanBody({
-        entitlements: patch.entitlements ?? cur.entitlements,
-        capabilities: patch.capabilities ?? cur.capabilities,
-        deviceLimit: patch.deviceLimit ?? cur.deviceLimit,
-      }),
-      version: cur.version + 1,
-      updatedAt: this.#d.clock.now(),
-    };
-    await this.#d.store.updatePlan(next);
-    await this.#opAudit('plan.updated', op, reason, { type: 'plan', id: planId }, undefined, {
-      from_version: cur.version,
-      to_version: next.version,
+    return this.#d.store.transaction(async (tx) => {
+      const cur = await tx.findPlan(planId);
+      if (!cur) throw new DomainError('not_found', 'plan not found');
+      const next: Plan = {
+        ...cur,
+        ...this.#validatePlanBody({
+          entitlements: patch.entitlements ?? cur.entitlements,
+          capabilities: patch.capabilities ?? cur.capabilities,
+          deviceLimit: patch.deviceLimit ?? cur.deviceLimit,
+        }),
+        version: cur.version + 1,
+        updatedAt: this.#d.clock.now(),
+      };
+      await tx.updatePlan(next);
+      await this.#opAudit(
+        tx.audit,
+        'plan.updated',
+        op,
+        reason,
+        { type: 'plan', id: planId },
+        undefined,
+        {
+          from_version: cur.version,
+          to_version: next.version,
+        },
+      );
+      return next;
     });
-    return next;
   }
 
   #validatePlanBody(b: {
@@ -305,18 +341,18 @@ export class LicensingService {
       currentPeriodEnd: input.currentPeriodEnd ?? null,
       createdAt: this.#d.clock.now(),
     };
-    await this.#d.store.insertSubscription(s);
-    await this.#opAudit(
-      'subscription.created',
-      op,
-      reason,
-      { type: 'subscription', id: s.id },
-      s.orgId,
-      {
-        status: s.status,
-        plan_id: s.planId,
-      },
-    );
+    await this.#d.store.transaction(async (tx) => {
+      await tx.insertSubscription(s);
+      await this.#opAudit(
+        tx.audit,
+        'subscription.created',
+        op,
+        reason,
+        { type: 'subscription', id: s.id },
+        s.orgId,
+        { status: s.status, plan_id: s.planId },
+      );
+    });
     return s;
   }
 
@@ -327,32 +363,32 @@ export class LicensingService {
     op: OperatorActor,
   ): Promise<Subscription> {
     const reason = requireReason(op.reason);
-    const cur = await this.#d.store.findSubscription(orgId, subscriptionId);
-    if (!cur) throw new DomainError('not_found', 'subscription not found');
     if (patch.status)
       need((SUBSCRIPTION_STATUSES as readonly string[]).includes(patch.status), 'invalid status');
-    if (patch.planId && !(await this.#d.store.findPlan(patch.planId)))
-      throw new DomainError('not_found', 'plan not found');
-    const next: Subscription = {
-      ...cur,
-      status: patch.status ?? cur.status,
-      planId: patch.planId ?? cur.planId,
-      currentPeriodEnd:
-        patch.currentPeriodEnd === undefined ? cur.currentPeriodEnd : patch.currentPeriodEnd,
-    };
-    await this.#d.store.updateSubscription(next);
-    await this.#opAudit(
-      'subscription.updated',
-      op,
-      reason,
-      { type: 'subscription', id: cur.id },
-      orgId,
-      {
-        from_status: cur.status,
-        to_status: next.status,
-      },
-    );
-    return next;
+    return this.#d.store.transaction(async (tx) => {
+      const cur = await tx.findSubscription(orgId, subscriptionId);
+      if (!cur) throw new DomainError('not_found', 'subscription not found');
+      if (patch.planId && !(await tx.findPlan(patch.planId)))
+        throw new DomainError('not_found', 'plan not found');
+      const next: Subscription = {
+        ...cur,
+        status: patch.status ?? cur.status,
+        planId: patch.planId ?? cur.planId,
+        currentPeriodEnd:
+          patch.currentPeriodEnd === undefined ? cur.currentPeriodEnd : patch.currentPeriodEnd,
+      };
+      await tx.updateSubscription(next);
+      await this.#opAudit(
+        tx.audit,
+        'subscription.updated',
+        op,
+        reason,
+        { type: 'subscription', id: cur.id },
+        orgId,
+        { from_status: cur.status, to_status: next.status },
+      );
+      return next;
+    });
   }
 
   /** Returns the license and its plaintext key — the only time the key is ever available. */
@@ -412,15 +448,18 @@ export class LicensingService {
       overrides,
       createdAt: this.#d.clock.now(),
     };
-    await this.#d.store.insertLicense(license);
-    await this.#opAudit(
-      input.kind === 'canary' ? 'license.canary_issued' : 'license.issued',
-      op,
-      reason,
-      { type: 'license', id: license.id },
-      license.orgId,
-      { kind: license.kind, product_id: product.id, plan_id: plan.id },
-    );
+    await this.#d.store.transaction(async (tx) => {
+      await tx.insertLicense(license);
+      await this.#opAudit(
+        tx.audit,
+        input.kind === 'canary' ? 'license.canary_issued' : 'license.issued',
+        op,
+        reason,
+        { type: 'license', id: license.id },
+        license.orgId,
+        { kind: license.kind, product_id: product.id, plan_id: plan.id },
+      );
+    });
     return { license: await this.#licenseView(this.#d.store, license), licenseKey };
   }
 
@@ -457,16 +496,17 @@ export class LicensingService {
             });
         }
       }
+      await this.#opAudit(
+        tx.audit,
+        `license.${action === 'revoke' ? 'revoked' : action === 'suspend' ? 'suspended' : 'reinstated'}`,
+        op,
+        reason,
+        { type: 'license', id: licenseId },
+        orgId,
+        { to_state: updated.state },
+      );
       return updated;
     });
-    await this.#opAudit(
-      `license.${action === 'revoke' ? 'revoked' : action === 'suspend' ? 'suspended' : 'reinstated'}`,
-      op,
-      reason,
-      { type: 'license', id: licenseId },
-      orgId,
-      { to_state: next.state },
-    );
     return this.#licenseView(this.#d.store, next);
   }
 
@@ -577,6 +617,13 @@ export class LicensingService {
           licenseId: license.id,
           createdAt: now,
         });
+        await tx.audit.append({
+          actor: { type: 'user', id: p.userId },
+          action: 'trial.started',
+          target: { type: 'license', id: license.id },
+          orgId: input.orgId,
+          metadata: { product_id: product.id },
+        });
       });
     } catch (e) {
       if (e instanceof Error && e.message === 'trial_exists') {
@@ -587,13 +634,6 @@ export class LicensingService {
       }
       throw e;
     }
-    await this.#d.audit.append({
-      actor: { type: 'user', id: p.userId },
-      action: 'trial.started',
-      target: { type: 'license', id: license.id },
-      orgId: input.orgId,
-      metadata: { product_id: product.id },
-    });
     await this.#d.telemetry.track('trial.started');
     return { license: await this.#licenseView(this.#d.store, license), licenseKey };
   }
@@ -608,8 +648,7 @@ export class LicensingService {
     const act = await this.#d.store.findActivation(orgId, activationId);
     if (!act) throw new DomainError('not_found', 'not found');
     if (act.activatedBy !== p.userId) await this.#d.authorize(p, orgId, 'device:deactivate');
-    const updated = await this.#deactivate(act);
-    await this.#d.audit.append({
+    const updated = await this.#deactivate(act, {
       actor: { type: 'user', id: p.userId },
       action: 'activation.deactivated',
       target: { type: 'activation', id: act.id },
@@ -791,7 +830,33 @@ export class LicensingService {
           ev,
           now,
         });
-        return { grant, newDevice, reissued, act, lic };
+        // Audit commits atomically with the activation, device registration and lease record.
+        const user = { type: 'user' as const, id: p.userId };
+        if (newDevice)
+          await tx.audit.append({
+            actor: user,
+            action: 'device.registered',
+            target: { type: 'device', id: grant.deviceId },
+            orgId: lic.orgId,
+          });
+        await tx.audit.append({
+          actor: user,
+          action: reissued ? 'activation.reissued' : 'activation.created',
+          target: { type: 'activation', id: act.id },
+          orgId: lic.orgId,
+          metadata: { license_id: lic.id },
+        });
+        await tx.audit.append({
+          actor: { type: 'system' },
+          action: 'lease.issued',
+          target: { type: 'activation', id: act.id },
+          orgId: lic.orgId,
+          metadata: {
+            expires_at: grant.leaseExpiresAt,
+            plan_version: grant.entitlements.planVersion,
+          },
+        });
+        return { grant, reissued };
       })
       .catch(async (e: unknown) => {
         if (e instanceof DomainError) {
@@ -814,28 +879,7 @@ export class LicensingService {
         throw e;
       });
 
-    const { grant, newDevice, reissued, act, lic } = result;
-    if (newDevice)
-      await this.#d.audit.append({
-        actor: { type: 'user', id: p.userId },
-        action: 'device.registered',
-        target: { type: 'device', id: grant.deviceId },
-        orgId: lic.orgId,
-      });
-    await this.#d.audit.append({
-      actor: { type: 'user', id: p.userId },
-      action: reissued ? 'activation.reissued' : 'activation.created',
-      target: { type: 'activation', id: act.id },
-      orgId: lic.orgId,
-      metadata: { license_id: lic.id },
-    });
-    await this.#d.audit.append({
-      actor: { type: 'system' },
-      action: 'lease.issued',
-      target: { type: 'activation', id: act.id },
-      orgId: lic.orgId,
-      metadata: { expires_at: grant.leaseExpiresAt, plan_version: grant.entitlements.planVersion },
-    });
+    const { grant, reissued } = result;
     await this.#d.telemetry.track('activation.succeeded', {
       tier: grant.entitlements.tier,
       reissued: reissued,
@@ -865,32 +909,41 @@ export class LicensingService {
     const ctx = await this.#authenticateDevice('refresh', input);
     const now = this.#d.clock.now();
     const grant = await this.#d.store.transaction(async (tx) => {
-      const act = (await tx.findActivationForDeviceAuth(ctx.act.id))!;
-      if (act.status !== 'active')
+      // Lock order is always license -> activation. Re-evaluate under the lock: the state read while
+      // authenticating the device may have changed (e.g. suspension) before we got here.
+      const lic = await tx.findLicenseForUpdate(ctx.lic.orgId, ctx.lic.id);
+      if (!lic) throw new DomainError('internal', 'license missing');
+      const fresh = await this.#loadContext(tx, lic);
+      const ev = this.#evaluate(lic, fresh.sub);
+      if (ev.outcome.decision !== 'ALLOW') {
+        throw new DomainError(ev.code ?? 'invalid_license', ev.outcome.reasons[0] ?? 'denied');
+      }
+      const act = await tx.findActivationForDeviceAuth(ctx.act.id);
+      if (!act || act.status !== 'active')
         throw new DomainError('activation_not_found', 'activation is not active');
-      const resolved = resolveEntitlements(ctx.plan, ctx.lic.overrides);
+      const resolved = resolveEntitlements(fresh.plan, lic.overrides);
       const g = await this.#issueLease(tx, {
-        lic: ctx.lic,
+        lic,
         act: { ...act, lastValidatedAt: now },
         device: ctx.device,
-        product: ctx.product,
-        plan: ctx.plan,
+        product: fresh.product,
+        plan: fresh.plan,
         resolved,
-        ev: ctx.ev,
+        ev,
         now,
       });
+      await tx.audit.append({
+        actor: { type: 'device', id: ctx.device.id },
+        action: 'lease.issued',
+        target: { type: 'activation', id: ctx.act.id },
+        orgId: lic.orgId,
+        metadata: {
+          expires_at: g.leaseExpiresAt,
+          plan_version: g.entitlements.planVersion,
+          via: 'refresh',
+        },
+      });
       return g;
-    });
-    await this.#d.audit.append({
-      actor: { type: 'device', id: ctx.device.id },
-      action: 'lease.issued',
-      target: { type: 'activation', id: ctx.act.id },
-      orgId: ctx.lic.orgId,
-      metadata: {
-        expires_at: grant.leaseExpiresAt,
-        plan_version: grant.entitlements.planVersion,
-        via: 'refresh',
-      },
     });
     await this.#d.telemetry.track('lease.refreshed', { tier: grant.entitlements.tier });
     return grant;
@@ -899,8 +952,7 @@ export class LicensingService {
   /** Self-deactivation by the device (e.g. uninstall or "sign out this device"). */
   async deactivateByDevice(input: DeviceAuthInput): Promise<ActivationView> {
     const ctx = await this.#authenticateDevice('deactivate', input, { requireValidLicense: false });
-    const updated = await this.#deactivate(ctx.act);
-    await this.#d.audit.append({
+    const updated = await this.#deactivate(ctx.act, {
       actor: { type: 'device', id: ctx.device.id },
       action: 'activation.deactivated',
       target: { type: 'activation', id: ctx.act.id },
@@ -967,17 +1019,19 @@ export class LicensingService {
     };
   }
 
-  async #deactivate(act: Activation): Promise<Activation> {
+  /** Idempotent. The audit event is written only when the state actually changes, atomically with it. */
+  async #deactivate(act: Activation, audit: AuditEventInput): Promise<Activation> {
     return this.#d.store.transaction(async (tx) => {
       const cur = await tx.findActivationForDeviceAuth(act.id);
       if (!cur) throw new DomainError('not_found', 'not found');
-      if (cur.status !== 'active') return cur; // idempotent
+      if (cur.status !== 'active') return cur;
       const next: Activation = {
         ...cur,
         status: 'deactivated',
         deactivatedAt: this.#d.clock.now(),
       };
       await tx.updateActivation(next);
+      await tx.audit.append(audit);
       return next;
     });
   }
@@ -1169,7 +1223,9 @@ export class LicensingService {
     await this.#d.telemetry.track('activation.rejected', { reason });
   }
 
+  /** Operator audit entry, written through the caller's transaction so it commits with the change. */
   async #opAudit(
+    writer: AuditWriter,
     action: string,
     op: OperatorActor,
     reason: string,
@@ -1177,7 +1233,7 @@ export class LicensingService {
     orgId: string | undefined,
     metadata?: Record<string, unknown>,
   ) {
-    await this.#d.audit.append({
+    await writer.append({
       actor: { type: 'operator', id: op.id },
       action,
       target,

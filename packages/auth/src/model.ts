@@ -1,3 +1,5 @@
+import type { AuditEventInput, AuditLog, AuditWriter } from '@trust/audit';
+import { AuditBuffer } from '@trust/audit';
 import type { OrgRole, PlatformRole } from '@trust/shared-types';
 
 export interface User {
@@ -32,8 +34,8 @@ export interface Session {
   revokedAt: Date | null;
 }
 
-/** Persistence port for identity. Adapters: in-memory (tests/dev), PostgreSQL (next slice). */
-export interface AuthStore {
+/** Identity data access. */
+export interface AuthRepo {
   insertUser(u: User): Promise<void>;
   findUserByEmail(email: string): Promise<User | undefined>;
   findUserById(id: string): Promise<User | undefined>;
@@ -49,62 +51,120 @@ export interface AuthStore {
   revokeSession(id: string, at: Date): Promise<void>;
 }
 
-export class InMemoryAuthStore implements AuthStore {
-  readonly #users = new Map<string, User>();
-  readonly #orgs = new Map<string, Organization>();
-  readonly #memberships = new Map<string, Membership>();
-  readonly #sessions = new Map<string, Session>();
+/** A transaction: every repository method, plus an audit writer that commits atomically with them. */
+export interface AuthTx extends AuthRepo {
+  audit: AuditWriter;
+}
+
+/** Persistence port for identity. Adapters: in-memory (tests/dev), PostgreSQL. */
+export interface AuthStore extends AuthRepo {
+  /**
+   * Unit of work: writes and audit events appended via `tx.audit` commit together or not at all.
+   * `fn` must be safe to re-run (the PostgreSQL adapter retries after deadlocks).
+   */
+  transaction<T>(fn: (tx: AuthTx) => Promise<T>): Promise<T>;
+}
+
+interface State {
+  users: Map<string, User>;
+  orgs: Map<string, Organization>;
+  memberships: Map<string, Membership>;
+  sessions: Map<string, Session>;
+}
+
+class MemoryRepo implements AuthRepo {
+  readonly s: State = {
+    users: new Map(),
+    orgs: new Map(),
+    memberships: new Map(),
+    sessions: new Map(),
+  };
 
   async insertUser(u: User) {
-    if ([...this.#users.values()].some((x) => x.email === u.email))
+    if ([...this.s.users.values()].some((x) => x.email === u.email))
       throw new Error('duplicate_email');
-    this.#users.set(u.id, { ...u });
+    this.s.users.set(u.id, { ...u });
   }
   async findUserByEmail(email: string) {
-    const u = [...this.#users.values()].find((x) => x.email === email);
+    const u = [...this.s.users.values()].find((x) => x.email === email);
     return u ? { ...u } : undefined;
   }
   async findUserById(id: string) {
-    const u = this.#users.get(id);
+    const u = this.s.users.get(id);
     return u ? { ...u } : undefined;
   }
   async setPlatformRole(userId: string, role: 'none' | 'platform_admin') {
-    const u = this.#users.get(userId);
+    const u = this.s.users.get(userId);
     if (u) u.platformRole = role;
   }
   async insertOrganization(o: Organization) {
-    this.#orgs.set(o.id, { ...o });
+    this.s.orgs.set(o.id, { ...o });
   }
   async findOrganization(id: string) {
-    const o = this.#orgs.get(id);
+    const o = this.s.orgs.get(id);
     return o ? { ...o } : undefined;
   }
   async insertMembership(m: Membership) {
     const k = `${m.orgId}|${m.userId}`;
-    if (this.#memberships.has(k)) throw new Error('duplicate_membership');
-    this.#memberships.set(k, { ...m });
+    if (this.s.memberships.has(k)) throw new Error('duplicate_membership');
+    this.s.memberships.set(k, { ...m });
   }
   async findMembership(orgId: string, userId: string) {
-    const m = this.#memberships.get(`${orgId}|${userId}`);
+    const m = this.s.memberships.get(`${orgId}|${userId}`);
     return m ? { ...m } : undefined;
   }
   async listMembershipsForUser(userId: string) {
-    return [...this.#memberships.values()]
+    return [...this.s.memberships.values()]
       .filter((m) => m.userId === userId)
       .map((m) => ({ ...m }));
   }
   async listMembershipsForOrg(orgId: string) {
-    return [...this.#memberships.values()].filter((m) => m.orgId === orgId).map((m) => ({ ...m }));
+    return [...this.s.memberships.values()].filter((m) => m.orgId === orgId).map((m) => ({ ...m }));
   }
   async insertSession(s: Session) {
-    this.#sessions.set(s.id, { ...s });
+    this.s.sessions.set(s.id, { ...s });
   }
   async findSessionByTokenHash(hash: string) {
-    const s = [...this.#sessions.values()].find((x) => x.tokenHash === hash);
+    const s = [...this.s.sessions.values()].find((x) => x.tokenHash === hash);
     return s ? { ...s } : undefined;
   }
   async revokeSession(id: string, at: Date) {
-    const s = this.#sessions.get(id);
+    const s = this.s.sessions.get(id);
     if (s && !s.revokedAt) s.revokedAt = at;
+  }
+}
+
+/** In-memory adapter: serialized transactions with snapshot rollback; audit flushed only on commit. */
+export class InMemoryAuthStore extends MemoryRepo implements AuthStore {
+  #lock: Promise<unknown> = Promise.resolve();
+  readonly #audit: AuditLog | undefined;
+  readonly committedAudit: AuditEventInput[] = [];
+
+  constructor(opts?: { audit?: AuditLog }) {
+    super();
+    this.#audit = opts?.audit;
+  }
+
+  transaction<T>(fn: (tx: AuthTx) => Promise<T>): Promise<T> {
+    const run = async (): Promise<T> => {
+      const snapshot = structuredClone(this.s);
+      const buffer = new AuditBuffer();
+      const tx = Object.assign(Object.create(this) as MemoryRepo, {
+        audit: buffer,
+      }) as unknown as AuthTx;
+      try {
+        const out = await fn(tx);
+        const events = buffer.drain();
+        if (this.#audit) await this.#audit.appendMany(events);
+        else this.committedAudit.push(...events);
+        return out;
+      } catch (e) {
+        Object.assign(this.s, snapshot);
+        throw e;
+      }
+    };
+    const p = this.#lock.then(run, run);
+    this.#lock = p.catch(() => undefined);
+    return p;
   }
 }

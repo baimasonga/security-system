@@ -3,7 +3,8 @@ import { redact, type Clock, type Json } from '@trust/shared-types';
 
 export const GENESIS_HASH = '0'.repeat(64);
 
-export type ActorType = 'user' | 'device' | 'system' | 'operator' | 'anonymous';
+export const ACTOR_TYPES = ['user', 'device', 'system', 'operator', 'anonymous'] as const;
+export type ActorType = (typeof ACTOR_TYPES)[number];
 
 export interface AuditEventInput {
   actor: { type: ActorType; id?: string | undefined };
@@ -34,8 +35,33 @@ export type ChainVerification =
   | { ok: true; count: number; headHash: string }
   | { ok: false; brokenAtSeq: number; reason: string };
 
+/**
+ * Write-only audit handle given to a store transaction. Events are buffered and written by the
+ * adapter inside the SAME unit of work as the business change, so a change and its audit record
+ * commit or roll back together. (If the audit write fails, the change does not happen.)
+ */
+export interface AuditWriter {
+  append(input: AuditEventInput): Promise<void>;
+}
+
+/** Shared buffering implementation used by every transactional adapter. */
+export class AuditBuffer implements AuditWriter {
+  #events: AuditEventInput[] = [];
+  async append(input: AuditEventInput): Promise<void> {
+    this.#events.push(input);
+  }
+  /** Returns and clears the buffered events, oldest first. */
+  drain(): AuditEventInput[] {
+    const out = this.#events;
+    this.#events = [];
+    return out;
+  }
+}
+
 export interface AuditLog {
   append(input: AuditEventInput): Promise<AuditEvent>;
+  /** Appends all events as one contiguous run of the chain (no other event can interleave). */
+  appendMany(inputs: readonly AuditEventInput[]): Promise<AuditEvent[]>;
   list(filter?: { orgId?: string; action?: string; limit?: number }): Promise<AuditEvent[]>;
   verifyChain(): Promise<ChainVerification>;
 }
@@ -87,6 +113,9 @@ export function buildEvent(
   prev: { seq: number; hash: string },
   at: Date,
 ): AuditEvent {
+  if (!(ACTOR_TYPES as readonly string[]).includes(input.actor.type)) {
+    throw new Error('invalid audit actor type');
+  }
   const base: Omit<AuditEvent, 'hash'> = {
     seq: prev.seq + 1,
     id: newId('aud'),
@@ -113,15 +142,25 @@ export class InMemoryAuditLog implements AuditLog {
   }
 
   append(input: AuditEventInput): Promise<AuditEvent> {
-    const run = async (): Promise<AuditEvent> => {
-      const last = this.#events.at(-1);
-      const ev = buildEvent(
-        input,
-        last ? { seq: last.seq, hash: last.hash } : { seq: 0, hash: GENESIS_HASH },
-        this.#clock.now(),
-      );
-      this.#events.push(Object.freeze(ev) as AuditEvent);
-      return ev;
+    return this.appendMany([input]).then((r) => r[0]!);
+  }
+
+  appendMany(inputs: readonly AuditEventInput[]): Promise<AuditEvent[]> {
+    const run = async (): Promise<AuditEvent[]> => {
+      // Build the whole run first: if any event is invalid, nothing is written (all-or-nothing).
+      const out: AuditEvent[] = [];
+      let prev = this.#events.at(-1);
+      for (const input of inputs) {
+        const ev = buildEvent(
+          input,
+          prev ? { seq: prev.seq, hash: prev.hash } : { seq: 0, hash: GENESIS_HASH },
+          this.#clock.now(),
+        );
+        out.push(ev);
+        prev = ev;
+      }
+      for (const ev of out) this.#events.push(Object.freeze(ev) as AuditEvent);
+      return out;
     };
     const p = this.#tail.then(run, run);
     this.#tail = p.catch(() => undefined);

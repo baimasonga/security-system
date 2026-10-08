@@ -79,5 +79,40 @@ export function auditLogContract(
       expect(e.metadata['note']).toBe('ab');
       expect(await log.verifyChain()).toMatchObject({ ok: true });
     });
+
+    it('appendMany writes a contiguous run, in order, even while other appends race', async () => {
+      const log = await make(clock);
+      const batch = (tag: string) =>
+        Array.from({ length: 5 }, (_, i) => ({
+          actor: { type: 'system' as const },
+          action: `${tag}${i}`,
+        }));
+      const all = await Promise.all([
+        log.appendMany(batch('a')),
+        log.appendMany(batch('b')),
+        log.append({ actor: { type: 'system' }, action: 'single' }),
+        log.appendMany(batch('c')),
+      ]);
+      for (const run of [all[0], all[1], all[3]]) {
+        const seqs = run.map((e) => e.seq);
+        expect(seqs).toEqual(Array.from({ length: 5 }, (_, i) => seqs[0]! + i)); // contiguous
+        expect(run.map((e) => e.action).map((a) => a.slice(1))).toEqual(['0', '1', '2', '3', '4']);
+      }
+      expect(await log.appendMany([])).toEqual([]);
+      expect(await log.verifyChain()).toMatchObject({ ok: true, count: 16 });
+    });
+
+    it('rejects a malformed event without writing anything, including the rest of its batch', async () => {
+      const log = await make(clock);
+      await log.append({ actor: { type: 'system' }, action: 'ok' });
+      await expect(
+        log.appendMany([
+          { actor: { type: 'system' }, action: 'first' },
+          { actor: { type: 'bogus' as never }, action: 'bad' },
+        ]),
+      ).rejects.toThrow();
+      expect((await log.list()).map((e) => e.action)).toEqual(['ok']);
+      expect(await log.verifyChain()).toMatchObject({ ok: true, count: 1 });
+    });
   });
 }

@@ -13,6 +13,8 @@ export interface StoreHarness {
   /** Create the org / user rows other tables reference (no-ops for adapters without foreign keys). */
   seedOrg(id: string): Promise<void>;
   seedUser(id: string): Promise<void>;
+  /** Actions of audit events that have been durably committed, oldest first. */
+  audited(): Promise<string[]>;
 }
 
 const T = new Date('2026-03-01T00:00:00Z');
@@ -533,6 +535,68 @@ export function licensingStoreContract(
           ),
         );
         expect(new Set(ids).size).toBe(1);
+      });
+    });
+
+    describe('transactions with atomic audit', () => {
+      it('commit persists the change and its audit events together', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.transaction(async (tx) => {
+          await tx.insertLicense(l);
+          await tx.audit.append({
+            actor: { type: 'operator', id: 'usr_op' },
+            action: 'license.issued',
+            orgId: f.orgA,
+          });
+        });
+        expect(await f.store.findLicense(f.orgA, l.id)).toBeDefined();
+        expect(await f.audited()).toEqual(['license.issued']);
+      });
+
+      it('rollback discards the change AND the audit events', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await expect(
+          f.store.transaction(async (tx) => {
+            await tx.insertLicense(l);
+            await tx.audit.append({ actor: { type: 'system' }, action: 'phantom' });
+            throw new Error('boom');
+          }),
+        ).rejects.toThrow('boom');
+        expect(await f.store.findLicense(f.orgA, l.id)).toBeUndefined();
+        expect(await f.audited()).toEqual([]);
+      });
+
+      it('a failing audit write rolls the change back: there is no unaudited state change', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await expect(
+          f.store.transaction(async (tx) => {
+            await tx.insertLicense(l);
+            await tx.audit.append({ actor: { type: 'bogus' as never }, action: 'bad' });
+          }),
+        ).rejects.toThrow();
+        expect(await f.store.findLicense(f.orgA, l.id)).toBeUndefined();
+      });
+
+      it('concurrent audited transactions each commit their own events as one contiguous run', async () => {
+        const f = await fixture();
+        await Promise.all(
+          Array.from({ length: 10 }, (_, i) =>
+            f.store.transaction(async (tx) => {
+              await tx.insertLicense(lic(f.orgA, f.prd.id, f.pln.id, null));
+              await tx.audit.append({ actor: { type: 'system' }, action: `t${i}.a` });
+              await tx.audit.append({ actor: { type: 'system' }, action: `t${i}.b` });
+            }),
+          ),
+        );
+        const actions = await f.audited();
+        expect(actions).toHaveLength(20);
+        for (let i = 0; i < 10; i++) {
+          const at = actions.indexOf(`t${i}.a`);
+          expect(actions[at + 1]).toBe(`t${i}.b`); // never interleaved with another transaction's events
+        }
       });
     });
   });

@@ -67,30 +67,36 @@ export class AuthService {
       platformRole: 'none',
       createdAt: now,
     };
-    try {
-      await this.#store.insertUser(user);
-    } catch {
-      throw new DomainError('conflict', 'email already registered');
-    }
     const org: Organization = {
       id: newId('org'),
       name: 'Personal',
       kind: 'personal',
       createdAt: now,
     };
-    await this.#store.insertOrganization(org);
-    await this.#store.insertMembership({
-      orgId: org.id,
-      userId: user.id,
-      role: 'owner',
-      createdAt: now,
-    });
-    await this.#audit.append({
-      actor: { type: 'user', id: user.id },
-      action: 'user.registered',
-      target: { type: 'user', id: user.id },
-      orgId: org.id,
-    });
+    try {
+      // User, personal org, membership and audit record: all or nothing.
+      await this.#store.transaction(async (tx) => {
+        await tx.insertUser(user);
+        await tx.insertOrganization(org);
+        await tx.insertMembership({
+          orgId: org.id,
+          userId: user.id,
+          role: 'owner',
+          createdAt: now,
+        });
+        await tx.audit.append({
+          actor: { type: 'user', id: user.id },
+          action: 'user.registered',
+          target: { type: 'user', id: user.id },
+          orgId: org.id,
+        });
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === 'duplicate_email') {
+        throw new DomainError('conflict', 'email already registered');
+      }
+      throw e;
+    }
     return { user, personalOrg: org };
   }
 
@@ -132,18 +138,20 @@ export class AuthService {
     const token = newSecretToken('sess');
     const expiresAt = new Date(now.getTime() + this.#cfg.sessionTtlMs);
     const sessionId = newId('ses');
-    await this.#store.insertSession({
-      id: sessionId,
-      userId: user.id,
-      tokenHash: sha256Hex(token),
-      createdAt: now,
-      expiresAt,
-      revokedAt: null,
-    });
-    await this.#audit.append({
-      actor: { type: 'user', id: user.id },
-      action: 'user.login_succeeded',
-      metadata: { session_id: sessionId },
+    await this.#store.transaction(async (tx) => {
+      await tx.insertSession({
+        id: sessionId,
+        userId: user.id,
+        tokenHash: sha256Hex(token),
+        createdAt: now,
+        expiresAt,
+        revokedAt: null,
+      });
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'user.login_succeeded',
+        metadata: { session_id: sessionId },
+      });
     });
     return { token, expiresAt, userId: user.id };
   }
@@ -169,11 +177,13 @@ export class AuthService {
   }
 
   async logout(principal: UserPrincipal): Promise<void> {
-    await this.#store.revokeSession(principal.sessionId, this.#clock.now());
-    await this.#audit.append({
-      actor: { type: 'user', id: principal.userId },
-      action: 'user.logout',
-      metadata: { session_id: principal.sessionId },
+    await this.#store.transaction(async (tx) => {
+      await tx.revokeSession(principal.sessionId, this.#clock.now());
+      await tx.audit.append({
+        actor: { type: 'user', id: principal.userId },
+        action: 'user.logout',
+        metadata: { session_id: principal.sessionId },
+      });
     });
   }
 
@@ -203,18 +213,20 @@ export class AuthService {
       kind: 'team',
       createdAt: this.#clock.now(),
     };
-    await this.#store.insertOrganization(org);
-    await this.#store.insertMembership({
-      orgId: org.id,
-      userId: p.userId,
-      role: 'owner',
-      createdAt: org.createdAt,
-    });
-    await this.#audit.append({
-      actor: { type: 'user', id: p.userId },
-      action: 'org.created',
-      target: { type: 'org', id: org.id },
-      orgId: org.id,
+    await this.#store.transaction(async (tx) => {
+      await tx.insertOrganization(org);
+      await tx.insertMembership({
+        orgId: org.id,
+        userId: p.userId,
+        role: 'owner',
+        createdAt: org.createdAt,
+      });
+      await tx.audit.append({
+        actor: { type: 'user', id: p.userId },
+        action: 'org.created',
+        target: { type: 'org', id: org.id },
+        orgId: org.id,
+      });
     });
     return org;
   }
@@ -262,14 +274,24 @@ export class AuthService {
     if (await this.#store.findMembership(orgId, target.id))
       throw new DomainError('conflict', 'already a member');
     const m: Membership = { orgId, userId: target.id, role, createdAt: this.#clock.now() };
-    await this.#store.insertMembership(m);
-    await this.#audit.append({
-      actor: { type: 'user', id: p.userId },
-      action: 'member.added',
-      target: { type: 'user', id: target.id },
-      orgId,
-      metadata: { role },
-    });
+    try {
+      await this.#store.transaction(async (tx) => {
+        await tx.insertMembership(m);
+        await tx.audit.append({
+          actor: { type: 'user', id: p.userId },
+          action: 'member.added',
+          target: { type: 'user', id: target.id },
+          orgId,
+          metadata: { role },
+        });
+      });
+    } catch (e) {
+      // Lost a race with a concurrent add of the same member.
+      if (e instanceof Error && e.message === 'duplicate_membership') {
+        throw new DomainError('conflict', 'already a member');
+      }
+      throw e;
+    }
     return m;
   }
 
@@ -281,11 +303,13 @@ export class AuthService {
   async bootstrapPlatformAdmin(email: string): Promise<void> {
     const u = await this.#store.findUserByEmail(email.trim().toLowerCase());
     if (!u) throw new Error('user not found');
-    await this.#store.setPlatformRole(u.id, 'platform_admin');
-    await this.#audit.append({
-      actor: { type: 'system' },
-      action: 'operator.bootstrapped',
-      target: { type: 'user', id: u.id },
+    await this.#store.transaction(async (tx) => {
+      await tx.setPlatformRole(u.id, 'platform_admin');
+      await tx.audit.append({
+        actor: { type: 'system' },
+        action: 'operator.bootstrapped',
+        target: { type: 'user', id: u.id },
+      });
     });
   }
 
@@ -293,12 +317,14 @@ export class AuthService {
   async revokePlatformAdmin(email: string, reason: string): Promise<void> {
     const u = await this.#store.findUserByEmail(email.trim().toLowerCase());
     if (!u) throw new Error('user not found');
-    await this.#store.setPlatformRole(u.id, 'none');
-    await this.#audit.append({
-      actor: { type: 'system' },
-      action: 'operator.revoked',
-      target: { type: 'user', id: u.id },
-      reason,
+    await this.#store.transaction(async (tx) => {
+      await tx.setPlatformRole(u.id, 'none');
+      await tx.audit.append({
+        actor: { type: 'system' },
+        action: 'operator.revoked',
+        target: { type: 'user', id: u.id },
+        reason,
+      });
     });
   }
 

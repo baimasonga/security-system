@@ -606,6 +606,30 @@ describe('validate / refresh / revocation / plan changes', () => {
     expect(await errCode(refresh(w, dev, g.activationId))).toBe('ok');
   });
 
+  it('a suspension that lands between device authentication and lease issuance is still honoured (no stale lease)', async () => {
+    const s = await seed(w);
+    const dev = new FakeDevice();
+    const g = await activate(w, s.alice, dev, s.licenseKey);
+    const input = await deviceCall(w, dev, 'refresh', g.activationId);
+    // Inject the race: the first transaction refresh opens is preceded by an operator suspending the license.
+    const store = w.store;
+    const original = store.transaction.bind(store);
+    let injected = false;
+    store.transaction = (async (fn: Parameters<typeof original>[0]) => {
+      if (!injected) {
+        injected = true;
+        store.transaction = original; // restore before the injected call
+        await w.svc.setLicenseState('org_a', s.license.id, 'suspend', w.op);
+      }
+      return original(fn);
+    }) as typeof store.transaction;
+    expect(await errCode(w.svc.refresh(input))).toBe('license_suspended');
+    expect(injected).toBe(true);
+    // and no lease was recorded for the refused refresh
+    const act = (await w.store.listActivationsForLicense('org_a', s.license.id))[0]!;
+    expect(act.lastLeaseId).toBe(readLease(w, g.lease).jti);
+  });
+
   it('subscription lapse blocks refresh', async () => {
     const s = await seed(w);
     const dev = new FakeDevice();

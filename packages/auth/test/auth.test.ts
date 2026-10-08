@@ -16,7 +16,7 @@ const FAST = { N: 1024, r: 8, p: 1 };
 
 function make() {
   const audit = new InMemoryAuditLog(clock);
-  const store = new InMemoryAuthStore();
+  const store = new InMemoryAuthStore({ audit });
   const auth = new AuthService({ store, clock, audit, config: { scrypt: FAST } });
   return { auth, audit, store };
 }
@@ -102,6 +102,29 @@ describe('registration and login', () => {
     expect(await code(auth.login({ email: 'a@b.co', password: PW }))).toBe('unauthenticated');
     now = new Date(now.getTime() + 16 * 60 * 1000);
     expect(await code(auth.login({ email: 'a@b.co', password: PW }))).toBe('ok');
+  });
+});
+
+describe('atomic audit', () => {
+  it('if auditing fails, registration leaves nothing behind (no user, no org, no membership)', async () => {
+    const audit = new InMemoryAuditLog(clock);
+    const store = new InMemoryAuthStore({ audit });
+    const auth = new AuthService({ store, clock, audit, config: { scrypt: FAST } });
+    audit.appendMany = async () => {
+      throw new Error('audit down');
+    };
+    await expect(auth.register({ email: 'a@b.co', password: PW })).rejects.toThrow('audit down');
+    expect(await store.findUserByEmail('a@b.co')).toBeUndefined();
+    expect(await store.listMembershipsForOrg('anything')).toEqual([]);
+  });
+
+  it('a successful registration commits user, personal org, membership and the audit record together', async () => {
+    const { auth, audit, store } = make();
+    const { user, personalOrg } = await auth.register({ email: 'a@b.co', password: PW });
+    expect(await store.findMembership(personalOrg.id, user.id)).toMatchObject({ role: 'owner' });
+    expect((await audit.list({ action: 'user.registered' }))[0]).toMatchObject({
+      orgId: personalOrg.id,
+    });
   });
 });
 

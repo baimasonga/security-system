@@ -1,5 +1,6 @@
 import { sign } from 'node:crypto';
-import { InMemoryAuditLog } from '@trust/audit';
+import { InMemoryAuditLog, type AuditLog } from '@trust/audit';
+import { PgAuditLog } from '../../../services/platform-api/src/db/pg-audit-log.ts';
 import {
   KeyRing,
   b64urlEncode,
@@ -29,7 +30,7 @@ export const PEPPER = 'test-pepper-test-pepper-test-pepper-0123456789';
 export interface World {
   svc: LicensingService;
   store: LicensingStore;
-  audit: InMemoryAuditLog;
+  audit: AuditLog;
   sink: InMemoryTelemetrySink;
   keyring: KeyRing;
   config: LicensingConfig;
@@ -51,12 +52,14 @@ export function world(cfg?: Partial<LicensingConfig>): World {
     set: (d: Date) => void (t = d),
     advance: (ms: number) => void (t = new Date(t.getTime() + ms)),
   };
-  const audit = new InMemoryAuditLog(clock);
+  const audit: AuditLog = pool ? new PgAuditLog(pool, clock) : new InMemoryAuditLog(clock);
   const sink = new InMemoryTelemetrySink();
   const telemetry = new Telemetry({ sink, clock, pseudonymKey: 'pk' });
   const keyring = new KeyRing({ now: clock.now });
   keyring.activate(keyring.generate('license').kid);
-  const store: LicensingStore = pool ? new PgLicensingStore(pool) : new InMemoryLicensingStore();
+  const store: LicensingStore = pool
+    ? new PgLicensingStore(pool, clock)
+    : new InMemoryLicensingStore({ audit });
   const members = new Map<string, 'owner' | 'admin' | 'member'>();
 
   const authorize: Authorizer = async (p, orgId, perm) => {

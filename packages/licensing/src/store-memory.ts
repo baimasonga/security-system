@@ -1,3 +1,4 @@
+import { AuditBuffer, type AuditEventInput, type AuditLog } from '@trust/audit';
 import type {
   Activation,
   Challenge,
@@ -6,6 +7,7 @@ import type {
   License,
   LicensingRepo,
   LicensingStore,
+  LicensingTx,
   LeaseRecord,
   Plan,
   Product,
@@ -231,21 +233,35 @@ class Repo implements LicensingRepo {
 
 /**
  * In-memory adapter. `transaction` serializes units of work with a mutex and rolls back by
- * restoring a snapshot when the callback throws — enough to test concurrency invariants such as the
- * device limit. The PostgreSQL adapter must provide the same guarantees with row locks.
+ * restoring a snapshot when the callback (or the audit flush) throws — enough to test concurrency
+ * invariants such as the device limit. The PostgreSQL adapter provides the same guarantees with row
+ * locks. Audit events are buffered and handed to `audit` only if the transaction commits.
  */
 export class InMemoryLicensingStore extends Repo implements LicensingStore {
   #lock: Promise<unknown> = Promise.resolve();
+  readonly #audit: AuditLog | undefined;
+  /** Committed audit inputs when no AuditLog was supplied (handy for standalone tests). */
+  readonly committedAudit: AuditEventInput[] = [];
 
-  constructor() {
+  constructor(opts?: { audit?: AuditLog }) {
     super(emptyState());
+    this.#audit = opts?.audit;
   }
 
-  transaction<T>(fn: (tx: LicensingRepo) => Promise<T>): Promise<T> {
+  transaction<T>(fn: (tx: LicensingTx) => Promise<T>): Promise<T> {
     const run = async (): Promise<T> => {
       const snapshot = structuredClone(this.s);
+      const buffer = new AuditBuffer();
+      // Prototype delegation: the transaction sees the live state through the store's own methods.
+      const tx = Object.assign(Object.create(this) as Repo, {
+        audit: buffer,
+      }) as unknown as LicensingTx;
       try {
-        return await fn(this);
+        const out = await fn(tx);
+        const events = buffer.drain();
+        if (this.#audit) await this.#audit.appendMany(events);
+        else this.committedAudit.push(...events);
+        return out;
       } catch (e) {
         Object.assign(this.s, snapshot);
         throw e;

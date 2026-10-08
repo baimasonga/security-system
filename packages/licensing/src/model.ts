@@ -1,3 +1,4 @@
+import type { AuditWriter } from '@trust/audit';
 import type { EntitlementOverrides, PlanDefinition } from '@trust/entitlements';
 import type { PublicJwk } from '@trust/crypto';
 import type { ProofPurpose } from '@trust/crypto/verify';
@@ -170,7 +171,18 @@ export interface LicensingRepo {
   purgeExpiredChallenges(before: Date): Promise<number>;
 }
 
+/** A transaction: every repository method, plus an audit writer that commits atomically with them. */
+export interface LicensingTx extends LicensingRepo {
+  audit: AuditWriter;
+}
+
 export interface LicensingStore extends LicensingRepo {
-  /** Serializable unit of work. In PostgreSQL: SERIALIZABLE/`FOR UPDATE` on the license row. */
-  transaction<T>(fn: (tx: LicensingRepo) => Promise<T>): Promise<T>;
+  /**
+   * Serializable unit of work. Writes AND audit events appended through `tx.audit` commit together or
+   * not at all. If the audit write fails the whole transaction rolls back.
+   *
+   * `fn` MUST be safe to re-run: the PostgreSQL adapter retries it from the start after a deadlock or
+   * serialization failure. Keep irreversible side effects out of it.
+   */
+  transaction<T>(fn: (tx: LicensingTx) => Promise<T>): Promise<T>;
 }
