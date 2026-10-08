@@ -1,0 +1,562 @@
+openapi: 3.1.0
+info:
+  title: Software Trust Platform API
+  version: 1.0.0-v1
+  description: |
+    V1 surface: identity (minimal), organizations, licensing, entitlements, device activation, signed offline leases.
+
+    Conventions
+    - Versioned under `/v1`. JSON only. Wire format is `snake_case`.
+    - Errors are `application/problem+json`: `{ code, message, request_id, details? }`. Codes are stable.
+    - Tenant isolation: every customer route is scoped by `{orgId}`. Resources of other tenants return `404`,
+      indistinguishable from nonexistent ones.
+    - Customer routes use `Authorization: Bearer <session token>` (no cookies, hence no CSRF surface).
+    - Device routes (`refresh`, `validate`, `deactivate`) carry no bearer token: they are authenticated by a device
+      signature over a single-use challenge (see `DeviceProof`).
+    - Mutating operator routes require a `reason` (3–500 chars) which is written to the audit log.
+servers:
+  - url: https://api.example.test
+security: []
+tags:
+  - { name: auth }
+  - { name: organizations }
+  - { name: licenses, description: Customer self-service }
+  - { name: devices, description: Device-facing protocol }
+  - { name: admin, description: Platform operators only }
+  - { name: keys }
+paths:
+  /healthz:
+    get:
+      summary: Liveness
+      responses: { '200': { description: ok } }
+
+  /v1/auth/register:
+    post:
+      tags: [auth]
+      summary: Create an account (and its personal organization)
+      requestBody: { $ref: '#/components/requestBodies/Credentials' }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Create a session. Uniform error for unknown user / wrong password; progressive lockout.
+      requestBody: { $ref: '#/components/requestBodies/Credentials' }
+      responses:
+        '200':
+          description: Session
+          content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /v1/auth/logout:
+    post:
+      tags: [auth]
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '204': { description: Session revoked },
+          '401': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/auth/me:
+    get:
+      tags: [auth]
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '200': { description: Current principal },
+          '401': { $ref: '#/components/responses/Problem' },
+        }
+
+  /v1/organizations:
+    get:
+      tags: [organizations]
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '200': { description: Organizations the caller belongs to },
+          '401': { $ref: '#/components/responses/Problem' },
+        }
+    post:
+      tags: [organizations]
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '201': { description: Created (caller becomes owner) },
+          '400': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/organizations/{orgId}:
+    parameters: [{ $ref: '#/components/parameters/OrgId' }]
+    get:
+      tags: [organizations]
+      security: [{ bearer: [] }]
+      responses:
+        { '200': { description: Organization }, '404': { $ref: '#/components/responses/Problem' } }
+  /v1/organizations/{orgId}/members:
+    parameters: [{ $ref: '#/components/parameters/OrgId' }]
+    get:
+      tags: [organizations]
+      security: [{ bearer: [] }]
+      responses:
+        { '200': { description: Members }, '404': { $ref: '#/components/responses/Problem' } }
+    post:
+      tags: [organizations]
+      security: [{ bearer: [] }]
+      summary: Add an existing user. Requires owner/admin; cannot grant a role above one's own; not allowed on personal orgs.
+      responses:
+        '201': { description: Added }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+
+  /v1/organizations/{orgId}/licenses:
+    parameters: [{ $ref: '#/components/parameters/OrgId' }]
+    get:
+      tags: [licenses]
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Licenses with effective status (never keys or digests)
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      properties:
+                        { items: { type: array, items: { $ref: '#/components/schemas/License' } } },
+                    },
+                },
+            }
+        '404': { $ref: '#/components/responses/Problem' }
+  /v1/organizations/{orgId}/licenses/{licenseId}:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    get:
+      tags: [licenses]
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          {
+            description: License,
+            content: { application/json: { schema: { $ref: '#/components/schemas/License' } } },
+          }
+        '404': { $ref: '#/components/responses/Problem' }
+  /v1/organizations/{orgId}/licenses/{licenseId}/activations:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    get:
+      tags: [licenses]
+      security: [{ bearer: [] }]
+      summary: Active and past device activations for a license
+      responses:
+        { '200': { description: Activations }, '404': { $ref: '#/components/responses/Problem' } }
+  /v1/organizations/{orgId}/activations/{activationId}/deactivate:
+    parameters:
+      - { $ref: '#/components/parameters/OrgId' }
+      - { name: activationId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [licenses]
+      security: [{ bearer: [] }]
+      summary: Free a device slot. Owners/admins any device; members only devices they activated. Idempotent.
+      responses:
+        '200': { description: Deactivated }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /v1/organizations/{orgId}/trials:
+    parameters: [{ $ref: '#/components/parameters/OrgId' }]
+    post:
+      tags: [licenses]
+      security: [{ bearer: [] }]
+      summary: Start the product trial. One per (product, org) and per (product, user), recorded server-side.
+      responses:
+        '201': { description: 'Trial license; `license_key` is shown once' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /v1/entitlements:
+    get:
+      tags: [licenses]
+      security: [{ bearer: [] }]
+      summary: Resolved entitlements/capabilities for a license, or `status` explaining why there are none
+      parameters:
+        - { name: org_id, in: query, required: true, schema: { type: string } }
+        - { name: license_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          {
+            description: Entitlements,
+            content:
+              {
+                application/json: { schema: { $ref: '#/components/schemas/EntitlementsResponse' } },
+              },
+          }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /v1/devices/challenges:
+    post:
+      tags: [devices]
+      summary: Issue a single-use, purpose-bound challenge (5 min TTL, capped per installation)
+      responses:
+        '201':
+          {
+            description: Challenge,
+            content: { application/json: { schema: { $ref: '#/components/schemas/Challenge' } } },
+          }
+        '400': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /v1/licenses/activate:
+    post:
+      tags: [devices]
+      security: [{ bearer: [] }]
+      summary: Activate a device. Needs session + license key + proof of possession; the key alone is never authority.
+      description: |
+        Failures that would reveal whether a key exists/belongs to someone else (unknown key, non-member,
+        canary) are all `403 invalid_license "invalid license"`.
+      responses:
+        '200':
+          {
+            description: Lease grant,
+            content: { application/json: { schema: { $ref: '#/components/schemas/LeaseGrant' } } },
+          }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /v1/licenses/validate:
+    post:
+      tags: [devices]
+      summary: Online validation, authenticated by DeviceProof. Returns state, no new lease.
+      requestBody: { $ref: '#/components/requestBodies/DeviceProof' }
+      responses:
+        '200': { description: Valid }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /v1/licenses/refresh:
+    post:
+      tags: [devices]
+      summary: Obtain a fresh lease (reflects current plan version, subscription and revocation state)
+      requestBody: { $ref: '#/components/requestBodies/DeviceProof' }
+      responses:
+        '200':
+          {
+            description: Lease grant,
+            content: { application/json: { schema: { $ref: '#/components/schemas/LeaseGrant' } } },
+          }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /v1/licenses/deactivate:
+    post:
+      tags: [devices]
+      summary: Device releases its own slot (works even when the license has lapsed)
+      requestBody: { $ref: '#/components/requestBodies/DeviceProof' }
+      responses:
+        {
+          '200': { description: Deactivated },
+          '403': { $ref: '#/components/responses/Problem' },
+          '404': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/keys/trust-bundle:
+    get:
+      tags: [keys]
+      summary: Public verification keys for leases (active + deprecated). Contains no secrets.
+      responses:
+        {
+          '200':
+            {
+              description: Trust bundle,
+              content:
+                { application/json: { schema: { $ref: '#/components/schemas/TrustBundle' } } },
+            },
+        }
+
+  /v1/admin/products:
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '201': { description: Created },
+          '403': { $ref: '#/components/responses/Problem' },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/products/{productId}/plans:
+    parameters: [{ name: productId, in: path, required: true, schema: { type: string } }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        { '201': { description: Created }, '403': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/plans/{planId}:
+    parameters: [{ name: planId, in: path, required: true, schema: { type: string } }]
+    patch:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Bumps the plan version; reaches devices on their next refresh (no client release)
+      responses:
+        { '200': { description: Updated }, '403': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/subscriptions:
+    parameters: [{ $ref: '#/components/parameters/OrgId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        { '201': { description: Created }, '403': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/subscriptions/{subscriptionId}:
+    parameters:
+      - { $ref: '#/components/parameters/OrgId' }
+      - { name: subscriptionId, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        { '200': { description: Updated }, '403': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/licenses:
+    parameters: [{ $ref: '#/components/parameters/OrgId' }]
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses: { '200': { description: Licenses (including canaries) } }
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Issue a license. The plaintext `license_key` is returned exactly once.
+      responses:
+        { '201': { description: Issued }, '403': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/licenses/{licenseId}/activations:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses: { '200': { description: Activations } }
+  /v1/admin/organizations/{orgId}/licenses/{licenseId}/suspend:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        { '200': { description: Suspended }, '409': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/licenses/{licenseId}/reinstate:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        { '200': { description: Reinstated }, '409': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/licenses/{licenseId}/revoke:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Terminal. Also revokes all activations of the license.
+      responses:
+        { '200': { description: Revoked }, '409': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/audit:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: org_id, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
+          }
+      responses: { '200': { description: Audit events (hash-chained) } }
+  /v1/admin/audit/verify:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Verify the audit hash chain end to end
+      responses:
+        {
+          '200':
+            {
+              description: '{ ok: true, count, head_hash } or { ok: false, broken_at_seq, reason }',
+            },
+        }
+
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }
+  parameters:
+    OrgId:
+      {
+        name: orgId,
+        in: path,
+        required: true,
+        schema: { type: string, pattern: '^org_[0-9a-f]{24}$' },
+      }
+    LicenseId:
+      {
+        name: licenseId,
+        in: path,
+        required: true,
+        schema: { type: string, pattern: '^lic_[0-9a-f]{24}$' },
+      }
+  requestBodies:
+    Credentials:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [email, password]
+            properties:
+              {
+                email: { type: string, maxLength: 254 },
+                password: { type: string, minLength: 12, maxLength: 256 },
+              }
+    DeviceProof:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [activation_id, installation_id, nonce, signature]
+            properties:
+              activation_id: { type: string }
+              installation_id: { type: string }
+              nonce:
+                {
+                  type: string,
+                  description: From /v1/devices/challenges (purpose and subject must match),
+                }
+              signature:
+                {
+                  type: string,
+                  description: 'base64url Ed25519 over the proof message (see DeviceProof message)',
+                }
+  responses:
+    Problem:
+      description: Error
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    Problem:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          enum:
+            [
+              invalid_request,
+              unauthenticated,
+              forbidden,
+              not_found,
+              conflict,
+              rate_limited,
+              invalid_license,
+              license_suspended,
+              license_revoked,
+              license_expired,
+              subscription_inactive,
+              device_limit_reached,
+              invalid_challenge,
+              invalid_device_proof,
+              device_key_conflict,
+              activation_not_found,
+              trial_not_available,
+              internal,
+            ]
+        message: { type: string }
+        request_id: { type: string }
+        details: { type: object }
+    Session:
+      type: object
+      properties:
+        {
+          token: { type: string },
+          expires_at: { type: string, format: date-time },
+          user_id: { type: string },
+        }
+    License:
+      type: object
+      properties:
+        id: { type: string }
+        org_id: { type: string }
+        product_id: { type: string }
+        product_code: { type: [string, 'null'] }
+        plan_id: { type: string }
+        tier:
+          {
+            type: [string, 'null'],
+            enum: [trial, standard, professional, business, enterprise, null],
+          }
+        subscription_id: { type: [string, 'null'] }
+        kind: { type: string, enum: [subscription, trial, perpetual, canary] }
+        state: { type: string, enum: [active, suspended, revoked] }
+        status:
+          {
+            type: string,
+            description: '`valid` or the reason the license currently confers nothing',
+          }
+        expires_at: { type: [string, 'null'] }
+        device_limit: { type: [integer, 'null'] }
+        active_devices: { type: integer }
+        created_at: { type: string }
+    EntitlementsResponse:
+      type: object
+      properties:
+        license_id: { type: string }
+        status: { type: string }
+        entitlements:
+          type: [object, 'null']
+          properties:
+            plan_id: { type: string }
+            plan_version: { type: integer }
+            tier: { type: string }
+            entitlements: { type: object, additionalProperties: { type: [boolean, integer] } }
+            capabilities: { type: array, items: { type: string } }
+            device_limit: { type: integer }
+    Challenge:
+      type: object
+      properties:
+        nonce: { type: string }
+        purpose: { type: string, enum: [activate, validate, refresh, deactivate] }
+        expires_at: { type: string }
+    LeaseGrant:
+      type: object
+      properties:
+        activation_id: { type: string }
+        device_id: { type: string }
+        license_id: { type: string }
+        lease:
+          {
+            type: string,
+            description: 'Compact JWS (EdDSA), typ `lease+jws`. Verify before use; see ADR-002.',
+          }
+        lease_expires_at: { type: string }
+        refresh_after: { type: string }
+        entitlements: { type: object }
+    TrustBundle:
+      type: object
+      properties:
+        schema: { type: integer, const: 1 }
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              kid: { type: string }
+              purpose: { type: string }
+              state: { type: string, enum: [active, deprecated] }
+              jwk:
+                {
+                  type: object,
+                  properties: { kty: { const: OKP }, crv: { const: Ed25519 }, x: { type: string } },
+                }
+    DeviceProofMessage:
+      description: |
+        Wire contract (not a JSON body). The device signs the UTF-8 string (Ed25519, base64url):
+        `trust-platform/v1/device-proof\n<purpose>\n<nonce>\n<installation_id>\n<subject_id>\n<key thumbprint>`
+        where `subject_id` is empty for `activate` and the activation id otherwise.
+      type: string

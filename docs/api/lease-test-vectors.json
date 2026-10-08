@@ -1,0 +1,186 @@
+{
+  "description": "Cross-language contract for offline leases (docs/adr/ADR-002). A conforming verifier must produce exactly `expect` for every case. skew_seconds defaults to 300.",
+  "trust_bundle": {
+    "schema": 1,
+    "keys": [
+      {
+        "kid": "key_7363632b220e058cdc01d405",
+        "purpose": "license",
+        "state": "active",
+        "jwk": {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "0ysd4_7d7amu_dw-6Y7DtgUTJy2S5VLaezdo2JwGQnw"
+        }
+      }
+    ]
+  },
+  "context": {
+    "product_code": "pdf-pro",
+    "installation_id": "inst_vectorvectorvector01",
+    "device_thumbprint": "4wAhn9mEx_Tgl1LynJHxjlO2syhGsXub5Pl307_cvdw",
+    "issuer": "trust-platform",
+    "skew_seconds": 300
+  },
+  "claims": {
+    "v": 1,
+    "jti": "lse_00000000000000000000vec1",
+    "iss": "trust-platform",
+    "aud": "product:pdf-pro",
+    "lic": "lic_000000000000000000000001",
+    "org": "org_000000000000000000000001",
+    "prd": "prd_000000000000000000000001",
+    "pln": "pln_000000000000000000000001",
+    "plv": 1,
+    "act": "act_000000000000000000000001",
+    "inst": "inst_vectorvectorvector01",
+    "dev": "dev_000000000000000000000001",
+    "cnf": {
+      "jkt": "4wAhn9mEx_Tgl1LynJHxjlO2syhGsXub5Pl307_cvdw"
+    },
+    "kind": "subscription",
+    "tier": "professional",
+    "ent": {
+      "ocr_pages_monthly": 5000,
+      "pdf_editing": true
+    },
+    "cap": ["CLOUD_SYNC", "OCR_ADVANCED"],
+    "dl": 3,
+    "iat": 1772323200,
+    "nbf": 1772323200,
+    "refresh_after": 1773619200,
+    "exp": 1774915200
+  },
+  "cases": [
+    {
+      "name": "valid early in life",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-02T00:00:00.000Z",
+      "expect": {
+        "state": "valid"
+      }
+    },
+    {
+      "name": "refresh recommended at half-life",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-16T00:00:00.000Z",
+      "expect": {
+        "state": "refresh_recommended"
+      }
+    },
+    {
+      "name": "tolerated within skew after exp",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-31T00:03:20.000Z",
+      "expect": {
+        "state": "refresh_recommended"
+      }
+    },
+    {
+      "name": "expired beyond exp + skew",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-31T00:05:01.000Z",
+      "expect": {
+        "state": "expired"
+      }
+    },
+    {
+      "name": "clock far behind issue time",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-02-28T21:00:00.000Z",
+      "expect": {
+        "state": "clock_anomaly"
+      }
+    },
+    {
+      "name": "clock rolled back vs high-water mark",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-11T00:00:00.000Z",
+      "last_seen_at": "2026-03-21T00:00:00.000Z",
+      "expect": {
+        "state": "clock_anomaly"
+      }
+    },
+    {
+      "name": "payload edited (capability added)",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiLCJBSV9ET0NVTUVOVF9BU1NJU1RBTlQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-02T00:00:00.000Z",
+      "expect": {
+        "state": "invalid",
+        "reason": "bad_signature"
+      }
+    },
+    {
+      "name": "alg none",
+      "token": "eyJhbGciOiJub25lIiwidHlwIjoibGVhc2UrandzIiwia2lkIjoia2V5XzczNjM2MzJiMjIwZTA1OGNkYzAxZDQwNSJ9.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.",
+      "now": "2026-03-02T00:00:00.000Z",
+      "expect": {
+        "state": "invalid",
+        "reason": "malformed"
+      }
+    },
+    {
+      "name": "signed by unknown key",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV9mNGM3YWJiOTQ2ZWZhYjhjMjgzOGI0ZjYifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.Yu6uLwUd_i-4FLvh_tajMHcEyUUZw8h_xKWo8Xit_qJztlUmEwSMTfxPUEvrI4Tiwg24xNCwBH4flwYbDa01Bg",
+      "now": "2026-03-02T00:00:00.000Z",
+      "expect": {
+        "state": "invalid",
+        "reason": "unknown_key"
+      }
+    },
+    {
+      "name": "wrong product",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-02T00:00:00.000Z",
+      "context": {
+        "product_code": "other-product"
+      },
+      "expect": {
+        "state": "invalid",
+        "reason": "wrong_product"
+      }
+    },
+    {
+      "name": "wrong installation",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-02T00:00:00.000Z",
+      "context": {
+        "installation_id": "inst_someoneelsesinstall1"
+      },
+      "expect": {
+        "state": "invalid",
+        "reason": "wrong_installation"
+      }
+    },
+    {
+      "name": "wrong device key",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thUOfGJ9JThDA",
+      "now": "2026-03-02T00:00:00.000Z",
+      "context": {
+        "device_thumbprint": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "expect": {
+        "state": "invalid",
+        "reason": "wrong_device"
+      }
+    },
+    {
+      "name": "truncated signature",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9.mx73V8hHEvloo8Z7iTGQFPzu82KQ7ZTCOz1Ec71j0B9vDB91WMCekguB7H2vqbszJnJoHK4i4thU",
+      "now": "2026-03-02T00:00:00.000Z",
+      "expect": {
+        "state": "invalid",
+        "reason": "bad_signature"
+      }
+    },
+    {
+      "name": "missing signature segment",
+      "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV83MzYzNjMyYjIyMGUwNThjZGMwMWQ0MDUifQ.eyJ2IjoxLCJqdGkiOiJsc2VfMDAwMDAwMDAwMDAwMDAwMDAwMDB2ZWMxIiwiaXNzIjoidHJ1c3QtcGxhdGZvcm0iLCJhdWQiOiJwcm9kdWN0OnBkZi1wcm8iLCJsaWMiOiJsaWNfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwib3JnIjoib3JnXzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMSIsInByZCI6InByZF8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEiLCJwbG4iOiJwbG5fMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwicGx2IjoxLCJhY3QiOiJhY3RfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiaW5zdCI6Imluc3RfdmVjdG9ydmVjdG9ydmVjdG9yMDEiLCJkZXYiOiJkZXZfMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxIiwiY25mIjp7ImprdCI6IjR3QWhuOW1FeF9UZ2wxTHluSkh4amxPMnN5aEdzWHViNVBsMzA3X2N2ZHcifSwia2luZCI6InN1YnNjcmlwdGlvbiIsInRpZXIiOiJwcm9mZXNzaW9uYWwiLCJlbnQiOnsib2NyX3BhZ2VzX21vbnRobHkiOjUwMDAsInBkZl9lZGl0aW5nIjp0cnVlfSwiY2FwIjpbIkNMT1VEX1NZTkMiLCJPQ1JfQURWQU5DRUQiXSwiZGwiOjMsImlhdCI6MTc3MjMyMzIwMCwibmJmIjoxNzcyMzIzMjAwLCJyZWZyZXNoX2FmdGVyIjoxNzczNjE5MjAwLCJleHAiOjE3NzQ5MTUyMDB9",
+      "now": "2026-03-02T00:00:00.000Z",
+      "expect": {
+        "state": "invalid",
+        "reason": "malformed"
+      }
+    }
+  ]
+}
