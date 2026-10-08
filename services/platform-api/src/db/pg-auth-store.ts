@@ -10,7 +10,14 @@ import type {
 } from '@trust/auth';
 import type { Clock, OrgRole, PlatformRole } from '@trust/shared-types';
 import { appendAuditInTx } from './pg-audit-log.ts';
-import { UNIQUE_VIOLATION, pgErr, withTransaction, type PgPool, type Queryable } from './pg.ts';
+import {
+  UNIQUE_VIOLATION,
+  pgErr,
+  serialized,
+  withTransaction,
+  type PgPool,
+  type Queryable,
+} from './pg.ts';
 
 interface UserRow {
   id: string;
@@ -177,7 +184,9 @@ export class PgAuthStore extends PgAuthRepo implements AuthStore {
   transaction<T>(fn: (tx: AuthTx) => Promise<T>): Promise<T> {
     return withTransaction(this.#pool, async (client) => {
       const buffer = new AuditBuffer(); // fresh per attempt (see withTransaction retry contract)
-      const tx = Object.assign(new PgAuthRepo(client), { audit: buffer }) as unknown as AuthTx;
+      const tx = Object.assign(new PgAuthRepo(serialized(client)), {
+        audit: buffer,
+      }) as unknown as AuthTx;
       const out = await fn(tx);
       await appendAuditInTx(client, this.#clock, buffer.drain());
       return out;

@@ -220,6 +220,76 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
   });
 
   // ---- R-14: deadlocks are retried; R-10: audit is atomic with the change -------------------------------
+  describe('shared license lock and retention indexes (found by load testing)', () => {
+    async function oneLicense() {
+      const pool = createSchemaPool();
+      const store = new PgLicensingStore(pool, { now: () => new Date('2026-01-01T00:00:00Z') });
+      await pool.query("INSERT INTO organizations (id,name,kind) VALUES ('org_s','S','team')");
+      await pool.query("INSERT INTO products (id,code,name) VALUES ('prd_s','prod-s','P')");
+      await pool.query(
+        "INSERT INTO plans (id,product_id,code,tier,device_limit) VALUES ('pln_s','prd_s','plan-s','professional',3)",
+      );
+      await pool.query(
+        "INSERT INTO licenses (id,org_id,product_id,plan_id,kind,key_hash) VALUES ('lic_s','org_s','prd_s','pln_s','perpetual','h')",
+      );
+      return { pool, store };
+    }
+
+    it('FOR SHARE holders coexist; an exclusive (FOR UPDATE) locker waits for all of them', async () => {
+      const { store } = await oneLicense();
+      const order: string[] = [];
+      let releaseA!: () => void;
+      const aHolds = new Promise<void>((r) => (releaseA = r));
+      let aLocked!: () => void;
+      const aReady = new Promise<void>((r) => (aLocked = r));
+
+      const a = store.transaction(async (tx) => {
+        await tx.findLicenseForShare('org_s', 'lic_s');
+        order.push('A:locked');
+        aLocked();
+        await aHolds;
+        order.push('A:done');
+      });
+      await aReady;
+      // B shares the lock while A still holds it: must complete without waiting for A.
+      await store.transaction(async (tx) => {
+        await tx.findLicenseForShare('org_s', 'lic_s');
+        order.push('B:shared-ok');
+      });
+      // C wants it exclusively: must NOT get it while A holds its shared lock.
+      let cGotIt = false;
+      const c = store.transaction(async (tx) => {
+        await tx.findLicenseForUpdate('org_s', 'lic_s');
+        cGotIt = true;
+        order.push('C:exclusive');
+      });
+      await new Promise((r) => setTimeout(r, 300));
+      expect(cGotIt).toBe(false);
+      releaseA();
+      await Promise.all([a, c]);
+      expect(order).toEqual(['A:locked', 'B:shared-ok', 'A:done', 'C:exclusive']);
+    }, 20_000);
+
+    it('the retention DELETE uses the expires_at index instead of scanning the table', async () => {
+      const { pool } = await oneLicense();
+      await pool.query(
+        `INSERT INTO challenges (nonce_hash, purpose, installation_id, expires_at, consumed_at)
+         SELECT 'n' || g, 'refresh', 'inst_x', now() + interval '1 day' + (g || ' seconds')::interval, now()
+         FROM generate_series(1, 30000) g`,
+      );
+      await pool.query('ANALYZE challenges');
+      const plan = (
+        await pool.query(
+          "EXPLAIN DELETE FROM challenges WHERE ctid IN (SELECT ctid FROM challenges WHERE expires_at < now() - interval '1 hour' LIMIT 5000)",
+        )
+      ).rows
+        .map((r) => r['QUERY PLAN'])
+        .join('\n');
+      expect(plan).toMatch(/challenges_expires_idx/);
+      expect(plan).not.toMatch(/Seq Scan on challenges\s+challenges_1/);
+    });
+  });
+
   describe('deadlock retry and atomic audit', () => {
     const NOW = new Date('2026-01-01T00:00:00Z');
     const clock2 = { now: () => NOW };
@@ -347,3 +417,43 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
     });
   });
 });
+
+describe.skipIf(!url)(
+  'audit chain under heavy cross-connection contention (guards the one-round-trip lock+head read)',
+  () => {
+    it('240 concurrent appends from 4 independent pools produce one gap-free, fork-free chain', async () => {
+      const first = createSchemaPool();
+      await first.query('SELECT 1');
+      const schema = (await first.query('SHOW search_path')).rows[0]!.search_path as string;
+      const extra = Array.from(
+        { length: 3 },
+        () => new pg.Pool({ connectionString: url, max: 8, options: `-c search_path=${schema}` }),
+      );
+      const pools = [first, ...extra];
+      const clock = { now: () => new Date('2026-01-01T00:00:00Z') };
+      try {
+        const logs = pools.map((p) => new PgAuditLog(p as never, clock));
+        await Promise.all(
+          Array.from({ length: 240 }, (_, i) =>
+            logs[i % 4]!.appendMany([
+              { actor: { type: 'system' }, action: `e${i}.a` },
+              { actor: { type: 'system' }, action: `e${i}.b` },
+            ]),
+          ),
+        );
+        expect(await logs[0]!.verifyChain()).toMatchObject({ ok: true, count: 480 });
+        const seqs = (await first.query('SELECT seq FROM audit_events ORDER BY seq')).rows.map(
+          (r) => Number(r.seq),
+        );
+        expect(seqs).toEqual(Array.from({ length: 480 }, (_, i) => i + 1));
+        // each appendMany run stayed contiguous
+        const acts = (await first.query('SELECT action FROM audit_events ORDER BY seq')).rows.map(
+          (r) => r.action as string,
+        );
+        for (let i = 0; i < 240; i++) expect(acts[acts.indexOf(`e${i}.a`) + 1]).toBe(`e${i}.b`);
+      } finally {
+        await Promise.all(extra.map((p) => p.end()));
+      }
+    }, 60_000);
+  },
+);

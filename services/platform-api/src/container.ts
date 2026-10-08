@@ -13,7 +13,8 @@ import { InMemoryTelemetrySink, Telemetry, type TelemetrySink } from '@trust/tel
 import pg from 'pg';
 import type { PlatformConfig } from './config.ts';
 import { MIGRATIONS_DIR, assertSchemaCurrent } from './db/migrate.ts';
-import type { PgPool } from './db/pg.ts';
+import { setTransactionObserver, type PgPool } from './db/pg.ts';
+import { Metrics } from './metrics.ts';
 import { PgAuditLog } from './db/pg-audit-log.ts';
 import { PgAuthStore } from './db/pg-auth-store.ts';
 import { PgKeyStore } from './db/pg-key-store.ts';
@@ -29,6 +30,7 @@ export interface Container {
   keyring: KeyRing;
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
+  metrics: Metrics;
   /** Releases pooled resources. Idempotent. */
   close(): Promise<void>;
 }
@@ -76,6 +78,24 @@ export async function createContainer(
     ownPool = new pg.Pool({ connectionString: config.databaseUrl, max: config.dbPoolMax });
     pool = ownPool;
     await assertSchemaCurrent(pool, MIGRATIONS_DIR);
+  }
+
+  const metrics = new Metrics();
+  if (usePg) {
+    setTransactionObserver({
+      onTransaction: (e) => {
+        metrics.inc('db_tx_total', { outcome: e.outcome });
+        metrics.observe('db_tx_duration_ms', e.durationMs, { outcome: e.outcome });
+      },
+      onRetry: (e) => metrics.inc('db_tx_retries_total', { sqlstate: e.code }),
+      onAuditLockWait: (ms) => metrics.observe('audit_lock_wait_ms', ms),
+    });
+  }
+  if (ownPool) {
+    const p = ownPool;
+    metrics.gauge('db_pool_total', () => p.totalCount);
+    metrics.gauge('db_pool_idle', () => p.idleCount);
+    metrics.gauge('db_pool_waiting', () => p.waitingCount);
   }
 
   const audit: AuditLog = pool ? new PgAuditLog(pool, clock) : new InMemoryAuditLog(clock);
@@ -163,6 +183,16 @@ export async function createContainer(
     keyring,
     config: defaultLicensingConfig({
       licenseKeyPepper: config.licenseKeyPepper,
+      // Operator-tunable knobs (only when explicitly set; otherwise the licensing defaults apply).
+      ...(config.challengeTtlSeconds !== undefined
+        ? { challengeTtlSeconds: config.challengeTtlSeconds }
+        : {}),
+      ...(config.challengeRetentionSeconds !== undefined
+        ? { challengeRetentionSeconds: config.challengeRetentionSeconds }
+        : {}),
+      ...(config.leaseRetentionSeconds !== undefined
+        ? { leaseRetentionSeconds: config.leaseRetentionSeconds }
+        : {}),
       ...overrides?.licensing,
     }),
     authorize: async (p, orgId, permission) => {
@@ -181,10 +211,13 @@ export async function createContainer(
     keyring,
     telemetry,
     telemetrySink,
+    metrics,
     async close() {
       if (closed) return;
       closed = true;
       await writes.flush().catch(() => undefined);
+      if (usePg) setTransactionObserver({});
+      metrics.close();
       await ownPool?.end();
     },
   };

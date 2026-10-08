@@ -16,6 +16,12 @@ export interface PlatformConfig {
   databaseUrl: string | undefined;
   /** Pool size for the PostgreSQL adapters. */
   dbPoolMax: number;
+  /** Retention and maintenance cadence (seconds). */
+  challengeTtlSeconds: number | undefined;
+  challengeRetentionSeconds: number | undefined;
+  leaseRetentionSeconds: number | undefined;
+  maintenanceIntervalSeconds: number;
+  logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
   scrypt?: ScryptParams;
   rateLimits: {
     global: number;
@@ -24,6 +30,15 @@ export interface PlatformConfig {
     challenge: number;
     activate: number;
   };
+}
+
+/** Per-IP requests/minute. Tunable by operators (e.g. behind a CDN with its own limits); validated. */
+function limit(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 10_000_000) throw new Error(`invalid ${name}`);
+  return n;
 }
 
 const ephemeral = (label: string) => `dev-only-${label}-${'x'.repeat(40)}`;
@@ -69,6 +84,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   if (!Number.isInteger(dbPoolMax) || dbPoolMax < 1 || dbPoolMax > 200)
     throw new Error('invalid DB_POOL_MAX');
 
+  const optInt = (name: string, min: number, max: number): number | undefined => {
+    const raw = env[name];
+    if (raw === undefined) return undefined;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < min || n > max) throw new Error(`invalid ${name}`);
+    return n;
+  };
+  const challengeTtlSeconds = optInt('CHALLENGE_TTL_SECONDS', 10, 3600);
+  const challengeRetentionSeconds = optInt('CHALLENGE_RETENTION_SECONDS', 0, 30 * 86400);
+  const leaseRetentionSeconds = optInt('LEASE_RETENTION_SECONDS', 0, 3650 * 86400);
+  const maintenanceIntervalSeconds = optInt('MAINTENANCE_INTERVAL_SECONDS', 1, 86400) ?? 60;
+
+  const logLevel = (env['LOG_LEVEL'] ?? 'info') as PlatformConfig['logLevel'];
+  if (!['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'].includes(logLevel)) {
+    throw new Error('invalid LOG_LEVEL');
+  }
+
   const port = Number(env['PORT'] ?? 8080);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('invalid PORT');
 
@@ -83,6 +115,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     persistence,
     databaseUrl,
     dbPoolMax,
-    rateLimits: { global: 300, login: 10, register: 5, challenge: 60, activate: 20 },
+    challengeTtlSeconds,
+    challengeRetentionSeconds,
+    leaseRetentionSeconds,
+    maintenanceIntervalSeconds,
+    logLevel,
+    rateLimits: {
+      global: limit(env, 'RATE_LIMIT_GLOBAL', 300),
+      login: limit(env, 'RATE_LIMIT_LOGIN', 10),
+      register: limit(env, 'RATE_LIMIT_REGISTER', 5),
+      challenge: limit(env, 'RATE_LIMIT_CHALLENGE', 60),
+      activate: limit(env, 'RATE_LIMIT_ACTIVATE', 20),
+    },
   };
 }

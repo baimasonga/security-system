@@ -20,6 +20,7 @@ import {
   FK_VIOLATION,
   UNIQUE_VIOLATION,
   pgErr,
+  serialized,
   withTransaction,
   type PgPool,
   type Queryable,
@@ -113,7 +114,8 @@ class PgRepo implements LicensingRepo {
   /** True inside a transaction: device-auth reads lock the activation row. */
   readonly #tx: boolean;
   constructor(q: Queryable, tx: boolean) {
-    this.#q = q;
+    // Inside a transaction every read shares one connection: queue them explicitly.
+    this.#q = tx ? serialized(q) : q;
     this.#tx = tx;
   }
 
@@ -258,6 +260,13 @@ class PgRepo implements LicensingRepo {
   }
   async findLicenseForUpdate(orgId: string, id: string) {
     const r = await this.#one('SELECT * FROM licenses WHERE id = $1 AND org_id = $2 FOR UPDATE', [
+      id,
+      orgId,
+    ]);
+    return r ? license(r) : undefined;
+  }
+  async findLicenseForShare(orgId: string, id: string) {
+    const r = await this.#one('SELECT * FROM licenses WHERE id = $1 AND org_id = $2 FOR SHARE', [
       id,
       orgId,
     ]);
@@ -438,8 +447,19 @@ class PgRepo implements LicensingRepo {
     ]);
     return { status: exists ? 'used' : 'missing' };
   }
-  async purgeExpiredChallenges(before: Date) {
-    const r = await this.#q.query('DELETE FROM challenges WHERE expires_at < $1', [before]);
+  // Batched with a ctid subselect so one call never holds a long lock or produces a huge WAL burst.
+  async purgeExpiredChallenges(before: Date, limit = 5000) {
+    const r = await this.#q.query(
+      'DELETE FROM challenges WHERE ctid IN (SELECT ctid FROM challenges WHERE expires_at < $1 LIMIT $2)',
+      [before, limit],
+    );
+    return r.rowCount ?? 0;
+  }
+  async purgeExpiredLeases(before: Date, limit = 5000) {
+    const r = await this.#q.query(
+      'DELETE FROM leases WHERE ctid IN (SELECT ctid FROM leases WHERE expires_at < $1 LIMIT $2)',
+      [before, limit],
+    );
     return r.rowCount ?? 0;
   }
 }

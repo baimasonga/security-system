@@ -22,7 +22,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   const app = Fastify({
     logger: opts.logger
       ? {
-          level: 'info',
+          level: c.config.logLevel,
           redact: ['req.headers.authorization', 'req.headers.cookie'],
           ...(opts.logStream ? { stream: opts.logStream } : {}),
         }
@@ -49,6 +49,17 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 
   app.addHook('onClose', async () => c.close());
+
+  // Request metrics: route TEMPLATE (never the raw URL), so labels cannot carry ids or secrets.
+  app.addHook('onResponse', async (req, reply) => {
+    const route = req.routeOptions?.url ?? 'unmatched';
+    c.metrics.inc('http_requests_total', {
+      method: req.method,
+      route,
+      status: String(reply.statusCode),
+    });
+    c.metrics.observe('http_request_duration_ms', reply.elapsedTime, { route });
+  });
 
   registerAuthRoutes(app, c);
   registerOrgRoutes(app, c);

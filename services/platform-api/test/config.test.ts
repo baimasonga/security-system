@@ -58,3 +58,35 @@ describe('loadConfig — fail closed', () => {
     expect(loadConfig(env({ TRUST_PROXY: '1' })).trustProxy).toBe(true);
   });
 });
+
+describe('loadConfig — operational knobs', () => {
+  it('accepts validated retention / maintenance / rate-limit / log overrides and rejects nonsense', () => {
+    const c = loadConfig(
+      env({
+        CHALLENGE_RETENTION_SECONDS: '120',
+        LEASE_RETENTION_SECONDS: '86400',
+        MAINTENANCE_INTERVAL_SECONDS: '15',
+        RATE_LIMIT_GLOBAL: '5000',
+        LOG_LEVEL: 'warn',
+      }),
+    );
+    expect(c).toMatchObject({
+      challengeRetentionSeconds: 120,
+      leaseRetentionSeconds: 86400,
+      maintenanceIntervalSeconds: 15,
+      logLevel: 'warn',
+    });
+    expect(c.rateLimits.global).toBe(5000);
+    expect(loadConfig(env({})).maintenanceIntervalSeconds).toBe(60);
+    const bads: Array<Record<string, string>> = [
+      { CHALLENGE_RETENTION_SECONDS: '-1' },
+      { MAINTENANCE_INTERVAL_SECONDS: '0' },
+      { LEASE_RETENTION_SECONDS: 'abc' },
+      { RATE_LIMIT_LOGIN: '0' },
+      { LOG_LEVEL: 'chatty' },
+    ];
+    for (const bad of bads) {
+      expect(() => loadConfig(env(bad)), JSON.stringify(bad)).toThrow();
+    }
+  });
+});

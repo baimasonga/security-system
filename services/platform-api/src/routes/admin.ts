@@ -3,6 +3,7 @@ import type { Container } from '../container.ts';
 import { operator, parse, principalOf, toWire } from '../http.ts';
 import {
   auditQuery,
+  metricsQuery,
   issueLicenseBody,
   licenseParams,
   mapOverrides,
@@ -158,6 +159,15 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
       limit: q.limit,
     });
     return { items: toWire(items) };
+  });
+
+  // Operational metrics (operator-only). JSON by default, Prometheus text with ?format=prometheus.
+  app.get('/v1/admin/metrics', pre, async (req, reply) => {
+    const { format } = parse(metricsQuery, req.query);
+    if (format === 'prometheus') {
+      return reply.type('text/plain; version=0.0.4').send(c.metrics.prometheus());
+    }
+    return c.metrics.snapshot();
   });
 
   app.get('/v1/admin/audit/verify', pre, async () => toWire(await c.audit.verifyChain()));

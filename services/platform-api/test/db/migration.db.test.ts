@@ -44,9 +44,9 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
 
   it('applies from an empty database, then is idempotent', async () => {
     const first = await applyMigrations(db, migrationsDir);
-    expect(first.applied).toEqual(['0001_init']);
+    expect(first.applied).toEqual(['0001_init', '0002_retention_indexes']);
     const second = await applyMigrations(db, migrationsDir);
-    expect(second).toEqual({ applied: [], skipped: ['0001_init'] });
+    expect(second).toEqual({ applied: [], skipped: ['0001_init', '0002_retention_indexes'] });
   });
 
   it('refuses to run when an applied migration file has been modified (immutable history)', async () => {

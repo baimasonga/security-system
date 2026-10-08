@@ -8,7 +8,7 @@ import {
   type ChainVerification,
 } from '@trust/audit';
 import type { Clock, Json } from '@trust/shared-types';
-import { withTransaction, type PgPool, type Queryable } from './pg.ts';
+import { observer, withTransaction, type PgPool, type Queryable } from './pg.ts';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -43,9 +43,17 @@ export async function appendAuditInTx(
   inputs: readonly AuditEventInput[],
 ): Promise<AuditEvent[]> {
   if (inputs.length === 0) return [];
-  await q.query('SELECT pg_advisory_xact_lock($1)', [AUDIT_APPEND_LOCK]);
-  const last = (await q.query('SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1'))
-    .rows[0];
+  const waitStart = performance.now();
+  // ONE round trip for "take the chain lock, then read the head". They must stay two separate STATEMENTS:
+  // in READ COMMITTED each statement gets its own snapshot, so the head read happens after the lock is
+  // granted and sees whatever the previous lock holder committed. Folding them into a single statement
+  // would read a snapshot taken BEFORE the wait and fork the chain. (No parameters => simple-query
+  // protocol, which allows several statements per message; the lock key is a module constant.)
+  const [, head] = (await q.query(
+    `SELECT pg_advisory_xact_lock(${AUDIT_APPEND_LOCK}); SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1`,
+  )) as unknown as [unknown, { rows: Array<{ seq: string; hash: string }> }];
+  observer.onAuditLockWait?.(performance.now() - waitStart);
+  const last = head.rows[0];
   let prev = last
     ? { seq: Number(last.seq), hash: last.hash as string }
     : { seq: 0, hash: GENESIS_HASH };

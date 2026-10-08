@@ -132,3 +132,7 @@ export function mapOverrides(o: z.infer<typeof overrides> | undefined) {
     ...(o.device_limit !== undefined ? { deviceLimit: o.device_limit } : {}),
   };
 }
+
+export const metricsQuery = z
+  .object({ format: z.enum(['json', 'prometheus']).default('json') })
+  .strict();

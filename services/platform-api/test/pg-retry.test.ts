@@ -130,3 +130,38 @@ describe('withTransaction retry policy (R-14)', () => {
     expect(f.log).toEqual(['BEGIN', 'COMMIT']);
   });
 });
+
+describe('serialized (no concurrent statements on one connection)', () => {
+  it('runs overlapping queries one at a time, in issue order, and survives a failing query', async () => {
+    const { serialized } = await import('../src/db/pg.ts');
+    let running = 0,
+      maxRunning = 0;
+    const order: string[] = [];
+    const base = {
+      async query(text: string) {
+        running++;
+        maxRunning = Math.max(maxRunning, running);
+        await new Promise((r) => setTimeout(r, 5));
+        running--;
+        order.push(text);
+        if (text === 'bad') throw new Error('boom');
+        return { rows: [{ text }], rowCount: 1 };
+      },
+    };
+    const q = serialized(base as never);
+    const results = await Promise.allSettled([
+      q.query('a'),
+      q.query('bad'),
+      q.query('c'),
+      q.query('d'),
+    ]);
+    expect(maxRunning).toBe(1);
+    expect(order).toEqual(['a', 'bad', 'c', 'd']);
+    expect(results.map((r) => r.status)).toEqual([
+      'fulfilled',
+      'rejected',
+      'fulfilled',
+      'fulfilled',
+    ]);
+  });
+});

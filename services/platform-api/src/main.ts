@@ -1,6 +1,7 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createContainer } from './container.ts';
+import { startMaintenance } from './maintenance.ts';
 
 const config = loadConfig();
 const container = await createContainer(config);
@@ -26,4 +27,13 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const) {
         .then(() => process.exit(0)),
   );
 }
+const maintenance = startMaintenance(container, {
+  everyMs: config.maintenanceIntervalSeconds * 1000,
+  onError: (e) =>
+    app.log.error(
+      { err: { name: (e as Error)?.name, message: (e as Error)?.message } },
+      'maintenance failed',
+    ),
+});
+app.addHook('onClose', async () => maintenance.stop());
 await app.listen({ host: config.host, port: config.port });
