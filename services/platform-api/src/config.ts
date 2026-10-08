@@ -29,6 +29,11 @@ export interface PlatformConfig {
    * risk explicitly accepted via AUDIT_ANCHOR_DISABLED=true).
    */
   auditAnchor: { url: string; token: string | undefined; intervalSeconds: number } | undefined;
+  /**
+   * Where HTTP rate-limit counters live (R-7). `postgres` shares them across instances; `memory` is per process
+   * (development, or a deliberately single-instance deployment).
+   */
+  rateLimitStore: 'memory' | 'postgres';
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
   scrypt?: ScryptParams;
   rateLimits: {
@@ -125,6 +130,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       }
     : undefined;
 
+  const rateLimitStore = (env['RATE_LIMIT_STORE'] ?? (prod ? 'postgres' : 'memory')) as string;
+  if (rateLimitStore !== 'memory' && rateLimitStore !== 'postgres')
+    throw new Error(`unsupported RATE_LIMIT_STORE=${rateLimitStore}`);
+  if (rateLimitStore === 'postgres' && persistence !== 'postgres')
+    throw new Error('RATE_LIMIT_STORE=postgres requires PERSISTENCE=postgres');
+
   const logLevel = (env['LOG_LEVEL'] ?? 'info') as PlatformConfig['logLevel'];
   if (!['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'].includes(logLevel)) {
     throw new Error('invalid LOG_LEVEL');
@@ -150,6 +161,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     maintenanceIntervalSeconds,
     auditChainShards,
     auditAnchor,
+    rateLimitStore,
     logLevel,
     rateLimits: {
       global: limit(env, 'RATE_LIMIT_GLOBAL', 300),

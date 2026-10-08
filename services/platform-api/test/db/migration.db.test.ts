@@ -52,6 +52,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0002_retention_indexes',
       '0003_partitioned_audit',
       '0004_audit_anchors',
+      '0005_shared_rate_state',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
@@ -61,6 +62,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         '0002_retention_indexes',
         '0003_partitioned_audit',
         '0004_audit_anchors',
+        '0005_shared_rate_state',
       ],
     });
   });

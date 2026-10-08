@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { generateEd25519 } from '@trust/crypto';
 import { Telemetry } from '@trust/telemetry';
+import { PgRateBackend } from '../../src/rate-limit.ts';
+import { rateBackendContract } from '../rate-backend-contract.ts';
 import { anchorStoreContract } from '../anchor-store-contract.ts';
 import { PgAnchorStore } from '../../src/db/pg-anchor-store.ts';
 import { auditLogContract } from '../../../../packages/audit/test/log-contract.ts';
@@ -30,6 +32,7 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
     const pool = createSchemaPool();
     return { store: new PgAuthStore(pool, clock), audited: auditedOf(pool) };
   });
+  rateBackendContract('postgres', () => new PgRateBackend(createSchemaPool()));
   anchorStoreContract('postgres', () => new PgAnchorStore(createSchemaPool()));
   auditLogContract('postgres', (clock, opts) => new PgAuditLog(createSchemaPool(), clock, opts));
   licensingStoreContract('postgres', () => {

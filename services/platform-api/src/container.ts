@@ -23,6 +23,12 @@ import {
   type AnchorStore,
 } from './anchors.ts';
 import { Metrics } from './metrics.ts';
+import {
+  MemoryRateBackend,
+  PgRateBackend,
+  ResilientRateBackend,
+  type RateBackend,
+} from './rate-limit.ts';
 import { PgAnchorStore } from './db/pg-anchor-store.ts';
 import { PgAuditLog } from './db/pg-audit-log.ts';
 import { PgAuthStore } from './db/pg-auth-store.ts';
@@ -44,6 +50,8 @@ export interface Container {
   anchorStore: AnchorStore;
   /** Present only when an external witness is configured. */
   anchors: AnchorPublisher | undefined;
+  /** Shared HTTP rate-limit counters (R-7); undefined = the limiter's per-process default. */
+  rateBackend: RateBackend | undefined;
   /** Releases pooled resources. Idempotent. */
   close(): Promise<void>;
 }
@@ -246,6 +254,14 @@ export async function createContainer(
     : undefined;
   await anchors?.init();
 
+  const rateBackend: RateBackend | undefined =
+    pool && config.rateLimitStore === 'postgres'
+      ? new ResilientRateBackend(new PgRateBackend(pool), new MemoryRateBackend(), {
+          // A database problem degrades to per-process counting; make it visible.
+          onFallback: (reason) => metrics.inc('rate_limit_fallback_total', { reason }),
+        })
+      : undefined;
+
   let closed = false;
   return {
     config,
@@ -259,6 +275,7 @@ export async function createContainer(
     metrics,
     anchorStore,
     anchors,
+    rateBackend,
     async close() {
       if (closed) return;
       closed = true;

@@ -103,6 +103,50 @@ describe('registration and login', () => {
     now = new Date(now.getTime() + 16 * 60 * 1000);
     expect(await code(auth.login({ email: 'a@b.co', password: PW }))).toBe('ok');
   });
+
+  it('lockout state is shared: failures counted by one instance lock the account on another (R-7)', async () => {
+    const audit = new InMemoryAuditLog(clock);
+    const store = new InMemoryAuthStore({ audit }); // one shared store = several API instances on one database
+    const a = new AuthService({ store, clock, audit, config: { scrypt: FAST } });
+    const b = new AuthService({ store, clock, audit, config: { scrypt: FAST } });
+    await a.register({ email: 'a@b.co', password: PW });
+    for (let i = 0; i < 3; i++)
+      await code(a.login({ email: 'a@b.co', password: 'bad-bad-bad-bad' }));
+    for (let i = 0; i < 2; i++)
+      await code(b.login({ email: 'a@b.co', password: 'bad-bad-bad-bad' }));
+    // five failures in total, none of the instances saw five: both must refuse the right password
+    expect(await code(a.login({ email: 'a@b.co', password: PW }))).toBe('unauthenticated');
+    expect(await code(b.login({ email: 'a@b.co', password: PW }))).toBe('unauthenticated');
+    expect((await audit.list({ action: 'user.login_blocked' })).length).toBe(2);
+  });
+
+  it('unknown accounts are counted and blocked exactly like real ones, without storing the address', async () => {
+    const { auth, store } = make();
+    for (let i = 0; i < 5; i++)
+      await code(auth.login({ email: 'ghost@b.co', password: 'bad-bad-bad-bad' }));
+    const { sha256Hex } = await import('@trust/crypto');
+    expect((await store.findLoginFailure(sha256Hex('ghost@b.co')))?.count).toBe(5);
+    expect(JSON.stringify(await store.findLoginFailure('ghost@b.co'))).toBe(undefined);
+    await auth.register({ email: 'ghost@b.co', password: PW }); // registering afterwards does not clear it
+    expect(await code(auth.login({ email: 'ghost@b.co', password: PW }))).toBe('unauthenticated');
+  });
+
+  it('a successful login clears the counter; maintenance forgets old failures', async () => {
+    const { auth, store } = make();
+    await auth.register({ email: 'a@b.co', password: PW });
+    const { sha256Hex } = await import('@trust/crypto');
+    const key = sha256Hex('a@b.co');
+    for (let i = 0; i < 4; i++)
+      await code(auth.login({ email: 'a@b.co', password: 'bad-bad-bad-bad' }));
+    expect(await code(auth.login({ email: 'a@b.co', password: PW }))).toBe('ok');
+    expect(await store.findLoginFailure(key)).toBeUndefined();
+
+    await code(auth.login({ email: 'a@b.co', password: 'bad-bad-bad-bad' }));
+    expect(await auth.runMaintenance()).toEqual({ loginFailures: 0 }); // too recent
+    now = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+    expect(await auth.runMaintenance()).toEqual({ loginFailures: 1 });
+    expect(await store.findLoginFailure(key)).toBeUndefined();
+  });
 });
 
 describe('atomic audit', () => {

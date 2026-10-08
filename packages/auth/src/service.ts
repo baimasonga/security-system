@@ -27,7 +27,6 @@ export class AuthService {
   readonly #clock: Clock;
   readonly #audit: AuditLog;
   readonly #cfg: AuthConfig;
-  readonly #failures = new Map<string, { count: number; lockedUntil: number }>();
   #dummyHash: Promise<string> | undefined;
 
   constructor(deps: {
@@ -106,8 +105,11 @@ export class AuthService {
   }): Promise<{ token: string; expiresAt: Date; userId: string }> {
     const email = input.email.trim().toLowerCase();
     const now = this.#clock.now();
-    const fail = this.#failures.get(email);
-    if (fail && fail.lockedUntil > now.getTime()) {
+    // Lockout state lives in the store, shared by every instance and surviving restarts (R-7). The key is a
+    // digest, so unknown accounts are tracked identically and no address is stored.
+    const failKey = sha256Hex(email);
+    const fail = await this.#store.findLoginFailure(failKey);
+    if (fail?.lockedUntil && fail.lockedUntil.getTime() > now.getTime()) {
       await this.#audit.append({
         actor: { type: 'anonymous' },
         action: 'user.login_blocked',
@@ -122,11 +124,12 @@ export class AuthService {
       user?.passwordHash ?? (await this.#dummy()),
     );
     if (!user || !ok || user.status !== 'active') {
-      const count = (fail?.count ?? 0) + 1;
-      this.#failures.set(email, {
-        count,
-        lockedUntil: count >= this.#cfg.maxFailedLogins ? now.getTime() + this.#cfg.lockoutMs : 0,
-      });
+      const { count } = await this.#store.recordLoginFailure(
+        failKey,
+        now,
+        this.#cfg.maxFailedLogins,
+        this.#cfg.lockoutMs,
+      );
       await this.#audit.append({
         actor: user ? { type: 'user', id: user.id } : { type: 'anonymous' },
         action: 'user.login_failed',
@@ -134,7 +137,7 @@ export class AuthService {
       });
       throw new DomainError('unauthenticated', BAD_LOGIN);
     }
-    this.#failures.delete(email);
+    if (fail) await this.#store.clearLoginFailure(failKey);
     const token = newSecretToken('sess');
     const expiresAt = new Date(now.getTime() + this.#cfg.sessionTtlMs);
     const sessionId = newId('ses');
@@ -338,6 +341,26 @@ export class AuthService {
       });
       throw new DomainError('forbidden', 'insufficient permissions');
     }
+  }
+
+  /**
+   * Retention for the failed-login counters, off the request path. An account that has not failed for a day
+   * (and at least twice the lockout period) starts again from zero.
+   */
+  async runMaintenance(opts?: {
+    batch?: number;
+    maxBatches?: number;
+  }): Promise<{ loginFailures: number }> {
+    const batch = opts?.batch ?? 5000;
+    const keep = Math.max(24 * 60 * 60 * 1000, this.#cfg.lockoutMs * 2);
+    const cutoff = new Date(this.#clock.now().getTime() - keep);
+    let total = 0;
+    for (let i = 0; i < (opts?.maxBatches ?? 20); i++) {
+      const n = await this.#store.purgeLoginFailures(cutoff, batch);
+      total += n;
+      if (n < batch) break;
+    }
+    return { loginFailures: total };
   }
 
   #dummy(): Promise<string> {

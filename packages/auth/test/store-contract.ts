@@ -129,6 +129,74 @@ export function authStoreContract(name: string, make: () => AuthHarness | Promis
       expect((await s.findSessionWithUser('h_ses_w'))!.session.revokedAt).toEqual(T);
     });
 
+    describe('login failure counters (shared lockout state, R-7)', () => {
+      const t = (ms: number) => new Date(T.getTime() + ms);
+      const LOCK = 15 * 60_000;
+      const K = (hex: string) => hex.padEnd(64, '0'); // keys are sha256 digests (the table enforces the shape)
+
+      it('counts failures atomically, locks at the threshold and keeps counting; keys are independent', async () => {
+        const { store: s } = await make();
+        expect(await s.findLoginFailure(K('a1'))).toBeUndefined();
+        for (let i = 1; i <= 4; i++)
+          expect(await s.recordLoginFailure(K('a1'), t(i), 5, LOCK)).toEqual({
+            count: i,
+            lockedUntil: null,
+          });
+        expect(await s.recordLoginFailure(K('a1'), t(10), 5, LOCK)).toEqual({
+          count: 5,
+          lockedUntil: t(10 + LOCK),
+        });
+        // still counting after the lock (the next failure after expiry locks again at once)
+        expect(await s.recordLoginFailure(K('a1'), t(20), 5, LOCK)).toEqual({
+          count: 6,
+          lockedUntil: t(20 + LOCK),
+        });
+        expect(await s.findLoginFailure(K('a1'))).toEqual({ count: 6, lockedUntil: t(20 + LOCK) });
+        expect(await s.findLoginFailure(K('a2'))).toBeUndefined();
+        expect(await s.recordLoginFailure(K('a2'), t(1), 5, LOCK)).toEqual({
+          count: 1,
+          lockedUntil: null,
+        });
+        expect(await s.recordLoginFailure(K('a3'), t(1), 1, LOCK)).toEqual({
+          count: 1,
+          lockedUntil: t(1 + LOCK),
+        });
+      });
+
+      it('clear forgets a key; clearing an unknown key is a no-op', async () => {
+        const { store: s } = await make();
+        await s.recordLoginFailure(K('a1'), t(1), 5, LOCK);
+        await s.clearLoginFailure(K('a1'));
+        await s.clearLoginFailure(K('ff'));
+        expect(await s.findLoginFailure(K('a1'))).toBeUndefined();
+        expect(await s.recordLoginFailure(K('a1'), t(2), 5, LOCK)).toEqual({
+          count: 1,
+          lockedUntil: null,
+        });
+      });
+
+      it('concurrent failures are not lost: 25 parallel attempts yield counts 1..25 exactly once', async () => {
+        const { store: s } = await make();
+        const rs = await Promise.all(
+          Array.from({ length: 25 }, () => s.recordLoginFailure(K('ab'), t(1), 5, LOCK)),
+        );
+        expect(rs.map((r) => r.count).sort((a, b) => a - b)).toEqual(
+          Array.from({ length: 25 }, (_, i) => i + 1),
+        );
+        expect((await s.findLoginFailure(K('ab')))!.count).toBe(25);
+      });
+
+      it('purge removes only entries last touched before the cutoff, in bounded batches', async () => {
+        const { store: s } = await make();
+        for (const k of [K('aa'), K('bb'), K('cc')]) await s.recordLoginFailure(k, t(100), 5, LOCK);
+        await s.recordLoginFailure(K('fe'), t(10_000), 5, LOCK);
+        expect(await s.purgeLoginFailures(t(5_000), 2)).toBe(2);
+        expect(await s.purgeLoginFailures(t(5_000), 2)).toBe(1);
+        expect(await s.findLoginFailure(K('fe'))).toBeDefined();
+        expect(await s.purgeLoginFailures(t(5_000), 2)).toBe(0);
+      });
+    });
+
     describe('transactions with atomic audit', () => {
       it('commit persists the change and its audit events, in order', async () => {
         const h = await make();

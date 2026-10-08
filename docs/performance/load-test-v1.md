@@ -212,6 +212,24 @@ correct (exactly 5 activations on the limit-5 license, 0 deadlocks). 5-minute so
 p50 18.0 ms, p99 25.0 ms (before: 18.9 / 27.9), flat per-minute p99. Not re-run: the 20-minute soak, multi-instance runs.
 Caveat: one shared 4-vCPU box; the load generator sat in the same CPU pool.
 
+### 3.12 After ADR-011: shared rate-limit counters (`RATE_LIMIT_STORE=postgres` vs `memory`, same box, back to back)
+
+Every limited request now costs one extra statement (the `commits` counter per flow rose from 5.3 to 8.1, confirming the
+setting applied). Refresh ramp, loopback (offered → achieved · p50 / p99 ms):
+
+| Offered | memory         | postgres       |
+| ------- | -------------- | -------------- |
+| 200/s   | 200 · 13 / 29  | 200 · 13 / 21  |
+| 300/s   | 300 · 12 / 24  | 300 · 12 / 33  |
+| 400/s   | 400 · 13 / 86  | 400 · 13 / 44  |
+| 500/s   | 500 · 19 / 169 | 497 · 62 / 254 |
+
+At a 2 ms round trip (refresh flow): 50/s p50 55 → 63 ms, 100/s 46 → 54 ms, 200/s 41 → 48 ms (≈ +15 %), no errors, no
+saturation up to 200/s in either mode. Up to 400 flows/s on this box the shared counters are within noise; the knee
+region (≈ 500/s) shows the cost. Lockout cost is one extra read per login and one atomic write per failure (logins are
+dominated by password hashing). Not measured: multi-instance throughput, behaviour under a sustained database outage
+(covered functionally by a test that drops the table: requests keep being served and limited locally).
+
 ## 4. Findings and dispositions
 
 | ID    | Severity      | Finding                                                                                                                                                                      | Evidence                                        | Status                                                                                                                                                                                         |
@@ -226,7 +244,7 @@ Caveat: one shared 4-vCPU box; the load generator sat in the same CPU pool.
 | LT-8  | Medium (mine) | Operator knobs (`CHALLENGE_*`, `LEASE_*`) were silently not applied — a patch step matched nothing — so the first "after" soak ran with default retention and proved nothing | exact row counts (121,000 = all) vs expectation | **Fixed** + regression test that each knob changes behaviour; **process lesson**: patch scripts must assert their anchors, and a measured outcome must be checked against its _expected_ value |
 | LT-9  | Medium (mine) | Load-tool `--assert-clean` never failed (same silent-no-op class) and the CLI mis-parsed valueless flags                                                                     | lint ("never reassigned"), then a negative test | **Fixed**; verified exit 0 on clean load and exit 1 on injected 429s                                                                                                                           |
 | LT-10 | Info          | Row growth: audit ≈ 0.6 KB, lease ≈ 0.24 KB, challenge ≈ 0.35 KB per flow; audit is immutable and unbounded by design                                                        | §3.8 tables                                     | Documented in runbook; archival/partitioning plan recommended                                                                                                                                  |
-| LT-11 | Open          | Scale-out throughput unverified; rate-limit and login-lockout counters are per instance (R-7)                                                                                | §3.6                                            | Needs real hardware; R-7 remains                                                                                                                                                               |
+| LT-11 | Open          | Scale-out throughput unverified. (Rate-limit and lockout counters now shared: ADR-011, §3.12)                                                                                | §3.6                                            | Needs real hardware; R-7 remains                                                                                                                                                               |
 | LT-12 | Open          | One isolated 180 ms p99 minute during the 20-min soak (no errors/retries)                                                                                                    | §3.8                                            | Not investigated (suspect PostgreSQL checkpoint); capture `log_checkpoints` in the next run                                                                                                    |
 
 ## 5. Limits of this evidence
@@ -254,7 +272,7 @@ case; tables stayed small (≤ 130k audit rows) — the audit index and verifica
    insert, COMMIT, challenge consume). Next candidates if needed: issue the challenge without a database write
    (stateless signed challenge — needs a new ADR, it changes replay protection) and pipelining `BEGIN` with the first read.
 3. **Validate scale-out on real hardware** (≥ 8 cores, separate database host): `--instances 2,4` with `latency-sweep`;
-   move rate limiting and login lockout out of process memory first (R-7).
+   (rate limiting and lockout are already shared, ADR-011).
 4. **Long soak (≥ 24 h) with `log_checkpoints`, autovacuum stats and table/index bloat sampling**, including a rolling
    restart and a PostgreSQL restart under load; investigate LT-12.
 5. **Client guidance:** SDKs should add jittered exponential backoff on `device_limit_reached`/`rate_limited`/5xx

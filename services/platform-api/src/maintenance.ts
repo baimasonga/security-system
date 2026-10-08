@@ -22,6 +22,10 @@ export function startMaintenance(
     const t0 = performance.now();
     try {
       const r = await c.licensing.runMaintenance();
+      const auth = await c.auth.runMaintenance();
+      const windows = (await c.rateBackend?.purgeExpired()) ?? 0;
+      c.metrics.inc('maintenance_deleted_total', { table: 'login_failures' }, auth.loginFailures);
+      c.metrics.inc('maintenance_deleted_total', { table: 'rate_limits' }, windows);
       c.metrics.inc('maintenance_runs_total', { outcome: 'ok' });
       c.metrics.inc('maintenance_deleted_total', { table: 'challenges' }, r.challenges);
       c.metrics.inc('maintenance_deleted_total', { table: 'leases' }, r.leases);

@@ -194,6 +194,42 @@ class PgAuthRepo implements AuthRepo {
       }),
     };
   }
+  async findLoginFailure(key: string) {
+    const r = await this.#db.query(
+      'SELECT count, locked_until FROM login_failures WHERE key = $1',
+      [key],
+    );
+    const row = r.rows[0];
+    return row
+      ? { count: row.count as number, lockedUntil: row.locked_until as Date | null }
+      : undefined;
+  }
+  async recordLoginFailure(key: string, now: Date, maxFailures: number, lockoutMs: number) {
+    const lock = new Date(now.getTime() + lockoutMs);
+    // One atomic statement: concurrent failures (from any instance) are never lost.
+    const r = await this.#db.query(
+      `INSERT INTO login_failures (key, count, locked_until, updated_at)
+       VALUES ($1, 1, CASE WHEN 1 >= $3 THEN $4::timestamptz END, $2)
+       ON CONFLICT (key) DO UPDATE
+          SET count = login_failures.count + 1,
+              locked_until = CASE WHEN login_failures.count + 1 >= $3 THEN $4::timestamptz END,
+              updated_at = $2
+       RETURNING count, locked_until`,
+      [key, now, maxFailures, lock],
+    );
+    const row = r.rows[0]!;
+    return { count: row.count as number, lockedUntil: row.locked_until as Date | null };
+  }
+  async clearLoginFailure(key: string) {
+    await this.#db.query('DELETE FROM login_failures WHERE key = $1', [key]);
+  }
+  async purgeLoginFailures(before: Date, limit = 5000) {
+    const r = await this.#db.query(
+      'DELETE FROM login_failures WHERE key IN (SELECT key FROM login_failures WHERE updated_at < $1 LIMIT $2)',
+      [before, limit],
+    );
+    return r.rowCount ?? 0;
+  }
   async revokeSession(id: string, at: Date) {
     await this.#db.query(
       'UPDATE sessions SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL',

@@ -51,6 +51,27 @@ export interface AuthRepo {
   /** `findSessionByTokenHash` plus the session's user in one read (one round trip per authenticated request). */
   findSessionWithUser(hash: string): Promise<{ session: Session; user: User } | undefined>;
   revokeSession(id: string, at: Date): Promise<void>;
+
+  /** Consecutive failed logins for an account key (a digest of the normalized email, never the email). */
+  findLoginFailure(key: string): Promise<LoginFailure | undefined>;
+  /**
+   * Atomically adds one failure (concurrent callers never lose a count, across processes). The count keeps
+   * growing after a lock; `lockedUntil` is `now + lockoutMs` whenever the new count is `>= maxFailures`.
+   */
+  recordLoginFailure(
+    key: string,
+    now: Date,
+    maxFailures: number,
+    lockoutMs: number,
+  ): Promise<LoginFailure>;
+  clearLoginFailure(key: string): Promise<void>;
+  /** Deletes up to `limit` entries last updated before `before`. Returns the number deleted. */
+  purgeLoginFailures(before: Date, limit?: number): Promise<number>;
+}
+
+export interface LoginFailure {
+  count: number;
+  lockedUntil: Date | null;
 }
 
 /** A transaction: every repository method, plus an audit writer that commits atomically with them. */
@@ -68,6 +89,7 @@ export interface AuthStore extends AuthRepo {
 }
 
 interface State {
+  loginFailures: Map<string, LoginFailure & { updatedAt: Date }>;
   users: Map<string, User>;
   orgs: Map<string, Organization>;
   memberships: Map<string, Membership>;
@@ -76,6 +98,7 @@ interface State {
 
 class MemoryRepo implements AuthRepo {
   readonly s: State = {
+    loginFailures: new Map(),
     users: new Map(),
     orgs: new Map(),
     memberships: new Map(),
@@ -134,6 +157,30 @@ class MemoryRepo implements AuthRepo {
     const s = [...this.s.sessions.values()].find((x) => x.tokenHash === hash);
     const u = s && this.s.users.get(s.userId);
     return s && u ? { session: { ...s }, user: { ...u } } : undefined;
+  }
+  async findLoginFailure(key: string) {
+    const f = this.s.loginFailures.get(key);
+    return f ? { count: f.count, lockedUntil: f.lockedUntil } : undefined;
+  }
+  async recordLoginFailure(key: string, now: Date, maxFailures: number, lockoutMs: number) {
+    const count = (this.s.loginFailures.get(key)?.count ?? 0) + 1;
+    const lockedUntil = count >= maxFailures ? new Date(now.getTime() + lockoutMs) : null;
+    this.s.loginFailures.set(key, { count, lockedUntil, updatedAt: now });
+    return { count, lockedUntil };
+  }
+  async clearLoginFailure(key: string) {
+    this.s.loginFailures.delete(key);
+  }
+  async purgeLoginFailures(before: Date, limit = 5000) {
+    let n = 0;
+    for (const [k, f] of this.s.loginFailures) {
+      if (n >= limit) break;
+      if (f.updatedAt < before) {
+        this.s.loginFailures.delete(k);
+        n++;
+      }
+    }
+    return n;
   }
   async revokeSession(id: string, at: Date) {
     const s = this.s.sessions.get(id);

@@ -34,3 +34,4 @@ Architecture decision records:
 8. [ADR-008 — Partitioned audit chains](adr/ADR-008-partitioned-audit-chains.md)
 9. [ADR-009 — Fewer database round trips per device flow](adr/ADR-009-fewer-database-round-trips.md)
 10. [ADR-010 — External audit anchor](adr/ADR-010-external-audit-anchor.md)
+11. [ADR-011 — Shared abuse-control state](adr/ADR-011-shared-abuse-control-state.md)

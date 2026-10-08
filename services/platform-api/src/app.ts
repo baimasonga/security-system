@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import rateLimit from '@fastify/rate-limit';
+import rateLimit, { type FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
+import { fastifyRateStore } from './rate-limit.ts';
 import { randomUUID } from 'node:crypto';
 import type { Container } from './container.ts';
 import { installErrorHandling, installSecurityHeaders } from './http.ts';
@@ -44,7 +45,14 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   installErrorHandling(app);
   app.addHook('onSend', async (req, reply) => void reply.header('x-request-id', req.id));
 
-  await app.register(rateLimit, { max: c.config.rateLimits.global, timeWindow: '1 minute' });
+  await app.register(rateLimit, {
+    max: c.config.rateLimits.global,
+    timeWindow: '1 minute',
+    // Shared across instances when configured (R-7); otherwise the plugin's per-process store.
+    ...(c.rateBackend
+      ? { store: fastifyRateStore(c.rateBackend) as unknown as FastifyRateLimitStoreCtor }
+      : {}),
+  });
 
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 
