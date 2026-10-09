@@ -12,7 +12,13 @@ import { systemClock, type Clock } from '@trust/shared-types';
 import { InMemoryTelemetrySink, Telemetry, type TelemetrySink } from '@trust/telemetry';
 import pg from 'pg';
 import type { PlatformConfig } from './config.ts';
-import { gatherRoleFacts, judgeRole, poolSettings } from './db/connection.ts';
+import {
+  describeConnectionTarget,
+  explainDbError,
+  gatherRoleFacts,
+  judgeRole,
+  poolSettings,
+} from './db/connection.ts';
 import { MIGRATIONS_DIR, assertSchemaCurrent } from './db/migrate.ts';
 import { setTransactionObserver, type PgPool } from './db/pg.ts';
 import {
@@ -120,7 +126,9 @@ export async function createContainer(
       await assertSchemaCurrent(pool, MIGRATIONS_DIR);
     } catch (e) {
       await ownPool.end().catch(() => undefined);
-      throw e;
+      // Say what is wrong in plain words (and never print the URL or password).
+      const hint = explainDbError(e, describeConnectionTarget(config.databaseUrl!));
+      throw hint ? new Error(hint, { cause: e }) : e;
     }
   }
 

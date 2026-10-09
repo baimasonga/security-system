@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config.ts';
 import {
   assertSchemaName,
+  describeConnectionTarget,
+  explainDbError,
   judgeRole,
   poolSettings,
   readCaPem,
@@ -297,5 +299,69 @@ describe('configuration', () => {
     expect(loadConfig(env({})).allowDbSuperuser).toBe(false);
     expect(loadConfig(env({ DB_ALLOW_SUPERUSER: 'true' })).allowDbSuperuser).toBe(true);
     expect(loadConfig(env({ DB_ALLOW_SUPERUSER: '1' })).allowDbSuperuser).toBe(false);
+  });
+});
+
+describe('explainDbError / describeConnectionTarget', () => {
+  const target = describeConnectionTarget(
+    'postgresql://trust_app.abc:s3cr3t%40x@db.abc.supabase.co:5432/postgres?sslmode=require',
+  );
+
+  it('reports host, port, user and database but never the password', () => {
+    expect(target).toEqual({
+      host: 'db.abc.supabase.co',
+      port: '5432',
+      user: 'trust_app.abc',
+      database: 'postgres',
+    });
+    expect(JSON.stringify(target)).not.toContain('s3cr3t');
+    expect(describeConnectionTarget('not a url')).toBeUndefined();
+  });
+
+  it.each([
+    ['IPv6-only host', { code: 'ENETUNREACH', address: '2a05:d018::1' }, /IPv6.*Session pooler/],
+    ['unreachable IPv4', { code: 'ENETUNREACH', address: '10.0.0.1' }, /cannot connect to db\.abc/],
+    ['timeout', { code: 'ETIMEDOUT' }, /ETIMEDOUT/],
+    ['refused', { code: 'ECONNREFUSED' }, /ECONNREFUSED/],
+    ['unknown host', { code: 'ENOTFOUND' }, /host name was not found/],
+    [
+      'wrong password',
+      { code: '28P01', message: 'password authentication failed for user "x"' },
+      /password in DATABASE_URL does not match/,
+    ],
+    ['pooler user', { message: 'Tenant or user not found' }, /<role>\.<project-ref>/],
+    ['no database', { code: '3D000' }, /does not exist/],
+    [
+      'untrusted certificate',
+      {
+        code: 'SELF_SIGNED_CERT_IN_CHAIN',
+        message: 'self-signed certificate in certificate chain',
+      },
+      /DATABASE_CA_PEM/,
+    ],
+  ])('explains: %s', (_n, err, re) => {
+    const msg = explainDbError(err, target);
+    expect(msg).toMatch(re);
+    expect(msg).not.toContain('s3cr3t');
+  });
+
+  it('leaves unrecognised errors alone', () => {
+    expect(explainDbError(new Error('something odd'), target)).toBeUndefined();
+  });
+});
+
+describe('startup with an unreachable database', () => {
+  it('fails with an explanation that names the target and never leaks the password', async () => {
+    const { createContainer } = await import('../src/container.ts');
+    const cfg = loadConfig(
+      env({
+        PERSISTENCE: 'postgres',
+        DATABASE_URL: 'postgres://trust_app:topsecretpw@127.0.0.1:1/postgres',
+      }),
+    );
+    const e = (await createContainer(cfg).catch((x: Error) => x)) as Error;
+    expect(e).toBeInstanceOf(Error);
+    expect(e.message).toMatch(/cannot connect to 127\.0\.0\.1:1 as "trust_app" \(ECONNREFUSED\)/);
+    expect(e.message).not.toContain('topsecretpw');
   });
 });

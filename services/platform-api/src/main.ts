@@ -1,10 +1,18 @@
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createContainer } from './container.ts';
+import { describeConnectionTarget } from './db/connection.ts';
 import { startAnchoring } from './anchors.ts';
 import { startMaintenance } from './maintenance.ts';
 
 const config = loadConfig();
+if (config.persistence === 'postgres' && config.databaseUrl) {
+  // Non-secret facts only (never the password): makes a wrong host/user obvious from the first log line.
+  const t = describeConnectionTarget(config.databaseUrl);
+  console.log(
+    `database: host=${t?.host} port=${t?.port} user=${t?.user} schema=${config.dbSchema ?? '(default)'} tls=${config.databaseCaPem ? 'verified (CA configured)' : 'sslmode from URL'}`,
+  );
+}
 const container = await createContainer(config);
 const app = await buildApp(container, { logger: true });
 

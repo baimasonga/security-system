@@ -138,3 +138,59 @@ export function judgeRole(
   if (f.bypassRls) warnings.push('application role bypasses row-level security');
   return warnings;
 }
+
+export interface ConnectionTarget {
+  host: string;
+  port: string;
+  user: string;
+  database: string;
+}
+
+/** The non-secret parts of a database URL (never the password), for logs and error messages. */
+export function describeConnectionTarget(databaseUrl: string): ConnectionTarget | undefined {
+  try {
+    const u = new URL(databaseUrl);
+    return {
+      host: u.hostname,
+      port: u.port || '5432',
+      user: decodeURIComponent(u.username),
+      database: decodeURIComponent(u.pathname.replace(/^\//, '')),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Turns the opaque errors of a failed first connection into an operator-readable cause and fix. Returns undefined for
+ * errors it does not recognise (they are re-thrown unchanged). Never includes the password.
+ */
+export function explainDbError(e: unknown, t: ConnectionTarget | undefined): string | undefined {
+  const err = e as { code?: string; message?: string; address?: string };
+  const where = t ? `${t.host}:${t.port} as "${t.user}"` : 'the database';
+  const code = err?.code;
+  const msg = err?.message ?? '';
+  if ((code === 'ENETUNREACH' || code === 'EHOSTUNREACH') && (err.address ?? '').includes(':'))
+    return `cannot reach ${where} over IPv6 and this host has no IPv6 route. The direct Supabase address (db.<ref>.supabase.co) is IPv6-only: use the Session pooler host (…pooler.supabase.com) with user <role>.<project-ref> instead`;
+  if (
+    code === 'ENETUNREACH' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNREFUSED'
+  )
+    return `cannot connect to ${where} (${code}): check the host and port, and that the database accepts connections from this host`;
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN')
+    return `the database host name was not found (${t?.host ?? 'unknown'}): check the host in DATABASE_URL`;
+  if (code === '28P01' || /password authentication failed/i.test(msg))
+    return `password authentication failed for "${t?.user ?? 'the user'}": the password in DATABASE_URL does not match the database (percent-encode special characters in the password)`;
+  if (/tenant or user not found/i.test(msg))
+    return `the pooler does not know the user "${t?.user ?? ''}": on the Supabase pooler the user must be <role>.<project-ref> (for example trust_app.abcdefgh)`;
+  if (code === '3D000')
+    return `database "${t?.database ?? ''}" does not exist on ${t?.host ?? 'the server'}`;
+  if (
+    /self.signed certificate|unable to verify the first certificate|certificate/i.test(msg) &&
+    /cert|SSL|TLS/i.test(`${code} ${msg}`)
+  )
+    return 'the database TLS certificate is not trusted: set DATABASE_CA_PEM to the database CA certificate (Supabase: Database settings → SSL configuration)';
+  return undefined;
+}
