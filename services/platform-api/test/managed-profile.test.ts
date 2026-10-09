@@ -78,6 +78,8 @@ describe('judgeRole', () => {
     allowSuperuser: false,
   };
   it('accepts a least-privilege role', () => expect(judgeRole(ok, o)).toEqual([]));
+  it('explains a missing or unusable schema (not migrated / no USAGE)', () =>
+    expect(() => judgeRole({ ...ok, schema: null }, o)).toThrow(/cannot use schema.*migrate/s));
   it('refuses the wrong schema', () =>
     expect(() => judgeRole({ ...ok, schema: 'public' }, o)).toThrow(/search_path/));
   it('refuses a superuser in production unless accepted; warns otherwise', () => {

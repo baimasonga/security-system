@@ -26,6 +26,7 @@ someone later enables it.
 2. **Data API:** leave `trust` out of "Exposed schemas" (or disable the Data API for this project). Do not use the
    project's `anon`/`service_role` keys anywhere in this system.
 3. **Create the schema and role:** run [`supabase-setup.sql`](supabase-setup.sql) in the SQL editor exactly as it is (it is safe to re-run and contains no password). Then, in a **separate** query, set the app role's password: `ALTER ROLE trust_app PASSWORD '<your generated password>';`. Generate the password in a password manager; never type it into the file or commit it.
+   Steps 4–5 also honour `DATABASE_CA_PEM` / `DATABASE_CA_FILE` (same CA as step 6); if the direct host is IPv6-only for your network, use the owner's Session-pooler user `postgres.<ref>`. If the API later starts with `the database role cannot use schema "trust" yet`, steps 4–5 have not been run (or not against this database).
 4. **Migrate** with the owner's _direct_ connection (migrations use session state and an advisory lock):
    ```sh
    DATABASE_MIGRATE_URL='postgresql://postgres:<owner-password>@db.<ref>.supabase.co:5432/postgres?sslmode=require' \

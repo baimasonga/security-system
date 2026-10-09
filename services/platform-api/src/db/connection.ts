@@ -119,6 +119,12 @@ export function judgeRole(
   f: RoleFacts,
   o: { production: boolean; expectedSchema: string | undefined; allowSuperuser: boolean },
 ): string[] {
+  if (o.expectedSchema !== undefined && !f.schema)
+    // current_schema() is NULL when no schema on the search path is usable: it does not exist yet, or the role has
+    // no USAGE on it. That is "migrations/grants not applied", not a search_path problem.
+    throw new Error(
+      `the database role cannot use schema "${o.expectedSchema}" yet (it does not exist, or the role has no USAGE on it). Create and grant it first, with the OWNER connection: npm run migrate, then npm run db:grants (see docs/deploy/supabase.md)`,
+    );
   if (o.expectedSchema !== undefined && f.schema !== o.expectedSchema)
     throw new Error(
       `connected with schema "${f.schema ?? ''}" but DB_SCHEMA=${o.expectedSchema}: set the role's search_path (ALTER ROLE … SET search_path = ${o.expectedSchema})`,
