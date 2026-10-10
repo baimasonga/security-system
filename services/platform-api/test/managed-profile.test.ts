@@ -347,6 +347,14 @@ describe('explainDbError / describeConnectionTarget', () => {
     expect(msg).not.toContain('s3cr3t');
   });
 
+  it('names the setting that held the URL (owner tools use DATABASE_MIGRATE_URL)', () => {
+    const err = { code: '28P01', message: 'password authentication failed for user "postgres"' };
+    expect(explainDbError(err, target)).toMatch(/password in DATABASE_URL /);
+    expect(explainDbError(err, target, 'DATABASE_MIGRATE_URL')).toMatch(
+      /password in DATABASE_MIGRATE_URL /,
+    );
+  });
+
   it('leaves unrecognised errors alone', () => {
     expect(explainDbError(new Error('something odd'), target)).toBeUndefined();
   });

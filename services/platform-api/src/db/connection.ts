@@ -171,7 +171,12 @@ export function describeConnectionTarget(databaseUrl: string): ConnectionTarget 
  * Turns the opaque errors of a failed first connection into an operator-readable cause and fix. Returns undefined for
  * errors it does not recognise (they are re-thrown unchanged). Never includes the password.
  */
-export function explainDbError(e: unknown, t: ConnectionTarget | undefined): string | undefined {
+export function explainDbError(
+  e: unknown,
+  t: ConnectionTarget | undefined,
+  /** Which setting held the URL, so the hint names the right one (the owner tools use DATABASE_MIGRATE_URL). */
+  variable = 'DATABASE_URL',
+): string | undefined {
   const err = e as { code?: string; message?: string; address?: string };
   const where = t ? `${t.host}:${t.port} as "${t.user}"` : 'the database';
   const code = err?.code;
@@ -186,9 +191,9 @@ export function explainDbError(e: unknown, t: ConnectionTarget | undefined): str
   )
     return `cannot connect to ${where} (${code}): check the host and port, and that the database accepts connections from this host`;
   if (code === 'ENOTFOUND' || code === 'EAI_AGAIN')
-    return `the database host name was not found (${t?.host ?? 'unknown'}): check the host in DATABASE_URL`;
+    return `the database host name was not found (${t?.host ?? 'unknown'}): check the host in ${variable}`;
   if (code === '28P01' || /password authentication failed/i.test(msg))
-    return `password authentication failed for "${t?.user ?? 'the user'}": the password in DATABASE_URL does not match the database (percent-encode special characters in the password)`;
+    return `password authentication failed for "${t?.user ?? 'the user'}": the password in ${variable} does not match the database (percent-encode special characters in the password)`;
   if (/tenant or user not found/i.test(msg))
     return `the pooler does not know the user "${t?.user ?? ''}": on the Supabase pooler the user must be <role>.<project-ref> (for example trust_app.abcdefgh)`;
   if (code === '3D000')

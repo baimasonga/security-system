@@ -12,7 +12,8 @@ import {
 } from '../services/platform-api/src/db/connection.ts';
 import { applyAppGrants } from '../services/platform-api/src/db/grants.ts';
 
-const url = process.env['DATABASE_MIGRATE_URL'] ?? process.env['DATABASE_URL'];
+const urlVar = process.env['DATABASE_MIGRATE_URL'] ? 'DATABASE_MIGRATE_URL' : 'DATABASE_URL';
+const url = process.env[urlVar];
 const schema = process.env['DB_SCHEMA'];
 const role = process.env['APP_DB_ROLE'];
 if (!url || !schema || !role) {
@@ -25,7 +26,7 @@ const client = new pg.Client(ssl ? { connectionString, ssl } : { connectionStrin
 try {
   await client.connect();
 } catch (e) {
-  const hint = explainDbError(e, describeConnectionTarget(url));
+  const hint = explainDbError(e, describeConnectionTarget(url), urlVar);
   console.error(`could not connect: ${hint ?? (e as Error).message}`);
   process.exit(1);
 }

@@ -12,7 +12,8 @@ import {
 } from '../services/platform-api/src/db/connection.ts';
 import { MIGRATIONS_DIR, applyMigrations } from '../services/platform-api/src/db/migrate.ts';
 
-const url = process.env['DATABASE_MIGRATE_URL'] ?? process.env['DATABASE_URL'];
+const urlVar = process.env['DATABASE_MIGRATE_URL'] ? 'DATABASE_MIGRATE_URL' : 'DATABASE_URL';
+const url = process.env[urlVar];
 if (!url) {
   console.error('DATABASE_MIGRATE_URL (or DATABASE_URL) is required');
   process.exit(2);
@@ -23,7 +24,7 @@ const client = new pg.Client(ssl ? { connectionString, ssl } : { connectionStrin
 try {
   await client.connect();
 } catch (e) {
-  const hint = explainDbError(e, describeConnectionTarget(url));
+  const hint = explainDbError(e, describeConnectionTarget(url), urlVar);
   console.error(`could not connect: ${hint ?? (e as Error).message}`);
   process.exit(1);
 }
