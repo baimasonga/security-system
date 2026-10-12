@@ -12,12 +12,13 @@ const url = process.env['DATABASE_URL'];
 const suffix = randomBytes(4).toString('hex');
 const SCHEMA = `trust_${suffix}`;
 const APP = `app_${suffix}`;
+const appPassword = randomBytes(24).toString('hex');
 const SIMULATED = ['anon', 'authenticated', 'service_role', 'authenticator'];
 
 const as = (role: string, over: Record<string, string> = {}) => {
   const u = new URL(url!);
   u.username = role;
-  u.password = '';
+  if (role === APP) u.password = appPassword;
   for (const [k, v] of Object.entries(over)) u.searchParams.set(k, v);
   return u.toString();
 };
@@ -50,7 +51,7 @@ describe.skipIf(!url)('managed-database profile (ADR-012)', () => {
         createdRoles.push(r);
       }
     }
-    await owner.query(`CREATE ROLE ${APP} LOGIN`);
+    await owner.query(`CREATE ROLE ${APP} LOGIN PASSWORD '${appPassword}'`);
     createdRoles.push(APP);
     // Migrate into a private schema, as on a managed platform.
     await applyMigrations(owner, MIGRATIONS_DIR, { schema: SCHEMA });
@@ -234,7 +235,7 @@ describe.skipIf(!url)('managed-database profile (ADR-012)', () => {
     const at = (user: string, db = dbName) => {
       const u = new URL(url!);
       u.username = user;
-      u.password = '';
+      if (user === 'trust_app') u.password = appPassword;
       u.pathname = `/${db}`;
       return u.toString();
     };
@@ -244,6 +245,7 @@ describe.skipIf(!url)('managed-database profile (ADR-012)', () => {
     try {
       await guide.query(sql); // exactly what an operator pastes into the SQL editor
       role = true;
+      await guide.query(`ALTER ROLE trust_app PASSWORD '${appPassword}'`);
       const base = {
         ...process.env,
         DB_SCHEMA: 'trust',

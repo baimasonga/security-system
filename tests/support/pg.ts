@@ -18,7 +18,7 @@ const created: Array<{ schema: string; pool: pg.Pool }> = [];
 function urlAs(role: string): string {
   const u = new URL(url());
   u.username = role;
-  u.password = '';
+  u.password = `test-only-${TEST_APP_ROLE}`;
   return u.toString();
 }
 
@@ -59,7 +59,10 @@ export function createSchemaPool(): PgPool {
           TEST_APP_ROLE,
         ]);
         if (!exists.rows.length)
-          await mig.query(`CREATE ROLE ${TEST_APP_ROLE} LOGIN`).catch(() => undefined);
+          await mig
+            .query(`CREATE ROLE ${TEST_APP_ROLE} LOGIN PASSWORD 'test-only-${TEST_APP_ROLE}'`)
+            .catch(() => undefined);
+        await mig.query(`ALTER ROLE ${TEST_APP_ROLE} PASSWORD 'test-only-${TEST_APP_ROLE}'`);
         await applyAppGrants(mig, { schema, role: TEST_APP_ROLE });
       }
     } finally {
