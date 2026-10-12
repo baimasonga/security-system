@@ -46,31 +46,33 @@ function toEvent(r: Row): AuditEvent {
 const headOf = (r: Row): ChainHead => ({ seq: Number(r.head_seq), hash: r.head_hash as string });
 
 /**
- * Locks the head rows of `chains` (sorted => deterministic lock order across transactions) and returns the
- * current heads, all in ONE round trip. `FOR UPDATE` re-reads the newest committed version after any wait, so
- * the head we get is the one the previous holder committed. Chains that do not exist yet are created.
+ * Acquire each head completely in the same binary chain-id order, including creation races.
+ * Locking all existing heads first and then missing heads violates that order and can deadlock.
+ * Single-head appends keep their one-read fast path; multi-head batches pay one read per head.
  */
 async function lockHeads(q: Queryable, chains: readonly string[]): Promise<Map<string, ChainHead>> {
-  const res = await q.query(
-    'SELECT chain_id, head_seq, head_hash FROM audit_chains WHERE chain_id = ANY($1::text[]) ORDER BY chain_id FOR UPDATE',
-    [chains],
-  );
-  const heads = new Map<string, ChainHead>(res.rows.map((r) => [r.chain_id as string, headOf(r)]));
+  const heads = new Map<string, ChainHead>();
   for (const chain of chains) {
-    if (heads.has(chain)) continue;
+    const existing = await q.query(
+      'SELECT chain_id, head_seq, head_hash FROM audit_chains WHERE chain_id = $1 FOR UPDATE',
+      [chain],
+    );
+    if (existing.rows[0]) {
+      heads.set(chain, headOf(existing.rows[0]));
+      continue;
+    }
     const ins = await q.query(
       'INSERT INTO audit_chains (chain_id, head_seq, head_hash) VALUES ($1, 0, $2) ON CONFLICT (chain_id) DO NOTHING RETURNING chain_id',
       [chain, GENESIS_HASH],
     );
-    if (ins.rowCount === 1) {
-      heads.set(chain, { seq: 0, hash: GENESIS_HASH }); // we created (and therefore hold) it
-    } else {
-      // Lost a creation race; the winner has committed by now. Lock the real row.
-      const r = await q.query(
+    if (ins.rowCount === 1) heads.set(chain, { seq: 0, hash: GENESIS_HASH });
+    else {
+      // The competing creator committed. Lock its newest head before moving to the next chain.
+      const current = await q.query(
         'SELECT chain_id, head_seq, head_hash FROM audit_chains WHERE chain_id = $1 FOR UPDATE',
         [chain],
       );
-      heads.set(chain, headOf(r.rows[0]!));
+      heads.set(chain, headOf(current.rows[0]!));
     }
   }
   return heads;

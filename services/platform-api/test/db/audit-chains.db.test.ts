@@ -40,6 +40,59 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
     }
   });
 
+  it('does not lock a later existing head while waiting for an earlier head being created', async () => {
+    const pool = createSchemaPool();
+    const log = new PgAuditLog(pool, clock);
+    await log.append({ actor: sys, action: 'seed', orgId: 'org_z' });
+    const creator = await pool.connect();
+    const probe = await pool.connect();
+    const appendClient = await pool.connect();
+    let started!: () => void;
+    const firstRead = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let signalled = false;
+    const wrapped = {
+      connect: async () => ({
+        query: async (...args: Parameters<typeof appendClient.query>) => {
+          const result = await appendClient.query(...args);
+          if (!signalled && String(args[0]).includes('SELECT chain_id, head_seq, head_hash')) {
+            signalled = true;
+            started();
+          }
+          return result;
+        },
+        release: () => undefined,
+      }),
+    };
+    let pending: Promise<unknown> | undefined;
+    try {
+      await creator.query('BEGIN');
+      await creator.query(
+        'INSERT INTO audit_chains(chain_id,head_seq,head_hash) VALUES ($1,0,$2)',
+        ['org:org_a', GENESIS_HASH],
+      );
+      pending = new PgAuditLog(wrapped as never, clock).appendMany([
+        { actor: sys, action: 'a', orgId: 'org_a' },
+        { actor: sys, action: 'z', orgId: 'org_z' },
+      ]);
+      await firstRead;
+      await probe.query('BEGIN');
+      // Appender waits for uncommitted A. It must not already hold the later Z lock.
+      await expect(
+        probe.query("SELECT 1 FROM audit_chains WHERE chain_id='org:org_z' FOR UPDATE NOWAIT"),
+      ).resolves.toBeDefined();
+    } finally {
+      await probe.query('ROLLBACK').catch(() => undefined);
+      await creator.query('COMMIT');
+      await pending;
+      creator.release();
+      probe.release();
+      appendClient.release();
+    }
+    expect(await log.verifyChain()).toMatchObject({ ok: true, count: 3, chains: 2 });
+  });
+
   it('concurrent appends across pools, orgs and a hot sharded org stay verifiable and gap-free', async () => {
     const first = createSchemaPool();
     await first.query('SELECT 1');

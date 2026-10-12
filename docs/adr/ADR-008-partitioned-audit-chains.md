@@ -78,3 +78,7 @@ What it does **not** need: a single total order across unrelated tenants — not
 `(seq)` with `(chain_id, seq)`, creates `audit_chains` and seeds the `legacy` head from the last existing event.
 Tested by applying 0001+0002, writing legacy-hashed events, then applying 0003 and verifying that the legacy chain
 still verifies, new events go to new chains, and immutability still holds.
+
+## Lock ordering correction (2026-10-12)
+
+Concurrent CI batches exposed a creation race: locking every existing head first, then creating missing heads, can hold a later chain while waiting for an earlier chain's uncommitted creator. The acquisition order now covers both lookup and creation in one binary-sorted per-chain loop. Each head is fully locked or created before moving to the next. Single-chain appends retain one lookup; multi-chain batches use one lookup per head. No database locale sort participates. A deterministic PostgreSQL regression holds an earlier uncommitted head and verifies the waiting appender has not acquired the later head; it fails against the previous implementation. Retries remain a safety net, not the lock-order strategy.
