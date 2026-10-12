@@ -22,40 +22,57 @@ const script = original.replace(
 );
 const scope = 'ci_diagnostic_' + process.pid + '_' + Date.now();
 try {
-  const result = spawnSync(
-    win32.join(process.env.SystemRoot!, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
-    [
-      '-NoLogo',
-      '-NoProfile',
-      '-NonInteractive',
-      '-EncodedCommand',
-      Buffer.from(script, 'utf16le').toString('base64'),
-    ],
-    {
-      windowsHide: true,
-      input: JSON.stringify({
-        scope,
-        key: 'diagnostic',
-        operation: 'set',
-        value: 'fixed-non-secret-fixture',
-      }),
-      encoding: 'utf8',
-      timeout: 15_000,
-      maxBuffer: 64 * 1024,
-    },
-  );
-  if (result.status !== 0) {
-    // Only this disposable fixture is processed. Escape GitHub workflow-command delimiters.
-    const error = String(
-      result.stderr || result.error?.message || 'Unknown Windows diagnostic failure',
-    )
-      .slice(0, 12000)
-      .replaceAll('%', '%25')
-      .replaceAll('\r', '%0D')
-      .replaceAll('\n', '%0A');
-    console.error('::error title=Windows synthetic-storage diagnosis::' + error);
-    process.exitCode = 1;
-  } else console.log('Synthetic Windows storage probe passed.');
+  const requests: Array<{ operation: string; value?: string }> = [
+    { operation: 'get' },
+    { operation: 'set', value: 'fixed-non-secret-fixture ⚑' },
+    { operation: 'get' },
+    { operation: 'set', value: 'replacement-fixture' },
+    { operation: 'get' },
+    { operation: 'delete' },
+    { operation: 'get' },
+  ];
+  for (const [index, request] of requests.entries()) {
+    const result = spawnSync(
+      win32.join(
+        process.env.SystemRoot!,
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe',
+      ),
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-EncodedCommand',
+        Buffer.from(script, 'utf16le').toString('base64'),
+      ],
+      {
+        windowsHide: true,
+        input: JSON.stringify({ scope, key: 'diagnostic', ...request }),
+        encoding: 'utf8',
+        timeout: 15_000,
+        maxBuffer: 64 * 1024,
+      },
+    );
+    if (result.status !== 0) {
+      // Only this disposable fixture is processed. Escape GitHub workflow-command delimiters.
+      const error = String(
+        result.stderr || result.error?.message || 'Unknown Windows diagnostic failure',
+      )
+        .slice(0, 12000)
+        .replaceAll('%', '%25')
+        .replaceAll('\r', '%0D')
+        .replaceAll('\n', '%0A');
+      console.error(
+        `::error title=Windows synthetic-storage diagnosis (${index} ${request.operation})::` +
+          error,
+      );
+      process.exitCode = 1;
+      break;
+    }
+    console.log(`Synthetic Windows storage step ${index} ${request.operation} passed.`);
+  }
 } finally {
   await rm(win32.join(process.env.LOCALAPPDATA!, 'TrustPlatform', scope), {
     recursive: true,

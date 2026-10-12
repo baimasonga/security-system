@@ -77,7 +77,13 @@ describe('browser device verification', () => {
     expect(result.entitlements).toEqual({});
   });
   it('rejects tampering and untrusted keys', async () => {
-    expect((await checkOffline(lease().slice(0, -3) + 'AAA', options)).state).toBe('invalid');
+    const original = lease();
+    const [header, body, encodedSignature] = original.split('.');
+    const signature = Buffer.from(encodedSignature, 'base64url');
+    signature[0] ^= 1; // Guaranteed byte change; a fixed suffix can equal the genuine random suffix.
+    const tampered = `${header}.${body}.${signature.toString('base64url')}`;
+    expect(tampered).not.toBe(original);
+    expect((await checkOffline(tampered, options)).state).toBe('invalid');
     expect((await checkOffline(lease(), { ...options, trust: { keys: [] } })).state).toBe(
       'invalid',
     );
