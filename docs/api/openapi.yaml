@@ -31,6 +31,7 @@ paths:
       security: []
       responses:
         '200': { description: Payment HTML shell }
+        '404': { description: Not the configured payment host or billing is disabled }
   /checkout.mjs:
     get:
       summary: Payment-page JavaScript
@@ -55,7 +56,7 @@ paths:
       - { $ref: '#/components/parameters/OrgId' }
       - { $ref: '#/components/parameters/LicenseId' }
     get:
-      summary: Read the existing checkout and current subscription state
+      summary: Read checkout and subscription state; organization admin or owner required
       security: [{ bearer: [] }]
       responses:
         '200': { description: Checkout state; payment URL only while ready }

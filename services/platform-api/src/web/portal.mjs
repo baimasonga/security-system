@@ -686,6 +686,7 @@ function mfaPanel() {
   return card;
 }
 async function billingPanel(l, license) {
+  if (!['admin', 'owner'].includes(state.orgs.find((o) => o.id === state.orgId)?.role)) return null;
   const configured = await api('/v1/billing/catalog');
   if (!configured.plan_ids.length || !license.subscription_id || license.state !== 'active')
     return null;
@@ -722,7 +723,7 @@ async function billingPanel(l, license) {
   } catch (error) {
     if (error.status !== 404) throw error;
   }
-  if (!['admin', 'owner'].includes(state.orgs.find((o) => o.id === state.orgId)?.role)) return null;
+
   const plans = (
     await api(`/v1/catalog/products/${encodeURIComponent(l.product_id)}/plans`)
   ).items.filter((p) => configured.plan_ids.includes(p.id));

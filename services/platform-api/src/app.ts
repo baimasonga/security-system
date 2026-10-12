@@ -56,7 +56,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
       : {}),
   });
 
-  registerPortalRoutes(app);
+  registerPortalRoutes(app, c.config.billing);
 
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 

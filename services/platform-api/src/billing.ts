@@ -16,6 +16,7 @@ export interface BillingConfig {
   paymentUrl: string;
   prices: Record<string, string>;
   clientToken?: string;
+  portalOrigin?: string;
 }
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const id = z.string().regex(/^bco_[a-z0-9_-]{16,64}$/);
@@ -85,7 +86,7 @@ export class BillingService {
     };
   }
   async get(p: UserPrincipal, orgId: string, licenseId: string) {
-    await this.#d.auth.requireOrgPermission(p, orgId, 'license:read');
+    await this.#d.auth.requireOrgPermission(p, orgId, 'org:manage_members');
     const c = await this.#d.store.findBillingCheckoutForLicense(orgId, licenseId);
     if (!c) throw new DomainError('not_found', 'not found');
     return this.#view(c);

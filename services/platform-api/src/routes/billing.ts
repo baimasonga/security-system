@@ -19,6 +19,7 @@ export function registerBillingRoutes(app: FastifyInstance, c: Container): void 
     return {
       environment: c.config.billing.environment,
       client_token: c.config.billing.clientToken,
+      portal_origin: c.config.billing.portalOrigin,
     };
   });
   app.get('/v1/billing/catalog', { preHandler: authenticated(c) }, async () =>

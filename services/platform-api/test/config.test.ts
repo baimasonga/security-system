@@ -195,3 +195,22 @@ it('never exposes API credentials as Paddle client-token configuration', () => {
     loadConfig({ ...base, PADDLE_CLIENT_TOKEN: 'test_' + 'x'.repeat(32) }).billing?.clientToken,
   ).toBe('test_' + 'x'.repeat(32));
 });
+
+it('requires production payment-origin separation from account storage', () => {
+  const base = {
+    PADDLE_API_KEY: 'test-key',
+    PADDLE_WEBHOOK_SECRET: 'w'.repeat(32),
+    PADDLE_ENVIRONMENT: 'sandbox',
+    PADDLE_PAYMENT_URL: 'https://pay.example/checkout',
+    PADDLE_PRICE_MAP: JSON.stringify({ pln_example: 'pri_' + 'a'.repeat(26) }),
+  };
+  expect(() => loadConfig({ ...base, NODE_ENV: 'production' })).toThrow(
+    'PUBLIC_ORIGIN is required',
+  );
+  expect(() => loadConfig({ ...base, PUBLIC_ORIGIN: 'https://pay.example' })).toThrow(
+    'separate origins',
+  );
+  expect(
+    loadConfig({ ...base, PUBLIC_ORIGIN: 'https://accounts.example' }).billing?.portalOrigin,
+  ).toBe('https://accounts.example');
+});

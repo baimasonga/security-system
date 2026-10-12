@@ -8,7 +8,7 @@ const price = 'pri_' + 'a'.repeat(26),
   txn = 'txn_' + 'b'.repeat(26),
   psub = 'sub_' + 'c'.repeat(26),
   secret = 'test-webhook-secret-' + 'x'.repeat(32);
-async function setup(fail = false) {
+async function setup(fail = false, trustProxy = false, team = false) {
   const prices: Record<string, string> = {};
   let intent = '';
   const provider: CheckoutProvider = {
@@ -29,6 +29,7 @@ async function setup(fail = false) {
   };
   env = await makeEnv({
     config: {
+      trustProxy,
       billing: {
         apiKey: 'test-key',
         webhookSecret: secret,
@@ -41,7 +42,20 @@ async function setup(fail = false) {
   });
   const user = await env.register('buyer@example.test'),
     other = await env.register('other@example.test'),
-    grant = await env.provision(user.orgId);
+    grant = await env.provision(
+      team
+        ? (
+            await env.call('POST', '/v1/organizations', {
+              token: user.token,
+              body: { name: 'Billing team' },
+            })
+          ).body.id
+        : user.orgId,
+    );
+  if (team)
+    user.orgId = (
+      await env.c.auth.listOrganizations(await env.c.auth.authenticate(user.token))
+    ).find((org) => org.kind === 'team')!.id;
   prices[grant.planId] = price;
   const path = `/v1/organizations/${user.orgId}/licenses/${grant.licenseId}/checkout`;
   const checkout = (key = 'checkout-request-001', token = user.token) =>
@@ -268,7 +282,7 @@ it('rejects equal-time conflicting notifications, expired paid periods and misma
 
 it('isolates payment scripts from the portal and exposes only an explicit public client token', async () => {
   const s = await setup();
-  const page = await env.call('GET', '/checkout'),
+  const page = await env.call('GET', '/checkout', { headers: { host: 'pay.example' } }),
     portal = await env.call('GET', '/');
   expect(String(page.headers['content-security-policy'])).toContain('https://cdn.paddle.com');
   expect(String(portal.headers['content-security-policy'])).not.toContain('paddle.com');
@@ -279,4 +293,53 @@ it('isolates payment scripts from the portal and exposes only an explicit public
   expect(JSON.stringify(options.body)).not.toContain('test-key');
   expect(JSON.stringify(options.body)).not.toContain(secret);
   expect((await s.checkout()).status).toBe(200);
+});
+
+it('never admits Paddle scripts on the account origin or serves the account portal on the payment host', async () => {
+  await setup(false, true);
+  env.c.config.billing!.portalOrigin = 'https://accounts.example';
+  expect(
+    (await env.call('GET', '/checkout', { headers: { host: 'accounts.example' } })).status,
+  ).toBe(404);
+  expect(
+    (
+      await env.call('GET', '/checkout', {
+        headers: {
+          host: 'accounts.example',
+          'x-forwarded-host': 'pay.example',
+          'x-forwarded-proto': 'https',
+        },
+      })
+    ).status,
+  ).toBe(404);
+  const payment = await env.call('GET', '/checkout', { headers: { host: 'pay.example' } });
+  expect(payment.status).toBe(200);
+  expect((await env.call('GET', '/', { headers: { host: 'pay.example' } })).status).toBe(404);
+  expect((await env.call('GET', '/device.mjs', { headers: { host: 'pay.example' } })).status).toBe(
+    404,
+  );
+  expect((await env.call('GET', '/', { headers: { host: 'accounts.example' } })).status).toBe(200);
+});
+
+it('protects payment links from ordinary organization members while preserving license reads', async () => {
+  const s = await setup(false, false, true);
+  expect(
+    (
+      await env.call('POST', `/v1/organizations/${s.user.orgId}/members`, {
+        token: s.user.token,
+        body: { email: 'other@example.test', role: 'member' },
+      })
+    ).status,
+  ).toBe(201);
+  await s.checkout();
+  expect((await env.call('GET', s.path, { token: s.other.token })).status).toBe(403);
+  expect((await s.checkout('member-checkout-request', s.other.token)).status).toBe(403);
+  expect(
+    (
+      await env.call('GET', `/v1/organizations/${s.user.orgId}/licenses/${s.grant.licenseId}`, {
+        token: s.other.token,
+      })
+    ).status,
+  ).toBe(200);
+  expect(s.provider.createCheckout).toHaveBeenCalledTimes(1);
 });

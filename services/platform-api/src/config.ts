@@ -126,6 +126,27 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       )
     )
       throw new Error('invalid PADDLE_PRICE_MAP');
+    let portalOrigin: string | undefined;
+    if (env['PUBLIC_ORIGIN']) {
+      let portal: URL;
+      try {
+        portal = new URL(env['PUBLIC_ORIGIN']);
+      } catch {
+        throw new Error('PUBLIC_ORIGIN must be a valid HTTPS portal origin for billing');
+      }
+      if (
+        portal.protocol !== 'https:' ||
+        portal.username ||
+        portal.password ||
+        portal.pathname !== '/' ||
+        portal.search ||
+        portal.hash
+      )
+        throw new Error('PUBLIC_ORIGIN must be a valid HTTPS portal origin for billing');
+      if (portal.origin === new URL(paymentUrl).origin)
+        throw new Error('payment and account portal must use separate origins');
+      portalOrigin = portal.origin;
+    } else if (prod) throw new Error('PUBLIC_ORIGIN is required with production billing');
     const clientToken = env['PADDLE_CLIENT_TOKEN'];
     if (
       clientToken &&
@@ -152,6 +173,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       paymentUrl,
       prices: prices as Record<string, string>,
       clientToken: env['PADDLE_CLIENT_TOKEN'],
+      portalOrigin,
     };
   }
   let emailDelivery: PlatformConfig['emailDelivery'];

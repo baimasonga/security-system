@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { buildProofMessage, verifySignature } from '@trust/crypto/verify';
 import { TrustPlatformClient, SoftwareDeviceKey } from '../src/index.ts';
 
 it('uses a host-owned asynchronous key without persisting private PEM', async () => {
@@ -97,5 +98,18 @@ it('awaits native signing when answering an activation challenge and sends only 
   });
   await expect(sdk.activate('session', 'license')).rejects.toMatchObject({ status: 403 });
   expect(typeof sent?.signature).toBe('string');
+  expect(
+    verifySignature(
+      key.publicJwk,
+      buildProofMessage({
+        purpose: 'activate',
+        nonce: 'challenge',
+        installationId: values.get('installation_id')!,
+        subjectId: '',
+        thumbprint: key.thumbprint,
+      }),
+      String(sent?.signature),
+    ),
+  ).toBe(true);
   expect(sent?.device_public_key).not.toHaveProperty('d');
 });

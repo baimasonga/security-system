@@ -25,7 +25,7 @@ Portal, operator console and device demo are implemented locally against existin
 
 ## Browser boundary
 
-Same-origin static portal served by the existing API at `/`. No new frontend build dependency. External local script/style assets only; no inline script, eval, unsafe HTML insertion, or third-party assets. Bearer sessions stay in memory and are lost on reload. Existing API remains the authorization boundary; hidden UI controls never supply authorization. Display only API-returned data. Public HTML contains no tenant/private material. A separate `/checkout` payment page permits Paddle CDN scripts and frames under its own CSP; this exception does not apply to the account portal. Sensitive one-time license keys are shown once and never persisted in browser storage. Mobile and keyboard interactions must remain usable.
+Same-origin static portal served by the existing API at `/`. No new frontend build dependency. External local script/style assets only; no inline script, eval, unsafe HTML insertion, or third-party assets. Bearer sessions stay in memory and are lost on reload. Existing API remains the authorization boundary; hidden UI controls never supply authorization. Display only API-returned data. Public HTML contains no tenant/private material. A separate-origin `/checkout` payment page permits Paddle CDN scripts and frames under its own CSP; this exception does not apply to the account portal. Sensitive one-time license keys are shown once and never persisted in browser storage. Mobile and keyboard interactions must remain usable.
 
 ## Infrastructure requirements
 

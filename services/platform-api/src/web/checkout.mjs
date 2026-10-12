@@ -8,6 +8,17 @@ async function initialize() {
   if (!response.ok)
     throw new Error('Payment is not configured. Contact support before proceeding.');
   const options = await response.json();
+  if (options.portal_origin) {
+    const portal = new URL(options.portal_origin);
+    if (
+      portal.protocol !== 'https:' ||
+      portal.username ||
+      portal.password ||
+      portal.origin === location.origin
+    )
+      throw new Error('Payment origin is not isolated from the account portal.');
+    document.getElementById('return-account').href = portal.origin;
+  }
   if (!window.Paddle)
     throw new Error('Secure payment could not load. Check your connection and retry.');
   if (options.environment === 'sandbox') window.Paddle.Environment.set('sandbox');

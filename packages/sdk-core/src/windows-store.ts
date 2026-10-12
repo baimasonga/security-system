@@ -41,7 +41,8 @@ try {
     try {
       $stream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
       try { $stream.Write($ciphertext, 0, $ciphertext.Length); $stream.Flush($true) } finally { $stream.Dispose() }
-      if ([IO.File]::Exists($path)) { [IO.File]::Replace($temporary, $path, $null) } else { [IO.File]::Move($temporary, $path) }
+      # Ordinary PowerShell $null becomes an invalid empty backup path; preserve a real .NET null.
+      if ([IO.File]::Exists($path)) { [IO.File]::Replace($temporary, $path, [System.Management.Automation.Language.NullString]::Value) } else { [IO.File]::Move($temporary, $path) }
     } finally { if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) } }
     [Console]::Out.Write('{}')
   } elseif ($request.operation -eq 'delete') {
