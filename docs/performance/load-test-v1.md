@@ -230,6 +230,35 @@ region (≈ 500/s) shows the cost. Lockout cost is one extra read per login and 
 dominated by password hashing). Not measured: multi-instance throughput, behaviour under a sustained database outage
 (covered functionally by a test that drops the table: requests keep being served and limited locally).
 
+### 3.13 After ADR-013: validation-state and subscription-plan fixes (2026-10-11)
+
+A fresh local smoke comparison used an archived copy of baseline commit
+`3ceb12f0975f253cfbf416cb86d0e02dc406e7ec` and the ADR-013 changes, with independent
+empty databases, PostgreSQL 17.11, `fsync=on`, pool 10, and the API/load generator on
+one cloud machine. The mixed workload chooses approximately 70% refresh, 20% validate,
+10% activation randomly; these are short correctness checks, not capacity measurements.
+
+| Workload                                       | Completed flows | Errors / drops | p50 / p99 (ms) |
+| ---------------------------------------------- | --------------- | -------------- | -------------- |
+| Baseline mixed, 80 users, 50/s, 15 s           | 750             | 0 / 0          | 26.60 / 33.81  |
+| ADR-013 mixed, same settings                   | 750             | 0 / 0          | 26.25 / 32.54  |
+| ADR-013 refresh, 80 users, 50/s, 4 s           | 200             | 0 / 0          | 26.78 / 30.93  |
+| ADR-013 refresh, 80 users, 100/s, 4 s          | 400             | 0 / 0          | 15.78 / 20.55  |
+| ADR-013 one hot license, 32 devices, 50/s, 4 s | 200             | 0 / 0          | 27.15 / 33.96  |
+| ADR-013 spread, 40 users, 50/s, 4 s            | 200             | 0 / 0          | 26.75 / 32.83  |
+
+Both mixed runs verified every audit chain and found **zero licenses over their device
+limit**. The 50-device stampede against a limit-5 license produced **exactly 5 successes
+and 45 `device_limit_reached` refusals**, zero deadlocks, and 282 ms wall time. Thus the
+outcomes match the invariants in §3.4–3.5 and §3.11, while the round-trip regression test
+still verifies ADR-009's 14 / 10 / 5 budgets. These results do not establish a speedup or
+replace the longer soaks and production-hardware recommendations in §5 and §7.
+
+Raw current-run JSON/logs were retained in `/workspace/.setup/security-load-results/`.
+The tool's PostgreSQL CPU probe assumes an OS user named `postgres`; the workspace-local
+cluster runs as `agent`, so its reported database CPU percentage is **unavailable**, not
+zero. No conclusions use that field or the tool's hard-coded CPU-count metadata.
+
 ## 4. Findings and dispositions
 
 | ID    | Severity      | Finding                                                                                                                                                                      | Evidence                                        | Status                                                                                                                                                                                         |

@@ -56,6 +56,32 @@ someone later enables it.
   transaction poolers reject; schema and timeouts come from the role (`ALTER ROLE … SET`), step 3.
 - Keep `DB_POOL_MAX` at 5–10 per instance, and `instances × DB_POOL_MAX` below the plan's connection limit (and the role's `CONNECTION LIMIT 40`).
 
+## Railway migration authentication failure
+
+If deployment logs repeatedly report `could not connect: password authentication failed` and name
+`DATABASE_MIGRATE_URL`, the migration/grant tool cannot authenticate. No migration SQL has run in that attempt;
+the failure occurs before the API starts. Fixing only `DATABASE_URL` will not help: the owner tools prefer
+`DATABASE_MIGRATE_URL` whenever it is set.
+
+1. In the correct Supabase project's **Connect** dialog, select the **Session pooler** connection (port 5432).
+   Use its exact host and owner username, `postgres.<project-ref>`. Check that the project reference matches the
+   intended database. Use the project's **database password**, not an API key, access token, or dashboard login password.
+2. In Railway's affected service and environment, replace `DATABASE_MIGRATE_URL` with that connection string and
+   the current owner password. Percent-encode the password component once (for example, `@` becomes `%40`,
+   `#` becomes `%23`, and `%` becomes `%25`); do not encode the whole URL. Remove placeholder brackets and
+   surrounding shell quotes. Keep `?sslmode=require` and the existing database CA configuration.
+3. If the owner password is unknown, reset it in Supabase and update every job that uses that owner credential.
+   This is a credential rotation: coordinate dependent jobs rather than repeatedly restarting the same failed deployment.
+   Do not reset `trust_app` as a substitute; it has a separate password.
+4. With the corrected owner setting securely injected into the migration job, run `npm run migrate`, then
+   `npm run db:grants` with `DB_SCHEMA=trust` and `APP_DB_ROLE=trust_app`. Run `npm run db:check` with the
+   separate app-role `DATABASE_URL`, then start/redeploy the API and verify `/healthz`.
+
+The API start command is `node services/platform-api/src/main.ts`. Migrations/grants belong in a controlled
+pre-deploy or operator job; running only the migration command as the service start command never starts the API.
+Keep the owner credential scoped to that job where possible, and keep the API on `trust_app`.
+Never paste passwords or full connection strings into chat, source files, or logs.
+
 ## What the guards enforce
 
 - Production refuses a remote `DATABASE_URL` without TLS (`sslmode=require|verify-ca|verify-full`), unless `DATABASE_CA_FILE`

@@ -226,6 +226,27 @@ export function licensingStoreContract(
         }
       });
 
+      it('uses the current subscription plan while perpetual licenses keep their issued plan', async () => {
+        const f = await fixture();
+        const s = sub(f.orgA, f.pln.id);
+        await f.store.insertSubscription(s);
+        const backed = lic(f.orgA, f.prd.id, f.pln.id, s.id);
+        const perpetual = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(backed);
+        await f.store.insertLicense(perpetual);
+        const basic = plan(f.prd.id, { tier: 'standard', deviceLimit: 1 });
+        await f.store.insertPlan(basic);
+        await f.store.updateSubscription({ ...s, planId: basic.id });
+        for (const lock of ['none', 'share', 'update'] as const) {
+          expect((await f.store.findLicenseContext(f.orgA, backed.id, lock))!.plan.id).toBe(
+            basic.id,
+          );
+          expect((await f.store.findLicenseContext(f.orgA, perpetual.id, lock))!.plan.id).toBe(
+            f.pln.id,
+          );
+        }
+      });
+
       it('a license cannot reference another tenant’s subscription', async () => {
         const f = await fixture();
         const s = sub(f.orgA, f.pln.id);
@@ -455,6 +476,36 @@ export function licensingStoreContract(
         await expect(f.store.updateActivation({ ...a, orgId: f.orgB })).rejects.toThrow(
           'activation_not_found',
         );
+      });
+
+      it('touchActiveActivation changes only the timestamp and refuses stale or unauthorized bindings', async () => {
+        const f = await fixture();
+        const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+        await f.store.insertLicense(l);
+        const d = await f.store.insertDevice(dev(f.orgA));
+        const a = act({ orgId: f.orgA, licenseId: l.id, deviceId: d.id, by: f.user });
+        await f.store.insertActivation(a);
+        expect(
+          await f.store.touchActiveActivation(f.orgB, a.id, a.installationId, later(1)),
+        ).toBeUndefined();
+        expect(
+          await f.store.touchActiveActivation(f.orgA, 'act_missing', a.installationId, later(1)),
+        ).toBeUndefined();
+        expect(
+          await f.store.touchActiveActivation(f.orgA, a.id, 'wrong_installation', later(1)),
+        ).toBeUndefined();
+        expect(await f.store.findActivation(f.orgA, a.id)).toEqual(a);
+        expect(
+          await f.store.touchActiveActivation(f.orgA, a.id, a.installationId, later(2)),
+        ).toEqual({ ...a, lastValidatedAt: later(2) });
+        for (const status of ['deactivated', 'revoked'] as const) {
+          const closed = { ...a, status, deactivatedAt: later(3) };
+          await f.store.updateActivation(closed);
+          expect(
+            await f.store.touchActiveActivation(f.orgA, a.id, a.installationId, later(4)),
+          ).toBeUndefined();
+          expect(await f.store.findActivation(f.orgA, a.id)).toEqual(closed);
+        }
       });
 
       it('recordLease stores the lease record and the activation’s lease fields together, or neither', async () => {

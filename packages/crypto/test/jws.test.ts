@@ -41,6 +41,23 @@ describe('JWS (EdDSA only)', () => {
     expect(v.header.alg).toBe('EdDSA');
   });
 
+  it('refuses to sign a token above the verifier limit before invoking custody', async () => {
+    let called = false;
+    await expect(
+      signJws(
+        { data: 'x'.repeat(20000) },
+        { typ: 'lease+jws', kid: 'test' },
+        {
+          sign: async () => {
+            called = true;
+            return Buffer.alloc(64);
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ reason: 'too_large' });
+    expect(called).toBe(false);
+  });
+
   it('rejects a tampered payload', async () => {
     const { token, resolveKey } = await setup();
     const [h, , s] = token.split('.') as [string, string, string];

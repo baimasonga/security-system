@@ -163,9 +163,9 @@ const ACTIVATION_COLS = [
 const CONTEXT_SQL = `SELECT ${prefixed('l', 'l', LICENSE_COLS)}, ${prefixed('p', 'p', PLAN_COLS)},
        ${prefixed('pr', 'pr', PRODUCT_COLS)}, ${prefixed('s', 's', SUB_COLS)}
   FROM licenses l
-  JOIN plans p ON p.id = l.plan_id
-  JOIN products pr ON pr.id = l.product_id
   LEFT JOIN subscriptions s ON s.id = l.subscription_id AND s.org_id = l.org_id
+  JOIN plans p ON p.id = COALESCE(s.plan_id, l.plan_id) AND p.product_id = l.product_id
+  JOIN products pr ON pr.id = l.product_id
  WHERE l.id = $1 AND l.org_id = $2`;
 const CONTEXT_LOCK = { none: '', share: ' FOR SHARE OF l', update: ' FOR UPDATE OF l' } as const;
 
@@ -451,6 +451,15 @@ class PgRepo implements LicensingRepo {
     } catch (e) {
       translate(e, { activations_one_active_uq: 'duplicate_active_activation' });
     }
+  }
+  async touchActiveActivation(orgId: string, id: string, installationId: string, at: Date) {
+    const r = await this.#one(
+      `UPDATE activations SET last_validated_at=$4
+       WHERE id=$1 AND org_id=$2 AND installation_id=$3 AND status='active'
+       RETURNING *`,
+      [id, orgId, installationId, at],
+    );
+    return r ? activation(r) : undefined;
   }
   async findActivation(orgId: string, id: string) {
     const r = await this.#one('SELECT * FROM activations WHERE id = $1 AND org_id = $2', [

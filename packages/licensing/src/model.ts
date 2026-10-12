@@ -40,6 +40,7 @@ export interface License {
   id: string;
   orgId: string;
   productId: string;
+  /** Issued plan; subscription-backed licenses resolve the current subscription plan. */
   planId: string;
   subscriptionId: string | null;
   kind: LicenseKind;
@@ -156,6 +157,7 @@ export interface LicensingRepo {
    * License + plan + product + subscription in ONE read (one database round trip), optionally taking the
    * same row lock as `findLicenseForShare` / `findLicenseForUpdate` on the license row. Undefined if the
    * license does not exist in `orgId`. `subscription` is undefined when the license has none.
+   * `plan` is the subscription's current plan for a subscription-backed license, otherwise its issued plan.
    */
   findLicenseContext(
     orgId: string,
@@ -179,6 +181,17 @@ export interface LicensingRepo {
 
   insertActivation(a: Activation): Promise<void>;
   updateActivation(a: Activation): Promise<void>;
+  /**
+   * Atomically updates only lastValidatedAt when the tenant, installation and active status still
+   * match. Returns the current row (including current lease metadata), or undefined on mismatch.
+   * Validation must not write an earlier activation snapshot back over concurrent state changes.
+   */
+  touchActiveActivation(
+    orgId: string,
+    id: string,
+    installationId: string,
+    at: Date,
+  ): Promise<Activation | undefined>;
   findActivation(orgId: string, id: string): Promise<Activation | undefined>;
   /** Inside a transaction this also locks the activation row (PostgreSQL adapter). */
   findActivationForDeviceAuth(id: string): Promise<Activation | undefined>;

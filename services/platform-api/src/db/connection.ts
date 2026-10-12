@@ -24,12 +24,18 @@ export function tlsProblem(databaseUrl: string): string | undefined {
   } catch {
     return 'DATABASE_URL is not a valid URL (never printed here): check it starts with postgresql://, has no quotes, spaces or [brackets], and that special characters in the password are percent-encoded';
   }
-  const host = u.hostname;
   const params = u.searchParams;
+  const host = params.get('host') ?? u.hostname;
   // A unix-socket host is a directory path (e.g. ?host=/var/run/postgresql or empty host).
   const socket = (params.get('host') ?? '').startsWith('/');
   if (LOCAL_HOSTS.has(host) || socket) return undefined;
   const mode = params.get('sslmode');
+  if (
+    (mode !== null && !['require', 'verify-ca', 'verify-full'].includes(mode)) ||
+    (params.get('uselibpqcompat') === 'true' && mode !== 'verify-full')
+  )
+    return 'DATABASE_URL must verify the TLS server certificate (use sslmode=verify-full without downgrade flags)';
+
   const ok =
     mode === 'require' ||
     mode === 'verify-ca' ||

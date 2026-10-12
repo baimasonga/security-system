@@ -1,6 +1,6 @@
 import { sign as edSign, type KeyObject } from 'node:crypto';
 import { b64urlEncode } from './encoding.ts';
-import type { JwsHeader } from './verify.ts';
+import { JwsError, MAX_JWS_BYTES, type JwsHeader } from './verify.ts';
 
 /**
  * Custody of private signing keys. The software implementation is for development/tests and for
@@ -18,6 +18,8 @@ export async function signJws(
 ): Promise<string> {
   const h = b64urlEncode(JSON.stringify({ alg: 'EdDSA', typ: header.typ, kid: header.kid }));
   const p = b64urlEncode(JSON.stringify(payload));
+  // Ed25519's 64-byte signature occupies 86 unpadded base64url characters.
+  if (h.length + p.length + 2 + 86 > MAX_JWS_BYTES) throw new JwsError('too_large');
   const sig = await custody.sign(header.kid, Buffer.from(`${h}.${p}`, 'ascii'));
   return `${h}.${p}.${b64urlEncode(sig)}`;
 }

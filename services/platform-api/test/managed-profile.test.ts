@@ -375,3 +375,19 @@ describe('startup with an unreachable database', () => {
     expect(e.message).not.toContain('topsecretpw');
   });
 });
+
+describe('TLS downgrade regression', () => {
+  it.each([
+    'sslmode=require&uselibpqcompat=true',
+    'ssl=true&sslmode=no-verify',
+    'ssl=true&sslmode=disable',
+  ])('rejects %s', (query) => {
+    expect(tlsProblem(`postgres://u:p@remote.invalid/db?${query}`)).toBeDefined();
+  });
+});
+
+describe('effective database host', () => {
+  it('checks a remote query host even when the URL host is localhost', () => {
+    expect(tlsProblem('postgres://u:p@localhost/db?host=remote.invalid')).toBeDefined();
+  });
+});

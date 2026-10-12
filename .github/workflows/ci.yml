@@ -49,7 +49,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vitest run --project db
+      - run: npm run test:db # owner and least-privilege app-role suites
       - name: Load-test smoke (the tool still works and a light load produces no errors)
         run: |
           npm run loadtest -- --scenario activate-ramp --users 40 --rps 20 --seconds 4 --assert-clean
@@ -57,6 +57,9 @@ jobs:
 
   security:
     name: Dependency and secret scanning
+    permissions:
+      contents: read
+      pull-requests: read # Gitleaks reads the commits belonging to the PR.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

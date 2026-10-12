@@ -18,6 +18,7 @@ import {
   validateCapabilities,
   validateDeviceLimit,
   validateEntitlementMap,
+  validateEntitlementSnapshot,
   EntitlementValidationError,
   type EntitlementOverrides,
   type ResolvedEntitlements,
@@ -300,11 +301,10 @@ export class LicensingService {
     deviceLimit: number;
   }) {
     try {
-      return {
-        entitlements: validateEntitlementMap(b.entitlements ?? {}),
-        capabilities: validateCapabilities(b.capabilities ?? []),
-        deviceLimit: validateDeviceLimit(b.deviceLimit),
-      };
+      const entitlements = validateEntitlementMap(b.entitlements ?? {});
+      const capabilities = validateCapabilities(b.capabilities ?? []);
+      validateEntitlementSnapshot(entitlements, capabilities);
+      return { entitlements, capabilities, deviceLimit: validateDeviceLimit(b.deviceLimit) };
     } catch (e) {
       if (e instanceof EntitlementValidationError)
         throw new DomainError('invalid_request', e.message);
@@ -368,8 +368,15 @@ export class LicensingService {
     return this.#d.store.transaction(async (tx) => {
       const cur = await tx.findSubscription(orgId, subscriptionId);
       if (!cur) throw new DomainError('not_found', 'subscription not found');
-      if (patch.planId && !(await tx.findPlan(patch.planId)))
-        throw new DomainError('not_found', 'plan not found');
+      if (patch.planId) {
+        const currentPlan = await tx.findPlan(cur.planId);
+        const nextPlan = await tx.findPlan(patch.planId);
+        if (!nextPlan) throw new DomainError('not_found', 'plan not found');
+        need(
+          currentPlan && nextPlan.productId === currentPlan.productId,
+          'subscription plan must belong to the same product',
+        );
+      }
       const next: Subscription = {
         ...cur,
         status: patch.status ?? cur.status,
@@ -545,12 +552,9 @@ export class LicensingService {
     licenseId: string,
   ): Promise<{ licenseId: string; status: string; entitlements: ResolvedEntitlements | null }> {
     await this.#d.authorize(p, orgId, 'license:read');
-    const lic = await this.#d.store.findLicense(orgId, licenseId);
-    if (!lic || lic.kind === 'canary') throw new DomainError('not_found', 'not found');
-    const plan = await this.#d.store.findPlan(lic.planId);
-    const sub = lic.subscriptionId
-      ? await this.#d.store.findSubscription(orgId, lic.subscriptionId)
-      : undefined;
+    const ctx = await this.#d.store.findLicenseContext(orgId, licenseId, 'none');
+    if (!ctx || ctx.license.kind === 'canary') throw new DomainError('not_found', 'not found');
+    const { license: lic, plan, subscription: sub } = ctx;
     const ev = this.#evaluate(lic, sub);
     if (!plan || ev.outcome.decision !== 'ALLOW') {
       return { licenseId, status: ev.code ?? 'invalid_license', entitlements: null };
@@ -891,12 +895,18 @@ export class LicensingService {
   }> {
     const ctx = await this.#authenticateDevice('validate', input);
     const now = this.#d.clock.now();
-    await this.#d.store.updateActivation({ ...ctx.act, lastValidatedAt: now });
+    const current = await this.#d.store.touchActiveActivation(
+      ctx.act.orgId,
+      ctx.act.id,
+      input.installationId,
+      now,
+    );
+    if (!current) throw new DomainError('activation_not_found', 'activation is not active');
     await this.#d.telemetry.track('validation.succeeded');
     return {
       status: 'valid',
       entitlements: resolveEntitlements(ctx.plan, ctx.lic.overrides),
-      leaseExpiresAt: ctx.act.lastLeaseExp?.toISOString() ?? null,
+      leaseExpiresAt: current.lastLeaseExp?.toISOString() ?? null,
     };
   }
 
@@ -1016,21 +1026,19 @@ export class LicensingService {
   }
 
   async #licenseView(repo: LicensingRepo, lic: License): Promise<LicenseView> {
-    const [plan, product, sub, active] = await Promise.all([
-      repo.findPlan(lic.planId),
-      repo.findProductById(lic.productId),
-      lic.subscriptionId
-        ? repo.findSubscription(lic.orgId, lic.subscriptionId)
-        : Promise.resolve(undefined),
+    const [ctx, active] = await Promise.all([
+      repo.findLicenseContext(lic.orgId, lic.id, 'none'),
       repo.countActiveActivations(lic.id),
     ]);
-    const ev = this.#evaluate(lic, sub);
+    const plan = ctx?.plan;
+    const product = ctx?.product;
+    const ev = this.#evaluate(ctx?.license ?? lic, ctx?.subscription);
     return {
       id: lic.id,
       orgId: lic.orgId,
       productId: lic.productId,
       productCode: product?.code ?? null,
-      planId: lic.planId,
+      planId: plan?.id ?? lic.planId,
       tier: plan?.tier ?? null,
       subscriptionId: lic.subscriptionId,
       kind: lic.kind,

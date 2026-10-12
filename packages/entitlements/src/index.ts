@@ -37,6 +37,8 @@ export interface ResolvedEntitlements {
 export const ENTITLEMENT_KEY = /^[a-z][a-z0-9_]{0,63}$/;
 export const CAPABILITY_KEY = /^[A-Z][A-Z0-9_]{0,63}$/;
 export const MAX_ENTRIES = 100;
+/** ASCII ent/cap JSON budget; leaves room for binding claims within the 16 KiB compact JWS limit. */
+export const MAX_ENTITLEMENT_SNAPSHOT_BYTES = 8 * 1024;
 export const MAX_DEVICE_LIMIT = 10_000;
 
 export class EntitlementValidationError extends Error {
@@ -78,6 +80,17 @@ export function validateDeviceLimit(n: number): number {
   return n;
 }
 
+/** Apply after validating the ASCII keys/values and after merging overrides. */
+export function validateEntitlementSnapshot(
+  entitlements: Record<string, EntitlementValue>,
+  capabilities: readonly string[],
+): void {
+  if (
+    JSON.stringify({ ent: entitlements, cap: capabilities }).length > MAX_ENTITLEMENT_SNAPSHOT_BYTES
+  )
+    throw new EntitlementValidationError('entitlement snapshot exceeds lease size budget');
+}
+
 export function resolveEntitlements(
   plan: PlanDefinition,
   overrides?: EntitlementOverrides,
@@ -92,6 +105,8 @@ export function resolveEntitlements(
   const caps = new Set(plan.capabilities);
   for (const c of overrides?.capabilities?.add ?? []) caps.add(c);
   for (const c of overrides?.capabilities?.remove ?? []) caps.delete(c);
+  const capabilities = validateCapabilities([...caps]);
+  validateEntitlementSnapshot(entitlements, capabilities);
   return {
     planId: plan.id,
     planVersion: plan.version,
@@ -99,7 +114,7 @@ export function resolveEntitlements(
     entitlements: Object.fromEntries(
       Object.entries(entitlements).sort(([a], [b]) => a.localeCompare(b)),
     ),
-    capabilities: validateCapabilities([...caps]),
+    capabilities,
     deviceLimit: validateDeviceLimit(overrides?.deviceLimit ?? plan.deviceLimit),
   };
 }

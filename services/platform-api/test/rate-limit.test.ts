@@ -159,3 +159,21 @@ describe('RATE_LIMIT_STORE', () => {
     );
   });
 });
+
+describe('fallback continuity', () => {
+  it('retains local requests across failure and recovery in one window', async () => {
+    let failed = false;
+    const counters = new MemoryRateBackend();
+    const primary: RateBackend = {
+      incr: (key, ms) => (failed ? Promise.reject(new Error('offline')) : counters.incr(key, ms)),
+      purgeExpired: () => counters.purgeExpired(),
+    };
+    const backend = new ResilientRateBackend(primary, new MemoryRateBackend(), { breakerMs: 0 });
+    expect((await backend.incr('ip', 60000)).current).toBe(1);
+    expect((await backend.incr('ip', 60000)).current).toBe(2);
+    failed = true;
+    expect((await backend.incr('ip', 60000)).current).toBe(3);
+    failed = false;
+    expect((await backend.incr('ip', 60000)).current).toBe(4);
+  });
+});

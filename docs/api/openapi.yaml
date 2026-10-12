@@ -308,6 +308,7 @@ paths:
       - { $ref: '#/components/parameters/OrgId' }
       - { name: subscriptionId, in: path, required: true, schema: { type: string } }
     patch:
+      description: Plan changes stay within the same product and apply to subsequent lease issuance and online entitlement reads. Existing offline leases retain their bounded lifetime.
       tags: [admin]
       security: [{ bearer: [] }]
       responses:
@@ -579,7 +580,9 @@ components:
         org_id: { type: string }
         product_id: { type: string }
         product_code: { type: [string, 'null'] }
-        plan_id: { type: string }
+        plan_id:
+          type: string
+          description: Current subscription plan for a subscription-backed license; issued plan otherwise.
         tier:
           {
             type: [string, 'null'],
@@ -626,7 +629,8 @@ components:
         lease:
           {
             type: string,
-            description: 'Compact JWS (EdDSA), typ `lease+jws`. Verify before use; see ADR-002.',
+            maxLength: 16384,
+            description: 'Compact JWS (EdDSA), typ `lease+jws`. Resolved ent/cap snapshots are limited to 8 KiB. Verify before use; see ADR-002 and ADR-013.',
           }
         lease_expires_at: { type: string }
         refresh_after: { type: string }

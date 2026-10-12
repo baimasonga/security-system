@@ -120,23 +120,30 @@ export class ResilientRateBackend implements RateBackend {
   }
 
   async incr(bucket: string, windowMs: number): Promise<RateWindow> {
+    // Count every request locally, including those served by the primary.
+    const local = await this.#fallback.incr(bucket, windowMs);
     if (Date.now() < this.#openUntil) {
       this.#onFallback('breaker');
-      return this.#fallback.incr(bucket, windowMs);
+      return local;
     }
     let timer: NodeJS.Timeout | undefined;
     try {
-      return await Promise.race([
+      const shared = await Promise.race([
         this.#primary.incr(bucket, windowMs),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error('timeout')), this.#timeoutMs);
         }),
       ]);
+      // Independent window boundaries can differ. Keep the stricter local/shared result.
+      return {
+        current: Math.max(shared.current, local.current),
+        ttl: Math.max(shared.ttl, local.ttl),
+      };
     } catch (e) {
       // Stop asking a struggling database for a few seconds; count locally meanwhile.
       this.#openUntil = Date.now() + this.#breakerMs;
       this.#onFallback((e as Error).message === 'timeout' ? 'timeout' : 'error');
-      return this.#fallback.incr(bucket, windowMs);
+      return local;
     } finally {
       clearTimeout(timer);
     }

@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # CodeQL reads workflow-run metadata during analysis/upload.
   security-events: write
 
 jobs:

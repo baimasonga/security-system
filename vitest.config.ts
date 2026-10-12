@@ -30,6 +30,7 @@ export default defineConfig({
           include: [
             '**/*.db.test.ts',
             'packages/licensing/test/activation.test.ts',
+            'packages/licensing/test/lifecycle-regressions.test.ts',
             'services/platform-api/test/api.test.ts',
             'tests/security/**/*.test.ts',
             'tests/integration/**/*.test.ts',
@@ -49,6 +50,7 @@ export default defineConfig({
           name: 'db-approle',
           include: [
             'packages/licensing/test/activation.test.ts',
+            'packages/licensing/test/lifecycle-regressions.test.ts',
             'services/platform-api/test/api.test.ts',
             'tests/security/**/*.test.ts',
             'tests/integration/**/*.test.ts',

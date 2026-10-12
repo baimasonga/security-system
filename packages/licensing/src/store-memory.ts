@@ -131,12 +131,12 @@ class Repo implements LicensingRepo {
   async findLicenseContext(orgId: string, id: string, _lock: 'none' | 'share' | 'update') {
     const license = await this.findLicense(orgId, id);
     if (!license) return undefined;
-    const plan = this.s.plans.get(license.planId);
-    const product = this.s.products.get(license.productId);
-    if (!plan || !product) return undefined;
     const sub = license.subscriptionId
       ? this.s.subscriptions.get(license.subscriptionId)
       : undefined;
+    const plan = this.s.plans.get(sub?.orgId === orgId ? sub.planId : license.planId);
+    const product = this.s.products.get(license.productId);
+    if (!plan || plan.productId !== license.productId || !product) return undefined;
     return clone({
       license,
       plan,
@@ -187,6 +187,19 @@ class Repo implements LicensingRepo {
     const cur = this.s.activations.get(a.id);
     if (!cur || cur.orgId !== a.orgId) throw new Error('activation_not_found');
     this.s.activations.set(a.id, clone(a));
+  }
+  async touchActiveActivation(orgId: string, id: string, installationId: string, at: Date) {
+    const cur = this.s.activations.get(id);
+    if (
+      !cur ||
+      cur.orgId !== orgId ||
+      cur.installationId !== installationId ||
+      cur.status !== 'active'
+    )
+      return undefined;
+    const next = { ...cur, lastValidatedAt: at };
+    this.s.activations.set(id, clone(next));
+    return clone(next);
   }
   async findActivation(orgId: string, id: string) {
     const a = this.s.activations.get(id);
