@@ -1,3 +1,9 @@
+import { BillingService } from './billing.ts';
+import {
+  PaddleCheckoutProvider,
+  PaddleWebhookVerifier,
+  type CheckoutProvider,
+} from './integrations/billing.ts';
 import { ResendMailDelivery } from './integrations/mail.ts';
 import { AuthService, InMemoryAuthStore, type AuthStore, type IdentityDelivery } from '@trust/auth';
 import { InMemoryAuditLog, type AuditLog } from '@trust/audit';
@@ -50,6 +56,7 @@ export interface Container {
   audit: AuditLog;
   auth: AuthService;
   licensing: LicensingService;
+  billing: BillingService | undefined;
   keyring: KeyRing;
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
@@ -69,6 +76,7 @@ export interface Container {
 export interface ContainerOverrides {
   clock?: Clock;
   identityDelivery?: IdentityDelivery;
+  checkoutProvider?: CheckoutProvider;
   licensing?: Partial<LicensingConfig>;
   /** Test seam: a ready-made pool (e.g. schema-scoped). Implies postgres persistence. */
   pool?: PgPool;
@@ -264,6 +272,20 @@ export async function createContainer(
     orgExists: (id) => auth.orgExists(id),
   });
 
+  const billing = config.billing
+    ? new BillingService({
+        store: licensingStore,
+        auth,
+        clock,
+        provider: overrides?.checkoutProvider ?? new PaddleCheckoutProvider(config.billing),
+        verifier: new PaddleWebhookVerifier({
+          secret: config.billing.webhookSecret,
+          now: () => clock.now().getTime(),
+        }),
+        prices: config.billing.prices,
+      })
+    : undefined;
+
   const anchorStore: AnchorStore = pool ? new PgAnchorStore(pool) : new InMemoryAnchorStore();
   const sink =
     overrides?.anchorSink ??
@@ -306,6 +328,7 @@ export async function createContainer(
     audit,
     auth,
     licensing,
+    billing,
     keyring,
     telemetry,
     telemetrySink,

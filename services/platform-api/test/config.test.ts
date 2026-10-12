@@ -148,3 +148,50 @@ describe('loadConfig — audit anchoring (ADR-010)', () => {
     );
   });
 });
+
+describe('Paddle checkout configuration', () => {
+  const settings = {
+    PADDLE_API_KEY: 'test-api-key',
+    PADDLE_WEBHOOK_SECRET: 'x'.repeat(32),
+    PADDLE_ENVIRONMENT: 'sandbox',
+    PADDLE_PAYMENT_URL: 'https://pay.example/checkout',
+    PADDLE_PRICE_MAP: JSON.stringify({ pln_example: 'pri_' + 'a'.repeat(26) }),
+  };
+  it('remains disabled without provider settings and maps only operator-configured prices', () => {
+    expect(loadConfig({}).billing).toBeUndefined();
+    expect(loadConfig(settings).billing?.prices).toEqual({ pln_example: 'pri_' + 'a'.repeat(26) });
+  });
+  it.each(Object.keys(settings))('rejects partial configuration missing %s', (key) => {
+    const partial = { ...settings };
+    delete partial[key as keyof typeof partial];
+    expect(() => loadConfig(partial)).toThrow();
+  });
+  it.each([
+    { PADDLE_ENVIRONMENT: 'other' },
+    { PADDLE_PAYMENT_URL: 'http://pay.example' },
+    { PADDLE_PRICE_MAP: '{"pln_example":"client-price"}' },
+    { PADDLE_PRICE_MAP: '[]' },
+    { PADDLE_WEBHOOK_SECRET: 'short' },
+  ])('rejects unsafe or malformed provider settings', (patch) =>
+    expect(() => loadConfig({ ...settings, ...patch })).toThrow(),
+  );
+});
+
+it('never exposes API credentials as Paddle client-token configuration', () => {
+  const base = {
+    PADDLE_API_KEY: 'pdl_live_apikey_' + 'x'.repeat(32),
+    PADDLE_WEBHOOK_SECRET: 'w'.repeat(32),
+    PADDLE_ENVIRONMENT: 'sandbox',
+    PADDLE_PAYMENT_URL: 'https://pay.example/checkout',
+    PADDLE_PRICE_MAP: JSON.stringify({ pln_example: 'pri_' + 'a'.repeat(26) }),
+  };
+  expect(() => loadConfig({ ...base, PADDLE_CLIENT_TOKEN: base.PADDLE_API_KEY })).toThrow(
+    'public client token',
+  );
+  expect(() => loadConfig({ ...base, PADDLE_CLIENT_TOKEN: 'live_' + 'x'.repeat(32) })).toThrow(
+    'public client token',
+  );
+  expect(
+    loadConfig({ ...base, PADDLE_CLIENT_TOKEN: 'test_' + 'x'.repeat(32) }).billing?.clientToken,
+  ).toBe('test_' + 'x'.repeat(32));
+});

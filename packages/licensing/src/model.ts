@@ -131,7 +131,41 @@ export interface QuotaCharge {
   units: number;
   createdAt: Date;
 }
+export interface BillingCheckout {
+  id: string;
+  orgId: string;
+  userId: string;
+  licenseId: string;
+  planId: string;
+  priceId: string;
+  requestHash: string;
+  status: 'submitting' | 'uncertain' | 'ready' | 'completed';
+  transactionId: string | null;
+  checkoutUrl: string | null;
+  providerSubscriptionId: string | null;
+  lastEventAt: Date | null;
+  createdAt: Date;
+}
+export interface BillingEventReceipt {
+  id: string;
+  checkoutId: string;
+  bodyHash: string;
+  occurredAt: Date;
+  createdAt: Date;
+}
 export interface LicensingRepo {
+  /** Internal provider lookup only; HTTP services must explicitly re-authorize tenant ownership. */
+  findBillingCheckout(id: string): Promise<BillingCheckout | undefined>;
+  /** Caller holds the license lock; only one intent per license prevents duplicate subscriptions. */
+  findBillingCheckoutForLicense(
+    orgId: string,
+    licenseId: string,
+  ): Promise<BillingCheckout | undefined>;
+  insertBillingCheckout(checkout: BillingCheckout): Promise<void>;
+  updateBillingCheckout(checkout: BillingCheckout): Promise<void>;
+  findBillingEvent(id: string): Promise<BillingEventReceipt | undefined>;
+  insertBillingEvent(event: BillingEventReceipt): Promise<void>;
+
   listQuotaUsage(
     orgId: string,
     licenseId: string,

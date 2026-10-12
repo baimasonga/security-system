@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import type { BillingConfig } from './billing.ts';
+import { PaddleCheckoutProvider, PaddleWebhookVerifier } from './integrations/billing.ts';
 import { MfaCipher, type ScryptParams } from '@trust/auth';
 import { validateAnchorUrl } from './anchors.ts';
 import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
@@ -8,6 +10,7 @@ export interface PlatformConfig {
   mfaEncryptionKey?: string;
   requireOperatorMfa: boolean;
   emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
+  billing?: BillingConfig;
   host: string;
   port: number;
   /** Behind a reverse proxy/CDN, trust X-Forwarded-For for client IP (rate limiting). */
@@ -81,6 +84,76 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     throw new Error('REQUIRE_OPERATOR_MFA must be true or false');
   if (requireOperatorMfa && !mfaEncryptionKey)
     throw new Error('MFA_ENCRYPTION_KEY is required for operator MFA');
+  let billing: BillingConfig | undefined;
+  if (
+    [
+      'PADDLE_API_KEY',
+      'PADDLE_WEBHOOK_SECRET',
+      'PADDLE_ENVIRONMENT',
+      'PADDLE_PAYMENT_URL',
+      'PADDLE_PRICE_MAP',
+      'PADDLE_CLIENT_TOKEN',
+    ].some((name) => env[name] !== undefined)
+  ) {
+    const apiKey = env['PADDLE_API_KEY'],
+      webhookSecret = env['PADDLE_WEBHOOK_SECRET'],
+      environment = env['PADDLE_ENVIRONMENT'],
+      paymentUrl = env['PADDLE_PAYMENT_URL'];
+    if (
+      !apiKey ||
+      !webhookSecret ||
+      !['sandbox', 'live'].includes(environment ?? '') ||
+      !paymentUrl ||
+      !env['PADDLE_PRICE_MAP']
+    )
+      throw new Error('all Paddle checkout settings are required');
+    let prices: unknown;
+    try {
+      prices = JSON.parse(env['PADDLE_PRICE_MAP']);
+    } catch {
+      throw new Error('invalid PADDLE_PRICE_MAP');
+    }
+    if (
+      !prices ||
+      typeof prices !== 'object' ||
+      Array.isArray(prices) ||
+      Object.keys(prices).length < 1 ||
+      Object.entries(prices).some(
+        ([plan, price]) =>
+          !/^pln_[A-Za-z0-9_-]+$/.test(plan) ||
+          typeof price !== 'string' ||
+          !/^pri_[a-z0-9]{26}$/.test(price),
+      )
+    )
+      throw new Error('invalid PADDLE_PRICE_MAP');
+    const clientToken = env['PADDLE_CLIENT_TOKEN'];
+    if (
+      clientToken &&
+      (!/^(test|live)_[A-Za-z0-9_-]{16,256}$/.test(clientToken) ||
+        clientToken === apiKey ||
+        clientToken === webhookSecret ||
+        (environment === 'sandbox'
+          ? !clientToken.startsWith('test_')
+          : !clientToken.startsWith('live_')))
+    )
+      throw new Error(
+        'PADDLE_CLIENT_TOKEN must be a public client token for the selected environment',
+      );
+    new PaddleCheckoutProvider({
+      apiKey,
+      environment: environment as 'sandbox' | 'live',
+      paymentUrl,
+    });
+    new PaddleWebhookVerifier({ secret: webhookSecret });
+    billing = {
+      apiKey,
+      webhookSecret,
+      environment: environment as 'sandbox' | 'live',
+      paymentUrl,
+      prices: prices as Record<string, string>,
+      clientToken: env['PADDLE_CLIENT_TOKEN'],
+    };
+  }
   let emailDelivery: PlatformConfig['emailDelivery'];
   if (env['RESEND_API_KEY']) {
     const from = env['EMAIL_FROM'];
@@ -201,6 +274,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   return {
     env: mode,
     emailDelivery,
+    billing,
     mfaEncryptionKey,
     requireOperatorMfa,
     host: env['HOST'] ?? '127.0.0.1',

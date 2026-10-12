@@ -29,3 +29,11 @@ See [monthly quota contracts](monthly-quotas.md) for wire requests and [OpenAPI]
 ## Deployment Verification
 
 Apply migrations and least-privilege grants before using new endpoints. Test customer activation, wrong-product leases, expiration, revocation, device limits, offline behavior, quota exhaustion, replay, and another organization's IDs in a staging environment. A passing GitHub workflow does not establish successful authenticated production integration.
+
+## Windows, Billing and Updates
+
+Windows hosts can use `new WindowsDpapiStore(productCode)` for protected SDK state. The adapter invokes the system Windows PowerShell executable with a static script; secrets travel on stdin and records are encrypted with CurrentUser DPAPI. It restricts its directory to the current user's SID and atomically replaces encrypted records. Windows CI runs a native round-trip/tamper test. DPAPI is OS-protected storage, not verified TPM attestation, and it does not defend against code already running as that user.
+
+For a native key service, pass `deviceKeyProvider: async installationId => deviceKey`. Signing may return a Promise. The provider must return the same persistent Ed25519 key for that installation; a failure never falls back to a new software identity. The SDK validates public-key/thumbprint binding and strips private JWK members before transport. It serializes key creation within an instance; the host must serialize across instances/processes. A Windows TPM using only P-256 needs a separately versioned server protocol and a validated attestation chain; that protocol is not implemented here.
+
+The SDK also provides `createCheckout(sessionToken, orgId, licenseId, planId, operationId)` and `getCheckout(sessionToken, orgId, licenseId)`. See [billing checkout](billing-checkout.md) for provider prerequisites and the payment-authority boundary. Use [SecureUpdateClient](secure-updates.md) separately from licensing for signed feed verification and artifact staging.

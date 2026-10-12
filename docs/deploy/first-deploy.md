@@ -74,3 +74,11 @@ Enroll every operator from **Account → Set up authenticator**, confirm a code,
 Apply migration `0008_monthly_quotas` with the schema owner, then run `npm run db:grants` with `APP_DB_ROLE`. The new `quota_charges` table requires SELECT/INSERT for the application role; migration alone does not grant these permissions. Verify `npm run db:check` with the application connection before deployment. A Railway pre-deploy job should run `npm run migrate && npm run db:grants` with the existing owner connection, schema and app-role settings; the API start command remains unchanged.
 
 Numeric `*_monthly` entitlements enable per-license calendar-month metering. Existing monthly entitlements now appear in the portal's license details. No new provider secret is required. See [Monthly Quota Accounting](../api/monthly-quotas.md) for consumption semantics and the execution boundary.
+
+## Billing and Product Update Rollout (ADR-019)
+
+Apply migration `0009_billing_checkout`, then run owner-side `npm run db:grants` with `APP_DB_ROLE`. The application needs SELECT/INSERT/UPDATE on checkout intents and SELECT/INSERT on immutable event receipts. Run `npm run db:check` with the application connection.
+
+Billing stays disabled until the complete Paddle setting group is present. Configure sandbox credentials, an approved Paddle.js payment-link page, server-owned price mapping and signed notification destination first. Prove a complete sandbox payment and uncertain-outcome recovery before live mode. See [billing checkout](../api/billing-checkout.md). Seller/payout availability for Sierra Leone must be confirmed with Paddle.
+
+The Node SDK now supports Windows DPAPI protected storage and native asynchronous key providers. DPAPI is not TPM attestation. Signed updates require an independently trusted root, release signing custody, root-approved immutable hosting, and a Windows installer/recovery flow. See [secure updates](../api/secure-updates.md). No update-signing secret is required by the API server; production signing belongs in the release pipeline, separate from license signing.

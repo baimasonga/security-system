@@ -12,3 +12,10 @@ condition = "AND"
 regexTarget = "secret"
 regexes = ['''^unique-operation-id-001$''']
 paths = ['''^docs/api/monthly-quotas\.md$''']
+
+[[rules.allowlists]]
+description = "SDK quota retry test operation ID; no access authority"
+condition = "AND"
+regexTarget = "secret"
+regexes = ['''^operation_123456789$''']
+paths = ['''(^|/)packages/sdk-core/test/quota-client\.test\.ts$''']

@@ -28,6 +28,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  windows-sdk:
+    name: Windows protected-storage integration
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run --project unit packages/sdk-core/test/windows-dpapi.native.test.ts
+
   database:
     name: PostgreSQL migration and schema tests
     runs-on: ubuntu-latest

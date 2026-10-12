@@ -46,9 +46,11 @@ async function api(path, method = 'GET', body) {
       state.principal = null;
       renderAuth();
     }
-    throw new Error(
+    const error = new Error(
       `${json?.message || 'Request failed'}${json?.request_id ? ` · Reference ${json.request_id}` : ''}`,
     );
+    error.status = response.status;
+    throw error;
   }
   return json;
 }
@@ -683,6 +685,75 @@ function mfaPanel() {
   );
   return card;
 }
+async function billingPanel(l, license) {
+  const configured = await api('/v1/billing/catalog');
+  if (!configured.plan_ids.length || !license.subscription_id || license.state !== 'active')
+    return null;
+  const card = panel(node('h2', 'Subscription checkout'));
+  const renderCheckout = (checkout) => {
+    card.replaceChildren(node('h2', 'Subscription checkout'), details(checkout));
+    if (checkout.status === 'ready' && checkout.checkout_url) {
+      const url = new URL(checkout.checkout_url);
+      if (url.protocol !== 'https:') throw new Error('Invalid payment link');
+      const link = node('a', 'Continue to secure payment');
+      link.href = url.href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      card.append(link);
+    } else if (['submitting', 'uncertain'].includes(checkout.status)) {
+      card.append(
+        node(
+          'p',
+          'Checkout is awaiting confirmation. Contact support if this persists; submitting again will not create another payment.',
+        ),
+      );
+    } else {
+      card.append(node('p', 'Payment processed. Current subscription details appear above.'));
+    }
+    card.append(
+      button('Refresh checkout status', async () =>
+        renderCheckout(await api(`${orgPath()}/licenses/${l.id}/checkout`)),
+      ),
+    );
+  };
+  try {
+    renderCheckout(await api(`${orgPath()}/licenses/${l.id}/checkout`));
+    return card;
+  } catch (error) {
+    if (error.status !== 404) throw error;
+  }
+  if (!['admin', 'owner'].includes(state.orgs.find((o) => o.id === state.orgId)?.role)) return null;
+  const plans = (
+    await api(`/v1/catalog/products/${encodeURIComponent(l.product_id)}/plans`)
+  ).items.filter((p) => configured.plan_ids.includes(p.id));
+  if (!plans.length) return null;
+  // Keep one operation ID for all retries of this form. Reload reads the durable existing intent first.
+  const operationId = crypto.randomUUID();
+  card.append(
+    node(
+      'p',
+      'Choose a plan and review its price and recurring terms on the payment page before paying.',
+    ),
+    fieldsForm(
+      [
+        {
+          name: 'plan_id',
+          label: 'Subscription plan',
+          options: plans.map((p) => [p.id, `${p.code} · ${p.tier}`]),
+        },
+      ],
+      'Create checkout',
+      async (data) =>
+        renderCheckout(
+          await api(`${orgPath()}/licenses/${l.id}/checkout`, 'POST', {
+            plan_id: data.plan_id,
+            idempotency_key: operationId,
+          }),
+        ),
+    ),
+  );
+  return card;
+}
 async function licenseDetail(l) {
   const [license, ent, activations, usage] = await Promise.all([
     api(`${orgPath()}/licenses/${l.id}`),
@@ -742,6 +813,8 @@ async function licenseDetail(l) {
       ),
     ),
   );
+  const billing = await billingPanel(l, license);
+  if (billing) content.append(billing);
 }
 async function deviceView() {
   const status = await device.summary();
@@ -891,6 +964,18 @@ async function operatorView() {
       (d) =>
         `/v1/admin/organizations/${encodeURIComponent(d.org_id)}/subscriptions/${encodeURIComponent(d.subscription_id)}`,
       'PATCH',
+    ],
+    [
+      'Reconcile uncertain checkout',
+      [
+        ids('org_id', 'Organization ID'),
+        ids('license_id', 'License ID'),
+        ids('transaction_id', 'Paddle transaction ID'),
+        reason,
+      ],
+      (d) =>
+        `/v1/admin/organizations/${encodeURIComponent(d.org_id)}/licenses/${encodeURIComponent(d.license_id)}/checkout/reconcile`,
+      'POST',
     ],
     [
       'Issue license',

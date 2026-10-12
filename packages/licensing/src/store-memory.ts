@@ -2,6 +2,8 @@ import { AuditBuffer, type AuditEventInput, type AuditLog } from '@trust/audit';
 import type {
   Activation,
   QuotaCharge,
+  BillingCheckout,
+  BillingEventReceipt,
   Challenge,
   ConsumeResult,
   Device,
@@ -18,6 +20,8 @@ import type {
 
 interface State {
   quotaCharges: Map<string, QuotaCharge>;
+  billingCheckouts: Map<string, BillingCheckout>;
+  billingEvents: Map<string, BillingEventReceipt>;
   products: Map<string, Product>;
   plans: Map<string, Plan>;
   subscriptions: Map<string, Subscription>;
@@ -34,6 +38,8 @@ const clone = <T>(v: T): T => structuredClone(v);
 function emptyState(): State {
   return {
     quotaCharges: new Map(),
+    billingCheckouts: new Map(),
+    billingEvents: new Map(),
     products: new Map(),
     plans: new Map(),
     subscriptions: new Map(),
@@ -52,6 +58,61 @@ class Repo implements LicensingRepo {
     this.s = s;
   }
 
+  async findBillingCheckout(id: string) {
+    return clone(this.s.billingCheckouts.get(id));
+  }
+  async findBillingCheckoutForLicense(orgId: string, licenseId: string) {
+    return clone(
+      [...this.s.billingCheckouts.values()].find(
+        (c) => c.orgId === orgId && c.licenseId === licenseId,
+      ),
+    );
+  }
+  async insertBillingCheckout(c: BillingCheckout) {
+    if (this.s.licenses.get(c.licenseId)?.orgId !== c.orgId || !this.s.plans.has(c.planId))
+      throw new Error('cross_tenant_reference');
+    if (
+      [...this.s.billingCheckouts.values()].some(
+        (x) =>
+          x.id === c.id ||
+          x.licenseId === c.licenseId ||
+          (x.orgId === c.orgId && x.requestHash === c.requestHash),
+      )
+    )
+      throw new Error('duplicate_checkout');
+    this.s.billingCheckouts.set(c.id, clone(c));
+  }
+  async updateBillingCheckout(c: BillingCheckout) {
+    const old = this.s.billingCheckouts.get(c.id);
+    if (
+      !old ||
+      old.orgId !== c.orgId ||
+      old.licenseId !== c.licenseId ||
+      old.planId !== c.planId ||
+      old.priceId !== c.priceId ||
+      old.userId !== c.userId ||
+      old.requestHash !== c.requestHash
+    )
+      throw new Error('checkout_not_found');
+    if (
+      [...this.s.billingCheckouts.values()].some(
+        (x) =>
+          x.id !== c.id &&
+          ((c.transactionId && x.transactionId === c.transactionId) ||
+            (c.providerSubscriptionId && x.providerSubscriptionId === c.providerSubscriptionId)),
+      )
+    )
+      throw new Error('duplicate_checkout');
+    this.s.billingCheckouts.set(c.id, clone(c));
+  }
+  async findBillingEvent(id: string) {
+    return clone(this.s.billingEvents.get(id));
+  }
+  async insertBillingEvent(e: BillingEventReceipt) {
+    if (this.s.billingEvents.has(e.id)) throw new Error('duplicate_billing_event');
+    if (!this.s.billingCheckouts.has(e.checkoutId)) throw new Error('cross_tenant_reference');
+    this.s.billingEvents.set(e.id, clone(e));
+  }
   async listQuotaUsage(orgId: string, licenseId: string, period: string) {
     const usage = new Map<string, number>();
     for (const c of this.s.quotaCharges.values())

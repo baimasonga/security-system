@@ -25,6 +25,99 @@ tags:
   - { name: admin, description: Platform operators only }
   - { name: keys }
 paths:
+  /checkout:
+    get:
+      summary: Isolated Paddle payment-link page; no account session stored here
+      security: []
+      responses:
+        '200': { description: Payment HTML shell }
+  /checkout.mjs:
+    get:
+      summary: Payment-page JavaScript
+      security: []
+      responses:
+        '200': { description: Public payment integration }
+  /v1/billing/checkout-options:
+    get:
+      summary: Public Paddle.js client token and environment; never API credentials
+      security: []
+      responses:
+        '200': { description: Public frontend configuration }
+        '503': { description: Payment page not configured }
+  /v1/billing/catalog:
+    get:
+      summary: Configured checkout plan IDs; empty when billing is disabled
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: Available local plan IDs }
+  /v1/organizations/{orgId}/licenses/{licenseId}/checkout:
+    parameters:
+      - { $ref: '#/components/parameters/OrgId' }
+      - { $ref: '#/components/parameters/LicenseId' }
+    get:
+      summary: Read the existing checkout and current subscription state
+      security: [{ bearer: [] }]
+      responses:
+        '200': { description: Checkout state; payment URL only while ready }
+        '404': { description: Not found or another tenant }
+        '503': { description: Billing is not configured }
+    post:
+      summary: Reserve one checkout for an existing license; organization admin or owner required
+      description: Reuse the same operation ID on retries. Uncertain provider outcomes require reconciliation.
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [plan_id, idempotency_key]
+              properties:
+                plan_id: { type: string, pattern: '^pln_[A-Za-z0-9_-]+$' }
+                idempotency_key: { type: string, pattern: '^[A-Za-z0-9_-]{16,128}$' }
+      responses:
+        '200': { description: Existing or newly submitted intent; no entitlement grant }
+        '409': { description: A different checkout already exists }
+        '503': { description: Billing is not configured }
+  /v1/admin/organizations/{orgId}/licenses/{licenseId}/checkout/reconcile:
+    post:
+      summary: Verify a candidate Paddle transaction against an existing intent; operator required
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [transaction_id, reason]
+              properties:
+                transaction_id: { type: string, pattern: '^txn_[a-z0-9]{26}$' }
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200': { description: Verified mapped transaction recorded with audit }
+        '404': { description: Intent not found }
+        '503': { description: Billing is not configured }
+  /v1/billing/webhooks/paddle:
+    post:
+      summary: Signed raw-byte Paddle notification; never accepts customer session as payment proof
+      security: []
+      parameters:
+        - in: header
+          name: Paddle-Signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Applied, duplicate, older or irrelevant event acknowledged }
+        '403': { description: Invalid signature or mapped price mismatch }
+        '409': { description: Unmapped, ambiguous or conflicting event requires reconciliation }
+        '503': { description: Billing is not configured }
   /v1/organizations/{orgId}/licenses/{licenseId}/usage:
     get:
       summary: Current UTC-month quota usage; historical receipts are retained

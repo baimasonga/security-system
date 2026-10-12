@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Secure subscription payment</title>
+    <link rel="stylesheet" href="/portal.css" />
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js" defer></script>
+    <script type="module" src="/checkout.mjs"></script>
+  </head>
+  <body>
+    <main class="panel">
+      <h1>Review your subscription</h1>
+      <p>Review the price, currency and recurring terms in Paddle Checkout before paying.</p>
+      <p id="payment-status" role="status" aria-live="polite">Preparing secure checkout…</p>
+      <button id="open-payment" type="button" disabled>Review payment</button>
+      <p>After payment, return to your account and refresh the subscription status.</p>
+      <a href="/">Return to account</a>
+    </main>
+  </body>
+</html>

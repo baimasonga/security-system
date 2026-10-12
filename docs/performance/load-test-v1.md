@@ -356,3 +356,18 @@ Every comparison run: 80 completed, 80 expected audit appends, zero drops/errors
 Quota contention after the comparison: one shared license with allowance 20; 50 requests/second for four seconds; each operation is attempted twice. All 200 requests complete: 40 HTTP successes return 20 unique receipts, and 160 expected quota refusals occur. Exact ledger usage is 20, remaining is zero, exactly 20 audit appends occur and the full audit chain verifies. Zero drops, unexpected errors, deadlocks or exhausted transactions. p50/p99 24.39/33 ms. A lighter CI smoke at 20 requests/second separately checks 40 operation IDs, 20 receipts, 40 successes and 40 quota refusals. PostgreSQL mutation testing catches replacing the exclusive license lock with a shared lock, proving the concurrent-budget regression is sensitive to that control.
 
 Artifacts: `/workspace/.setup/quota-load-{base,new}-{activate,refresh}.json` and `/workspace/.setup/quota-final-{light,stress}.json`.
+
+### 3.18 Product integration regression checks (2026-10-12)
+
+ADR-019 adds billing intent/event storage and commercial transitions. A paired baseline archive of `b990e01` and the integration implementation used separate fresh databases, verified fsync on, 40 users, 20 requests/second for four seconds, and sequential runs. No server ports or populated schemas were shared between scenarios. All four runs launched/completed/succeeded on 80 requests, appended exactly 80 audit events, and reported zero dropped requests, unexpected errors, exhausted retries or deadlocks.
+
+| Revision                   | Scenario   | p50 (ms) | p99 (ms) |
+| -------------------------- | ---------- | -------: | -------: |
+| Baseline b990e01           | Activation |    64.49 |    97.58 |
+| Integration implementation | Activation |    64.50 |   107.99 |
+| Baseline b990e01           | Refresh    |    77.93 |   249.11 |
+| Integration implementation | Refresh    |    60.30 |    81.39 |
+
+These short local runs are correctness/regression smoke checks, not capacity estimates or evidence of a speedup. The quota smoke completed 80 requests representing 40 logical operations: exactly 20 receipts/units used, 40 accepted retries and 40 expected quota-exhaustion responses, with 20 audit appends and zero unexpected errors/deadlocks/drops. PostgreSQL CPU is unavailable in this local harness (`pgrep` cannot resolve its external `postgres` user); its printed zero must not be interpreted as a measurement.
+
+Billing behavioral suites additionally run under PostgreSQL owner and least-privilege roles. Concurrent checkout retries produce one intent/provider submission; twenty reverse-ordered subscription notifications retain a monotonic latest-event watermark. The shared adapter contract verifies cross-tenant foreign keys, one-intent uniqueness and transaction rollback of event receipts. Browser checks exercise checkout/resume without another provider call and isolate a mocked Paddle widget; no live payment is performed. Signature, event-order, update-signature, channel, rollback and artifact-integrity mutations are caught by their negative-path tests.

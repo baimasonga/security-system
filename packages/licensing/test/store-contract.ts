@@ -117,6 +117,63 @@ export function licensingStoreContract(
   }
 
   describe(`LicensingStore contract: ${name}`, () => {
+    it('isolates checkout intents, enforces one per license and atomically retains event receipts', async () => {
+      const f = await fixture(),
+        l = lic(f.orgA, f.prd.id, f.pln.id, null);
+      await f.store.insertLicense(l);
+      const c = {
+        id: uid('bco'),
+        orgId: f.orgA,
+        userId: f.user,
+        licenseId: l.id,
+        planId: f.pln.id,
+        priceId: 'pri_' + 'a'.repeat(26),
+        requestHash: 'b'.repeat(64),
+        status: 'submitting' as const,
+        transactionId: null,
+        checkoutUrl: null,
+        providerSubscriptionId: null,
+        lastEventAt: null,
+        createdAt: T,
+      };
+      await f.store.transaction(async (tx) => {
+        await tx.insertBillingCheckout(c);
+        await tx.audit.append({
+          actor: { type: 'user', id: f.user },
+          action: 'billing.checkout_requested',
+          orgId: f.orgA,
+        });
+      });
+      expect(await f.store.findBillingCheckoutForLicense(f.orgB, l.id)).toBeUndefined();
+      expect(await f.store.findBillingCheckout(c.id)).toEqual(c);
+      await expect(f.store.insertBillingCheckout({ ...c, id: uid('bco') })).rejects.toThrow(
+        'duplicate_checkout',
+      );
+      const l2 = lic(f.orgA, f.prd.id, f.pln.id, null);
+      await f.store.insertLicense(l2);
+      await expect(
+        f.store.insertBillingCheckout({ ...c, id: uid('bco'), licenseId: l2.id, orgId: f.orgB }),
+      ).rejects.toThrow('cross_tenant_reference');
+      const event = {
+        id: uid('evt'),
+        checkoutId: c.id,
+        bodyHash: 'a'.repeat(64),
+        occurredAt: T,
+        createdAt: T,
+      };
+      await expect(
+        f.store.transaction(async (tx) => {
+          await tx.insertBillingEvent(event);
+          await tx.updateBillingCheckout({ ...c, status: 'uncertain' });
+          throw new Error('abort billing');
+        }),
+      ).rejects.toThrow('abort billing');
+      expect(await f.store.findBillingEvent(event.id)).toBeUndefined();
+      expect((await f.store.findBillingCheckout(c.id))?.status).toBe('submitting');
+      await f.store.insertBillingEvent(event);
+      await expect(f.store.insertBillingEvent(event)).rejects.toThrow('duplicate_billing_event');
+    });
+
     it('stores tenant-bound immutable quota receipts and rolls them back with the transaction', async () => {
       const f = await fixture(),
         l = lic(f.orgA, f.prd.id, f.pln.id, null);

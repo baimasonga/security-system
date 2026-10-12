@@ -51,6 +51,9 @@ describe('OpenAPI ↔ implementation drift', () => {
     expect(open.sort()).toEqual(
       [
         'get /',
+        'get /checkout',
+        'get /checkout.mjs',
+        'get /v1/billing/checkout-options',
         'get /device.mjs',
         'get /healthz',
         'get /portal.css',
@@ -58,6 +61,7 @@ describe('OpenAPI ↔ implementation drift', () => {
         'get /v1/auth/options',
         'get /v1/keys/trust-bundle',
         'post /v1/auth/login',
+        'post /v1/billing/webhooks/paddle',
         'post /v1/auth/register',
         'post /v1/auth/password/request',
         'post /v1/auth/password/reset',

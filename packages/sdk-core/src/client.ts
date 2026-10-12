@@ -1,5 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { buildProofMessage, type ProofPurpose } from '@trust/crypto/verify';
+import {
+  buildProofMessage,
+  jwkThumbprint,
+  normalizePublicJwk,
+  type ProofPurpose,
+} from '@trust/crypto/verify';
 import type { LeaseClaims } from '@trust/shared-types';
 import { SoftwareDeviceKey, type DeviceKey, type SecureStore } from './device-key.ts';
 import { verifyLease, type LeaseCheck, type TrustBundle } from './lease-verifier.ts';
@@ -20,6 +25,8 @@ export interface ClientOptions {
   productCode: string;
   trust: TrustBundle;
   store: SecureStore;
+  /** Host-owned persistent key (OS/native service). Failure never falls back to software. */
+  deviceKeyProvider?: (installationId: string) => Promise<DeviceKey>;
   fetch?: typeof fetch;
   now?: () => Date;
   issuer?: string;
@@ -47,6 +54,17 @@ export interface QuotaUsage {
 }
 
 /** Accounting receipt, not an execution capability or proof of completed work. */
+export interface CheckoutState {
+  id: string;
+  license_id: string;
+  plan_id: string;
+  status: 'submitting' | 'uncertain' | 'ready' | 'completed';
+  checkout_url: string | null;
+  created_at: string;
+  subscription_status: string | null;
+  current_period_end: string | null;
+}
+
 export interface QuotaReceipt {
   id: string;
   license_id: string;
@@ -76,6 +94,8 @@ export class TrustPlatformClient {
   readonly #fetch: typeof fetch;
   #key: DeviceKey | undefined;
   #installationId: string | undefined;
+  #keyPending: Promise<DeviceKey> | undefined;
+  #installationPending: Promise<string> | undefined;
 
   constructor(opts: ClientOptions) {
     this.#o = opts;
@@ -89,6 +109,14 @@ export class TrustPlatformClient {
   /** Install-scoped random id. Generated once; reinstall = new id (the server tracks trial history). */
   async installationId(): Promise<string> {
     if (this.#installationId) return this.#installationId;
+    if (!this.#installationPending)
+      this.#installationPending = this.#loadInstallation().finally(() => {
+        this.#installationPending = undefined;
+      });
+    return this.#installationPending;
+  }
+
+  async #loadInstallation(): Promise<string> {
     let id = await this.#o.store.get(K.installation);
     if (!id) {
       id = `inst_${randomBytes(18).toString('base64url')}`;
@@ -99,6 +127,25 @@ export class TrustPlatformClient {
 
   async deviceKey(): Promise<DeviceKey> {
     if (this.#key) return this.#key;
+    if (!this.#keyPending)
+      this.#keyPending = this.#loadKey().finally(() => {
+        this.#keyPending = undefined;
+      });
+    return this.#keyPending;
+  }
+
+  async #loadKey(): Promise<DeviceKey> {
+    if (this.#o.deviceKeyProvider) {
+      const key = await this.#o.deviceKeyProvider(await this.installationId());
+      const publicJwk = normalizePublicJwk(key.publicJwk);
+      if (jwkThumbprint(publicJwk) !== key.thumbprint)
+        throw new PlatformError('invalid_device_key', 0, 'host device key binding is invalid');
+      return (this.#key = {
+        publicJwk,
+        thumbprint: key.thumbprint,
+        sign: (message) => key.sign(message),
+      });
+    }
     const pem = await this.#o.store.get(K.devicePem);
     if (pem) return (this.#key = SoftwareDeviceKey.fromPem(pem));
     const k = SoftwareDeviceKey.generate();
@@ -135,7 +182,7 @@ export class TrustPlatformClient {
       ...(subjectId ? { subject_id: subjectId } : {}),
     });
     const key = await this.deviceKey();
-    const signature = key.sign(
+    const signature = await key.sign(
       buildProofMessage({
         purpose,
         nonce: ch.nonce,
@@ -238,6 +285,34 @@ export class TrustPlatformClient {
         'session and valid organization/license IDs are required',
       );
     return `/v1/organizations/${orgId}/licenses/${licenseId}/usage`;
+  }
+
+  /** Online administrator/owner action. Reuse one durable operation ID; payment does not occur here. */
+  async createCheckout(
+    sessionToken: string,
+    orgId: string,
+    licenseId: string,
+    planId: string,
+    operationId: string,
+  ): Promise<CheckoutState> {
+    return this.#call(
+      'POST',
+      this.#usagePath(sessionToken, orgId, licenseId).replace(/usage$/, 'checkout'),
+      { plan_id: planId, idempotency_key: operationId },
+      sessionToken,
+    );
+  }
+  async getCheckout(
+    sessionToken: string,
+    orgId: string,
+    licenseId: string,
+  ): Promise<CheckoutState> {
+    return this.#call(
+      'GET',
+      this.#usagePath(sessionToken, orgId, licenseId).replace(/usage$/, 'checkout'),
+      undefined,
+      sessionToken,
+    );
   }
 
   /** Online only. Remaining allowance does not authorize execution. */

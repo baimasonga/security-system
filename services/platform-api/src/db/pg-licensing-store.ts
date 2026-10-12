@@ -4,6 +4,8 @@ import type { Clock } from '@trust/shared-types';
 import type {
   Activation,
   QuotaCharge,
+  BillingCheckout,
+  BillingEventReceipt,
   Challenge,
   ConsumeResult,
   Device,
@@ -31,6 +33,28 @@ import {
 // ---- row mapping -------------------------------------------------------------------------------
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
+const billingCheckout = (r: Row): BillingCheckout => ({
+  id: r.id,
+  orgId: r.org_id,
+  userId: r.user_id,
+  licenseId: r.license_id,
+  planId: r.plan_id,
+  priceId: r.price_id,
+  requestHash: r.request_hash,
+  status: r.status,
+  transactionId: r.transaction_id,
+  checkoutUrl: r.checkout_url,
+  providerSubscriptionId: r.provider_subscription_id,
+  lastEventAt: r.last_event_at,
+  createdAt: r.created_at,
+});
+const billingEvent = (r: Row): BillingEventReceipt => ({
+  id: r.id,
+  checkoutId: r.checkout_id,
+  bodyHash: r.body_hash,
+  occurredAt: r.occurred_at,
+  createdAt: r.created_at,
+});
 const quotaCharge = (r: Row): QuotaCharge => ({
   id: r.id,
   orgId: r.org_id,
@@ -207,6 +231,88 @@ class PgRepo implements LicensingRepo {
     return (await this.#q.query(sql, params)).rows;
   }
 
+  async findBillingCheckout(id: string) {
+    const r = await this.#one(
+      'SELECT * FROM billing_checkouts WHERE id=$1' + (this.#tx ? ' FOR UPDATE' : ''),
+      [id],
+    );
+    return r ? billingCheckout(r) : undefined;
+  }
+  async findBillingCheckoutForLicense(orgId: string, licenseId: string) {
+    const r = await this.#one(
+      'SELECT * FROM billing_checkouts WHERE org_id=$1 AND license_id=$2' +
+        (this.#tx ? ' FOR UPDATE' : ''),
+      [orgId, licenseId],
+    );
+    return r ? billingCheckout(r) : undefined;
+  }
+  async insertBillingCheckout(c: BillingCheckout) {
+    try {
+      await this.#q.query(
+        'INSERT INTO billing_checkouts(id,org_id,user_id,license_id,plan_id,price_id,request_hash,status,transaction_id,checkout_url,provider_subscription_id,last_event_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+        [
+          c.id,
+          c.orgId,
+          c.userId,
+          c.licenseId,
+          c.planId,
+          c.priceId,
+          c.requestHash,
+          c.status,
+          c.transactionId,
+          c.checkoutUrl,
+          c.providerSubscriptionId,
+          c.lastEventAt,
+          c.createdAt,
+        ],
+      );
+    } catch (e) {
+      if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_checkout');
+      if (pgErr(e).code === FK_VIOLATION) throw new Error('cross_tenant_reference');
+      throw e;
+    }
+  }
+  async updateBillingCheckout(c: BillingCheckout) {
+    try {
+      const result = await this.#q.query(
+        'UPDATE billing_checkouts SET status=$8,transaction_id=$9,checkout_url=$10,provider_subscription_id=$11,last_event_at=$12 WHERE id=$1 AND org_id=$2 AND user_id=$3 AND license_id=$4 AND plan_id=$5 AND price_id=$6 AND request_hash=$7',
+        [
+          c.id,
+          c.orgId,
+          c.userId,
+          c.licenseId,
+          c.planId,
+          c.priceId,
+          c.requestHash,
+          c.status,
+          c.transactionId,
+          c.checkoutUrl,
+          c.providerSubscriptionId,
+          c.lastEventAt,
+        ],
+      );
+      if (!result.rowCount) throw new Error('checkout_not_found');
+    } catch (e) {
+      if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_checkout');
+      throw e;
+    }
+  }
+  async findBillingEvent(id: string) {
+    const r = await this.#one('SELECT * FROM billing_events WHERE id=$1', [id]);
+    return r ? billingEvent(r) : undefined;
+  }
+  async insertBillingEvent(e: BillingEventReceipt) {
+    try {
+      await this.#q.query(
+        'INSERT INTO billing_events(id,checkout_id,body_hash,occurred_at,created_at) VALUES($1,$2,$3,$4,$5)',
+        [e.id, e.checkoutId, e.bodyHash, e.occurredAt, e.createdAt],
+      );
+    } catch (error) {
+      if (pgErr(error).code === UNIQUE_VIOLATION) throw new Error('duplicate_billing_event');
+      if (pgErr(error).code === FK_VIOLATION) throw new Error('cross_tenant_reference');
+      throw error;
+    }
+  }
   // ---- catalog ----
   async listQuotaUsage(orgId: string, licenseId: string, period: string) {
     const rows = await this.#q.query(

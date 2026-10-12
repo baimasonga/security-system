@@ -23,7 +23,7 @@ import {
 export interface DeviceKey {
   readonly publicJwk: PublicJwk;
   readonly thumbprint: string;
-  sign(message: string): string;
+  sign(message: string): string | Promise<string>;
 }
 
 export class SoftwareDeviceKey implements DeviceKey {

@@ -124,9 +124,11 @@ export function installSecurityHeaders(app: FastifyInstance, production: boolean
     reply.header('referrer-policy', 'no-referrer');
     reply.header(
       'content-security-policy',
-      req.routeOptions.url === '/'
-        ? "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
-        : "default-src 'none'; frame-ancestors 'none'",
+      req.routeOptions.url === '/checkout'
+        ? "default-src 'none'; script-src 'self' https://cdn.paddle.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.paddle.com; frame-src https://*.paddle.com; img-src 'self' data: https://*.paddle.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        : req.routeOptions.url === '/'
+          ? "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+          : "default-src 'none'; frame-ancestors 'none'",
     );
     reply.header('cross-origin-resource-policy', 'same-origin');
     if (production)

@@ -4,6 +4,7 @@ import { fastifyRateStore } from './rate-limit.ts';
 import { randomUUID } from 'node:crypto';
 import type { Container } from './container.ts';
 import { installErrorHandling, installSecurityHeaders } from './http.ts';
+import { registerBillingRoutes } from './routes/billing.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerOrgRoutes } from './routes/organizations.ts';
 import { registerLicenseRoutes } from './routes/licenses.ts';
@@ -73,6 +74,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   });
 
   registerAuthRoutes(app, c);
+  registerBillingRoutes(app, c);
   registerOrgRoutes(app, c);
   registerLicenseRoutes(app, c);
   registerDeviceRoutes(app, c);

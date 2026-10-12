@@ -64,3 +64,30 @@ it('rejects path injection and missing sessions before any request', async () =>
   await expect(sdk.getUsage('session', '../org_b', 'lic_a')).rejects.toBeInstanceOf(PlatformError);
   expect(fetcher).not.toHaveBeenCalled();
 });
+
+it('uses the tenant session and a caller-owned durable operation ID for checkout', async () => {
+  const response = {
+    id: 'bco_example',
+    license_id: 'lic_a',
+    plan_id: 'pln_a',
+    status: 'uncertain',
+    checkout_url: null,
+    created_at: '2026-10-12T00:00:00Z',
+    subscription_status: 'trialing',
+    current_period_end: null,
+  };
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json(response));
+  const sdk = client(fetcher);
+  expect(
+    await sdk.createCheckout('session', 'org_a', 'lic_a', 'pln_a', 'checkout-request-001'),
+  ).toEqual(response);
+  expect(String(fetcher.mock.calls[0]?.[0])).toBe(
+    'https://platform.example/v1/organizations/org_a/licenses/lic_a/checkout',
+  );
+  expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+    plan_id: 'pln_a',
+    idempotency_key: 'checkout-request-001',
+  });
+  expect(await sdk.getCheckout('session', 'org_a', 'lic_a')).toEqual(response);
+  expect(fetcher.mock.calls[1]?.[1]?.method).toBe('GET');
+});

@@ -9,6 +9,7 @@ export default tseslint.config(
       globals: Object.fromEntries(
         [
           'document',
+          'window',
           'location',
           'history',
           'URLSearchParams',
