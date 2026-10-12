@@ -52,8 +52,20 @@ jobs:
       - run: npm run test:db # owner and least-privilege app-role suites
       - name: Load-test smoke (the tool still works and a light load produces no errors)
         run: |
-          npm run loadtest -- --scenario activate-ramp --users 40 --rps 20 --seconds 4 --assert-clean
-          npm run loadtest -- --scenario refresh-ramp --users 40 --rps 20 --seconds 4 --assert-clean
+          # Each scenario seeds fixed identities; never share a populated database.
+          node --input-type=module <<'JS'
+          import pg from 'pg';
+          const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          try {
+            await client.query('CREATE DATABASE smoke_activate');
+            await client.query('CREATE DATABASE smoke_refresh');
+          } finally {
+            await client.end();
+          }
+          JS
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/smoke_activate npm run loadtest -- --scenario activate-ramp --users 40 --rps 20 --seconds 4 --assert-clean
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/smoke_refresh npm run loadtest -- --scenario refresh-ramp --users 40 --rps 20 --seconds 4 --assert-clean
 
   security:
     name: Dependency and secret scanning
