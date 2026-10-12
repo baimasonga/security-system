@@ -25,6 +25,61 @@ tags:
   - { name: admin, description: Platform operators only }
   - { name: keys }
 paths:
+  /v1/organizations/{orgId}/licenses/{licenseId}/usage:
+    get:
+      summary: Current UTC-month quota usage; historical receipts are retained
+      security:
+        - bearer: []
+      responses:
+        '200':
+          description: License id, period, reset time, commercial status and allowance usage
+        '401':
+          description: Authentication required
+        '404':
+          description: Not found or not a member
+    post:
+      summary: Consume allowance atomically and return an idempotent accounting receipt
+      description: Receipt is not a capability or authorization to execute external
+        work. The same operation key must also deduplicate execution.
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - entitlement
+                - units
+                - idempotency_key
+              properties:
+                entitlement:
+                  type: string
+                  pattern: ^[a-z][a-z0-9_]{0,55}_monthly$
+                units:
+                  type: integer
+                  minimum: 1
+                  maximum: 1099511627776
+                idempotency_key:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{16,128}$
+      responses:
+        '200':
+          description: Accounting receipt (also returned on matching retries)
+        '400':
+          description: Invalid input
+        '401':
+          description: Authentication required
+        '403':
+          description: License or allowance unavailable
+        '404':
+          description: Not found or not a member
+        '409':
+          description: Quota exhausted or idempotency payload differs
+        '429':
+          description: Rate limited
   /v1/auth/mfa/begin:
     post:
       summary: MFA begin

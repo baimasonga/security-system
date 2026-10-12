@@ -684,12 +684,13 @@ function mfaPanel() {
   return card;
 }
 async function licenseDetail(l) {
-  const [license, ent, activations] = await Promise.all([
+  const [license, ent, activations, usage] = await Promise.all([
     api(`${orgPath()}/licenses/${l.id}`),
     api(
       `/v1/entitlements?org_id=${encodeURIComponent(state.orgId)}&license_id=${encodeURIComponent(l.id)}`,
     ),
     api(`${orgPath()}/licenses/${l.id}/activations`),
+    api(`${orgPath()}/licenses/${l.id}/usage`),
   ]);
   content.replaceChildren(
     title(productName(l.product_id), 'License details and currently resolved entitlements.'),
@@ -698,6 +699,41 @@ async function licenseDetail(l) {
       details(license),
     ),
     panel(node('h2', 'Entitlements'), details(ent)),
+    panel(
+      node('h2', 'Monthly usage'),
+      node(
+        'p',
+        `Period ${usage.period} · Resets ${new Date(usage.resets_at).toLocaleDateString(undefined, { timeZone: 'UTC' })} (UTC). Allowances are shared by users of this license.`,
+      ),
+      ...(usage.status !== 'valid'
+        ? [node('p', 'This license is currently unavailable for consumption.')]
+        : []),
+      ...(usage.items.length
+        ? [
+            table(
+              ['Allowance', 'Used', 'Limit', 'Remaining'],
+              usage.items.map((item) => [
+                item.entitlement
+                  .replace(/_monthly$/, '')
+                  .split('_')
+                  .map((word, index) =>
+                    word === 'ocr'
+                      ? 'OCR'
+                      : word === 'ai'
+                        ? 'AI'
+                        : index === 0
+                          ? word[0].toUpperCase() + word.slice(1)
+                          : word,
+                  )
+                  .join(' '),
+                item.used,
+                item.limit,
+                item.remaining,
+              ]),
+            ),
+          ]
+        : [empty('No monthly allowances are configured for this license.')]),
+    ),
     panel(
       node('h2', 'Activations'),
       table(

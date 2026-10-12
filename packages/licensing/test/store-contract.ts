@@ -117,6 +117,68 @@ export function licensingStoreContract(
   }
 
   describe(`LicensingStore contract: ${name}`, () => {
+    it('stores tenant-bound immutable quota receipts and rolls them back with the transaction', async () => {
+      const f = await fixture(),
+        l = lic(f.orgA, f.prd.id, f.pln.id, null);
+      await f.store.insertLicense(l);
+      const charge = {
+        id: uid('qch'),
+        orgId: f.orgA,
+        licenseId: l.id,
+        userId: f.user,
+        requestHash: 'a'.repeat(64),
+        entitlement: 'ocr_pages_monthly',
+        period: '2026-03',
+        units: 3,
+        createdAt: T,
+      };
+      await f.store.transaction(async (tx) => {
+        await tx.findLicenseForUpdate(f.orgA, l.id);
+        await tx.insertQuotaCharge(charge);
+        await tx.audit.append({
+          actor: { type: 'user', id: f.user },
+          action: 'quota.consumed',
+          orgId: f.orgA,
+        });
+      });
+      expect(await f.store.getQuotaUsed(f.orgA, l.id, charge.entitlement, charge.period)).toBe(3);
+      expect(await f.store.getQuotaUsed(f.orgB, l.id, charge.entitlement, charge.period)).toBe(0);
+      expect(await f.store.listQuotaUsage(f.orgA, l.id, charge.period)).toEqual([
+        { entitlement: charge.entitlement, used: 3 },
+      ]);
+      expect(await f.store.listQuotaUsage(f.orgB, l.id, charge.period)).toEqual([]);
+      expect(await f.store.findQuotaCharge(f.orgB, l.id, charge.requestHash)).toBeUndefined();
+      expect(await f.store.findQuotaCharge(f.orgA, l.id, charge.requestHash)).toMatchObject({
+        units: 3,
+        createdAt: T,
+      });
+      await expect(f.store.insertQuotaCharge({ ...charge, id: uid('qch') })).rejects.toThrow(
+        'duplicate_quota_request',
+      );
+      await expect(
+        f.store.insertQuotaCharge({
+          ...charge,
+          id: uid('qch'),
+          orgId: f.orgB,
+          requestHash: 'b'.repeat(64),
+        }),
+      ).rejects.toThrow('cross_tenant_reference');
+      await expect(
+        f.store.transaction(async (tx) => {
+          await tx.insertQuotaCharge({ ...charge, id: uid('qch'), requestHash: 'c'.repeat(64) });
+          throw new Error('rollback quota');
+        }),
+      ).rejects.toThrow('rollback quota');
+      expect(await f.store.getQuotaUsed(f.orgA, l.id, charge.entitlement, charge.period)).toBe(3);
+      expect(await f.store.getQuotaUsed(f.orgA, l.id, charge.entitlement, '2026-04')).toBe(0);
+      await expect(
+        f.store.transaction(async (tx) => {
+          await tx.insertQuotaCharge({ ...charge, id: uid('qch'), requestHash: 'd'.repeat(64) });
+          await tx.audit.append({ actor: { type: 'bogus' as never }, action: 'invalid.audit' });
+        }),
+      ).rejects.toThrow();
+      expect(await f.store.getQuotaUsed(f.orgA, l.id, charge.entitlement, charge.period)).toBe(3);
+    });
     describe('catalog', () => {
       it('enforces unique product codes and unique plan codes per product', async () => {
         const f = await fixture();

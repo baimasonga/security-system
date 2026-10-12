@@ -3,6 +3,7 @@ import { appendAuditInTx } from './pg-audit-log.ts';
 import type { Clock } from '@trust/shared-types';
 import type {
   Activation,
+  QuotaCharge,
   Challenge,
   ConsumeResult,
   Device,
@@ -30,6 +31,17 @@ import {
 // ---- row mapping -------------------------------------------------------------------------------
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
+const quotaCharge = (r: Row): QuotaCharge => ({
+  id: r.id,
+  orgId: r.org_id,
+  licenseId: r.license_id,
+  userId: r.user_id,
+  requestHash: r.request_hash,
+  entitlement: r.entitlement,
+  period: r.period,
+  units: Number(r.units),
+  createdAt: r.created_at,
+});
 const product = (r: Row): Product => ({
   id: r.id,
   code: r.code,
@@ -196,6 +208,55 @@ class PgRepo implements LicensingRepo {
   }
 
   // ---- catalog ----
+  async listQuotaUsage(orgId: string, licenseId: string, period: string) {
+    const rows = await this.#q.query(
+      'SELECT entitlement,sum(units)::text AS used FROM quota_charges WHERE org_id=$1 AND license_id=$2 AND period=$3 GROUP BY entitlement ORDER BY entitlement',
+      [orgId, licenseId, period],
+    );
+    return rows.rows.map((r) => {
+      const used = Number(r.used);
+      if (!Number.isSafeInteger(used)) throw new Error('quota usage out of range');
+      return { entitlement: r.entitlement as string, used };
+    });
+  }
+  async findQuotaCharge(orgId: string, licenseId: string, requestHash: string) {
+    const r = await this.#q.query(
+      'SELECT * FROM quota_charges WHERE org_id=$1 AND license_id=$2 AND request_hash=$3',
+      [orgId, licenseId, requestHash],
+    );
+    return r.rows[0] ? quotaCharge(r.rows[0]) : undefined;
+  }
+  async getQuotaUsed(orgId: string, licenseId: string, entitlement: string, period: string) {
+    const r = await this.#q.query(
+      'SELECT COALESCE(sum(units),0)::text AS used FROM quota_charges WHERE org_id=$1 AND license_id=$2 AND entitlement=$3 AND period=$4',
+      [orgId, licenseId, entitlement, period],
+    );
+    const used = Number(r.rows[0]!.used);
+    if (!Number.isSafeInteger(used)) throw new Error('quota usage out of range');
+    return used;
+  }
+  async insertQuotaCharge(c: QuotaCharge) {
+    try {
+      await this.#q.query(
+        'INSERT INTO quota_charges(id,org_id,license_id,user_id,request_hash,entitlement,period,units,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        [
+          c.id,
+          c.orgId,
+          c.licenseId,
+          c.userId,
+          c.requestHash,
+          c.entitlement,
+          c.period,
+          c.units,
+          c.createdAt,
+        ],
+      );
+    } catch (e) {
+      if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_quota_request');
+      if (pgErr(e).code === FK_VIOLATION) throw new Error('cross_tenant_reference');
+      throw e;
+    }
+  }
   async insertProduct(p: Product) {
     try {
       await this.#q.query(

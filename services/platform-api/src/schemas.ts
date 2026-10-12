@@ -28,6 +28,17 @@ export const memberBody = z.object({ email: str(254), role: z.enum(ORG_ROLES) })
 export const orgParams = z.object({ orgId: id }).strict();
 export const licenseParams = z.object({ orgId: id, licenseId: id }).strict();
 export const activationParams = z.object({ orgId: id, activationId: id }).strict();
+export const quotaBody = z
+  .object({
+    entitlement: z.string().regex(/^[a-z][a-z0-9_]{0,55}_monthly$/),
+    units: z
+      .number()
+      .int()
+      .min(1)
+      .max(2 ** 40),
+    idempotency_key: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
+  })
+  .strict();
 export const trialBody = z.object({ product_id: id }).strict();
 export const entitlementsQuery = z.object({ org_id: id, license_id: id }).strict();
 

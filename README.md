@@ -98,3 +98,5 @@ See [feature program](docs/architecture/08-feature-program.md) and [proposed adv
 Provider integration foundations include a tested Resend delivery adapter, explicit local mail capture, and Paddle webhook-signature verification. Recovery routes now use hashed, expiring, single-use PostgreSQL tokens and revoke sessions on password reset. Billing routes still require durable event processing, checkout/account mapping and provider configuration.
 
 Authenticator MFA setup and recovery codes are available in Account when `MFA_ENCRYPTION_KEY` is configured. See [MFA rollout](docs/deploy/first-deploy.md#authenticator-mfa-rollout-adr-017) before enabling operator enforcement.
+
+[Monthly quota accounting](docs/api/monthly-quotas.md) provides current usage, atomic consumption and retry-safe receipts; processing services and payment settlement remain separate capabilities.

@@ -55,6 +55,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0005_shared_rate_state',
       '0006_identity_recovery',
       '0007_authenticator_mfa',
+      '0008_monthly_quotas',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
@@ -67,6 +68,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         '0005_shared_rate_state',
         '0006_identity_recovery',
         '0007_authenticator_mfa',
+        '0008_monthly_quotas',
       ],
     });
   });

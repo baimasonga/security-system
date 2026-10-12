@@ -3,6 +3,7 @@ import type { Container } from '../container.ts';
 import { authenticated, parse, principalOf, toWire } from '../http.ts';
 import {
   productParams,
+  quotaBody,
   activationParams,
   entitlementsQuery,
   licenseParams,
@@ -13,6 +14,21 @@ import {
 /** Customer self-service. Every route is tenant-scoped and authorized by org membership/role. */
 export function registerLicenseRoutes(app: FastifyInstance, c: Container): void {
   const pre = { preHandler: authenticated(c) };
+  app.get('/v1/organizations/:orgId/licenses/:licenseId/usage', pre, async (req) => {
+    const { orgId, licenseId } = parse(licenseParams, req.params);
+    return toWire(await c.licensing.getUsage(principalOf(req), orgId, licenseId));
+  });
+  app.post('/v1/organizations/:orgId/licenses/:licenseId/usage', pre, async (req) => {
+    const { orgId, licenseId } = parse(licenseParams, req.params),
+      body = parse(quotaBody, req.body);
+    return toWire(
+      await c.licensing.consumeQuota(principalOf(req), orgId, licenseId, {
+        entitlement: body.entitlement,
+        units: body.units,
+        idempotencyKey: body.idempotency_key,
+      }),
+    );
+  });
 
   app.get('/v1/catalog/products', pre, async () => ({
     items: toWire(await c.licensing.catalogProducts()),

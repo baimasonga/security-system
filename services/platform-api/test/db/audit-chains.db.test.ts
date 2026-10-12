@@ -346,6 +346,7 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
         '0005_shared_rate_state',
         '0006_identity_recovery',
         '0007_authenticator_mfa',
+        '0008_monthly_quotas',
       ]);
       const head = (
         await db.query("SELECT head_seq, head_hash FROM audit_chains WHERE chain_id='legacy'")

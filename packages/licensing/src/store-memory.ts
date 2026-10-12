@@ -1,6 +1,7 @@
 import { AuditBuffer, type AuditEventInput, type AuditLog } from '@trust/audit';
 import type {
   Activation,
+  QuotaCharge,
   Challenge,
   ConsumeResult,
   Device,
@@ -16,6 +17,7 @@ import type {
 } from './model.ts';
 
 interface State {
+  quotaCharges: Map<string, QuotaCharge>;
   products: Map<string, Product>;
   plans: Map<string, Plan>;
   subscriptions: Map<string, Subscription>;
@@ -31,6 +33,7 @@ const clone = <T>(v: T): T => structuredClone(v);
 
 function emptyState(): State {
   return {
+    quotaCharges: new Map(),
     products: new Map(),
     plans: new Map(),
     subscriptions: new Map(),
@@ -49,6 +52,44 @@ class Repo implements LicensingRepo {
     this.s = s;
   }
 
+  async listQuotaUsage(orgId: string, licenseId: string, period: string) {
+    const usage = new Map<string, number>();
+    for (const c of this.s.quotaCharges.values())
+      if (c.orgId === orgId && c.licenseId === licenseId && c.period === period)
+        usage.set(c.entitlement, (usage.get(c.entitlement) ?? 0) + c.units);
+    return [...usage.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([entitlement, used]) => ({ entitlement, used }));
+  }
+  async findQuotaCharge(orgId: string, licenseId: string, requestHash: string) {
+    return clone(
+      [...this.s.quotaCharges.values()].find(
+        (c) => c.orgId === orgId && c.licenseId === licenseId && c.requestHash === requestHash,
+      ),
+    );
+  }
+  async getQuotaUsed(orgId: string, licenseId: string, entitlement: string, period: string) {
+    return [...this.s.quotaCharges.values()]
+      .filter(
+        (c) =>
+          c.orgId === orgId &&
+          c.licenseId === licenseId &&
+          c.entitlement === entitlement &&
+          c.period === period,
+      )
+      .reduce((n, c) => n + c.units, 0);
+  }
+  async insertQuotaCharge(c: QuotaCharge) {
+    if (this.s.licenses.get(c.licenseId)?.orgId !== c.orgId)
+      throw new Error('cross_tenant_reference');
+    if (
+      [...this.s.quotaCharges.values()].some(
+        (x) => x.id === c.id || (x.licenseId === c.licenseId && x.requestHash === c.requestHash),
+      )
+    )
+      throw new Error('duplicate_quota_request');
+    this.s.quotaCharges.set(c.id, clone(c));
+  }
   async insertProduct(p: Product) {
     if ([...this.s.products.values()].some((x) => x.code === p.code))
       throw new Error('duplicate_product_code');

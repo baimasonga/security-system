@@ -60,12 +60,14 @@ jobs:
           try {
             await client.query('CREATE DATABASE smoke_activate');
             await client.query('CREATE DATABASE smoke_refresh');
+            await client.query('CREATE DATABASE smoke_quota');
           } finally {
             await client.end();
           }
           JS
           DATABASE_URL=postgres://postgres:postgres@localhost:5432/smoke_activate npm run loadtest -- --scenario activate-ramp --users 40 --rps 20 --seconds 4 --assert-clean
           DATABASE_URL=postgres://postgres:postgres@localhost:5432/smoke_refresh npm run loadtest -- --scenario refresh-ramp --users 40 --rps 20 --seconds 4 --assert-clean
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/smoke_quota npm run loadtest -- --scenario quota-ramp --users 20 --quota-limit 20 --rps 20 --seconds 4 --assert-clean
 
   security:
     name: Dependency and secret scanning

@@ -28,3 +28,5 @@ exactly the source reviewed, with minimal moving parts and dependencies.
   − Client SDKs for .NET/Rust/Dart (later) cannot share this code; the lease
   format (ADR-002) and the test vectors in `docs/api/lease-test-vectors.json`
   are the cross-language contract.
+
+The load driver starts API children with a private IPC channel. After listening, a child acknowledges its own bound port before the driver probes health. An unrelated process's healthy HTTP response cannot satisfy readiness. Child exit, startup timeout and port mismatch fail the run; cleanup stops only the child the driver created. This adds no public API, bypass, or secret-bearing message.

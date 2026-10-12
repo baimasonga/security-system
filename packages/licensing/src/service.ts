@@ -562,6 +562,119 @@ export class LicensingService {
     return { licenseId, status: 'valid', entitlements: resolveEntitlements(plan, lic.overrides) };
   }
 
+  async getUsage(p: UserPrincipal, orgId: string, licenseId: string) {
+    await this.#d.authorize(p, orgId, 'license:read');
+    return this.#d.store.transaction(async (tx) => {
+      const ctx = await tx.findLicenseContext(orgId, licenseId, 'share');
+      if (!ctx || ctx.license.kind === 'canary') throw new DomainError('not_found', 'not found');
+      const now = this.#d.clock.now(),
+        period = now.toISOString().slice(0, 7);
+      const ent = resolveEntitlements(ctx.plan, ctx.license.overrides).entitlements;
+      const usage = new Map(
+        (await tx.listQuotaUsage(orgId, licenseId, period)).map((row) => [
+          row.entitlement,
+          row.used,
+        ]),
+      );
+      const items = [];
+      for (const [entitlement, limit] of Object.entries(ent)) {
+        if (!entitlement.endsWith('_monthly') || typeof limit !== 'number') continue;
+        const used = usage.get(entitlement) ?? 0;
+        items.push({ entitlement, limit, used, remaining: Math.max(0, limit - used) });
+      }
+      return {
+        licenseId,
+        period,
+        resetsAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
+        status:
+          this.#evaluate(ctx.license, ctx.subscription).outcome.decision === 'ALLOW'
+            ? 'valid'
+            : 'unavailable',
+        items,
+      };
+    });
+  }
+  async consumeQuota(
+    p: UserPrincipal,
+    orgId: string,
+    licenseId: string,
+    input: { entitlement: string; units: number; idempotencyKey: string },
+  ) {
+    await this.#d.authorize(p, orgId, 'license:activate');
+    if (
+      !/^[a-z][a-z0-9_]{0,55}_monthly$/.test(input.entitlement) ||
+      !Number.isSafeInteger(input.units) ||
+      input.units < 1 ||
+      input.units > 2 ** 40 ||
+      !/^[A-Za-z0-9_-]{16,128}$/.test(input.idempotencyKey)
+    )
+      throw new DomainError('invalid_request', 'invalid quota request');
+    const requestHash = sha256Hex(input.idempotencyKey),
+      id = newId('qch');
+    return this.#d.store.transaction(async (tx) => {
+      const ctx = await tx.findLicenseContext(orgId, licenseId, 'update');
+      if (!ctx || ctx.license.kind === 'canary') throw new DomainError('not_found', 'not found');
+      if (this.#evaluate(ctx.license, ctx.subscription).outcome.decision !== 'ALLOW')
+        throw new DomainError('forbidden', 'license is unavailable');
+      const previous = await tx.findQuotaCharge(orgId, licenseId, requestHash);
+      if (previous) {
+        if (previous.entitlement !== input.entitlement || previous.units !== input.units)
+          throw new DomainError('conflict', 'idempotency key payload differs');
+        return {
+          id: previous.id,
+          licenseId,
+          entitlement: previous.entitlement,
+          period: previous.period,
+          units: previous.units,
+          createdAt: previous.createdAt,
+        };
+      }
+      const ent = resolveEntitlements(ctx.plan, ctx.license.overrides).entitlements,
+        limit = ent[input.entitlement];
+      if (typeof limit !== 'number') throw new DomainError('forbidden', 'quota is unavailable');
+      const now = this.#d.clock.now(),
+        period = now.toISOString().slice(0, 7);
+      const used = await tx.getQuotaUsed(orgId, licenseId, input.entitlement, period);
+      if (input.units > Math.max(0, limit - used))
+        throw new DomainError('conflict', 'monthly quota exhausted');
+      const charge = {
+        id,
+        orgId,
+        licenseId,
+        userId: p.userId,
+        requestHash,
+        entitlement: input.entitlement,
+        period,
+        units: input.units,
+        createdAt: now,
+      };
+      await tx.insertQuotaCharge(charge);
+      await tx.audit.append({
+        actor: { type: 'user', id: p.userId },
+        action: 'quota.consumed',
+        target: { type: 'license', id: licenseId },
+        orgId,
+        metadata: {
+          entitlement: input.entitlement,
+          units: input.units,
+          period,
+          receipt_id: id,
+          plan_id: ctx.plan.id,
+          plan_version: ctx.plan.version,
+          effective_limit: limit,
+        },
+      });
+      return {
+        id,
+        licenseId,
+        entitlement: input.entitlement,
+        period,
+        units: input.units,
+        createdAt: now,
+      };
+    });
+  }
+
   async listActivations(
     p: UserPrincipal,
     orgId: string,

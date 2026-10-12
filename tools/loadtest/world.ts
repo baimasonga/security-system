@@ -6,7 +6,7 @@ import { SoftwareDeviceKey } from '@trust/sdk-core';
 import { loadConfig } from '../../services/platform-api/src/config.ts';
 import { createContainer } from '../../services/platform-api/src/container.ts';
 import { MIGRATIONS_DIR, applyMigrations } from '../../services/platform-api/src/db/migrate.ts';
-import { Http, sleep, type OpResult, type Requester } from './lib.ts';
+import { Http, type OpResult, type Requester } from './lib.ts';
 
 export const SIGNING_PEM = generateKeyPairSync('ed25519')
   .privateKey.export({ type: 'pkcs8', format: 'pem' })
@@ -144,7 +144,7 @@ export async function startServer(
   const big = '10000000';
   const child: ChildProcess = spawn('node', ['services/platform-api/src/main.ts'], {
     // LT_DEBUG=1 shows the server's structured log (otherwise discarded to keep the measurement quiet).
-    stdio: ['ignore', process.env['LT_DEBUG'] ? 'inherit' : 'ignore', 'inherit'],
+    stdio: ['ignore', process.env['LT_DEBUG'] ? 'inherit' : 'ignore', 'inherit', 'ipc'],
     env: {
       ...process.env,
       ...baseEnv(dbUrl),
@@ -160,26 +160,72 @@ export async function startServer(
       ...o.extraEnv, // explicit overrides win over the tool's defaults
     },
   });
-  const base = `http://127.0.0.1:${o.port}`;
-  const probe = new Http(base, 1);
-  for (let i = 0; i < 100; i++) {
-    if (child.exitCode !== null) throw new Error('server exited during start-up');
+  const stop = async () => {
+    if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
+    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    child.kill('SIGTERM');
+    const timeout = setTimeout(() => child.kill('SIGKILL'), 5000);
     try {
-      if ((await probe.request('GET', '/healthz')).status === 200) break;
-    } catch {
-      /* not up yet */
+      await exited;
+    } finally {
+      clearTimeout(timeout);
     }
-    await sleep(100);
-  }
-  probe.destroy();
-  return {
-    pid: child.pid!,
-    base,
-    async stop() {
-      child.kill('SIGTERM');
-      await new Promise((r) => child.once('exit', r));
-    },
   };
+  try {
+    // Only the child that successfully bound its socket can acknowledge readiness.
+    // A health response from an unrelated process on the requested port is insufficient.
+    const port = await new Promise<number>((resolve, reject) => {
+      const clean = () => {
+        clearTimeout(timeout);
+        child.off('message', ready);
+        child.off('exit', exited);
+        child.off('error', failed);
+      };
+      const failed = (error: Error) => {
+        clean();
+        reject(error);
+      };
+      const exited = () => failed(new Error('server exited before readiness'));
+      const ready = (message: unknown) => {
+        if (
+          !message ||
+          typeof message !== 'object' ||
+          !('type' in message) ||
+          message.type !== 'trust-platform-ready'
+        )
+          return;
+        const port = 'port' in message ? message.port : undefined;
+        if (
+          typeof port !== 'number' ||
+          !Number.isInteger(port) ||
+          port < 1 ||
+          port > 65535 ||
+          (o.port !== 0 && port !== o.port)
+        ) {
+          failed(new Error('server readiness port mismatch'));
+          return;
+        }
+        clean();
+        resolve(port);
+      };
+      const timeout = setTimeout(() => failed(new Error('server readiness timed out')), 10000);
+      child.on('message', ready);
+      child.once('exit', exited);
+      child.once('error', failed);
+    });
+    const base = `http://127.0.0.1:${port}`;
+    const probe = new Http(base, 1);
+    try {
+      if ((await probe.request('GET', '/healthz')).status !== 200)
+        throw new Error('server health check failed');
+    } finally {
+      probe.destroy();
+    }
+    return { pid: child.pid!, base, stop };
+  } catch (e) {
+    await stop();
+    throw e;
+  }
 }
 
 // ---- virtual devices ---------------------------------------------------------------------------

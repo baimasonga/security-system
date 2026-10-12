@@ -72,3 +72,8 @@ if (container.anchors && config.auditAnchor) {
   );
 }
 await app.listen({ host: config.host, port: config.port });
+
+// Private child-process acknowledgement used by the load driver; never exposes settings or secrets.
+const address = app.server.address();
+if (process.send && process.connected && address && typeof address !== 'string')
+  process.send({ type: 'trust-platform-ready', port: address.port }, () => undefined);

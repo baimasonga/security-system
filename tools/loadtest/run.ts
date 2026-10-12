@@ -1,6 +1,6 @@
 // Load / soak test driver. Run under an ephemeral PostgreSQL:
 //   PG_FSYNC=on node tools/with-postgres.mjs node tools/loadtest/run.ts --scenario <name> [--out file.json] [opts]
-// Scenarios: audit-micro | activate-ramp | refresh-ramp | hot-license | herd | soak | pool-sweep
+// Scenarios: quota-ramp | audit-micro | activate-ramp | refresh-ramp | hot-license | herd | soak | pool-sweep
 import { writeFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import pg from 'pg';
@@ -287,6 +287,111 @@ async function activateMany(c: Ctx, devs: VDev[], concurrency: number) {
 }
 
 const scenarios: Record<string, () => Promise<void>> = {
+  async 'quota-ramp'() {
+    const limit = num('quota-limit', 1000);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 2 ** 40)
+      throw new Error('invalid quota limit');
+    await withServer(num('users', 20), 3, POOL, async (c) => {
+      const user = c.users[0]!;
+      const path = `/v1/organizations/${user.orgId}/licenses/${user.licenseId}/usage`;
+      const license = await c.http.request(
+        'GET',
+        `/v1/organizations/${user.orgId}/licenses/${user.licenseId}`,
+        undefined,
+        user.token,
+      );
+      const configured = await c.http.request(
+        'PATCH',
+        `/v1/admin/plans/${license.body.plan_id}`,
+        {
+          entitlements: { pdf_editing: true, ocr_pages_monthly: limit },
+          reason: 'Quota load verification',
+        },
+        c.operatorToken,
+      );
+      if (configured.status !== 200) throw new Error('quota plan configuration failed');
+      const operations = new Set<string>(),
+        receipts = new Set<string>();
+      const frequencies = new Map<string, number>(),
+        acceptedOperations = new Set<string>();
+      let accepted = 0,
+        exhausted = 0,
+        offset = 0;
+      const rows = [];
+      for (const rps of list('rps', [20])) {
+        const row = await step(
+          c,
+          'quota consume/retry on one license',
+          rps,
+          num('seconds', 4),
+          async (i) => {
+            const key = `load-quota-operation-${Math.floor((offset + i) / 2)}`;
+            operations.add(key);
+            frequencies.set(key, (frequencies.get(key) ?? 0) + 1);
+            const response = await c.http.request(
+              'POST',
+              path,
+              { entitlement: 'ocr_pages_monthly', units: 1, idempotency_key: key },
+              user.token,
+            );
+            if (response.status === 200) {
+              accepted++;
+              acceptedOperations.add(key);
+              receipts.add(response.body.id);
+              return { ok: true, code: 'ok' };
+            }
+            if (response.status === 409 && response.body.message === 'monthly quota exhausted') {
+              exhausted++;
+              return { ok: true, code: 'ok' };
+            }
+            return { ok: false, code: String(response.status) };
+          },
+        );
+        rows.push(row);
+        offset += row.launched;
+      }
+      const usage = await c.http.request('GET', path, undefined, user.token);
+      const expected = Math.min(limit, operations.size);
+      if (
+        usage.status !== 200 ||
+        usage.body.items[0]?.used !== expected ||
+        receipts.size !== expected
+      )
+        throw new Error('quota consumption invariant failed');
+      const expectedAccepted = [...acceptedOperations].reduce(
+        (total, key) => total + frequencies.get(key)!,
+        0,
+      );
+      const attempts = [...frequencies.values()].reduce((a, b) => a + b, 0);
+      if (
+        accepted !== expectedAccepted ||
+        exhausted !== attempts - expectedAccepted ||
+        rows.reduce((sum, row) => sum + row.server.auditAppends, 0) !== expected
+      )
+        throw new Error('quota retry/audit invariant failed');
+      result['rows'] = rows;
+      result['quota'] = {
+        limit,
+        operations: operations.size,
+        uniqueReceipts: receipts.size,
+        accepted,
+        exhausted,
+        used: usage.body.items[0].used,
+        remaining: usage.body.items[0].remaining,
+      };
+      const audit = await c.http.request(
+        'GET',
+        '/v1/admin/audit/verify',
+        undefined,
+        c.operatorToken,
+      );
+      if (audit.status !== 200 || !audit.body.ok)
+        throw new Error('quota audit verification failed');
+      result['auditVerified'] = true;
+      result['final'] = await dbStats();
+    });
+  },
+
   /**
    * Same workload with a fixed network round trip between the API and PostgreSQL. Database round trips
    * dominate per-request latency and the audit-chain lock is held across several of them plus the commit,

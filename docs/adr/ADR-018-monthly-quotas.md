@@ -1,0 +1,11 @@
+# ADR-018: Monthly quota ledger
+
+Numeric entitlements whose names end in `_monthly` opt into calendar-month metering. Limits come from the current subscription plan plus license overrides, never request bodies. UTC months reset usage by selecting a new period; historical receipts remain. Downgrades preserve usage and clamp remaining allowance to zero. Quotas are per license, shared across the organization's users; separate licenses do not share an allowance.
+
+Consumption requires a tenant session and license activation permission. Under the exclusive license row lock: resolve current commercial eligibility, check an idempotency receipt, aggregate this month's usage, enforce the limit, insert an immutable receipt, and append audit atomically. A retry with the same key and matching feature/units returns the original receipt even after month rollover; different payload is a conflict. Revoked/ineligible licenses cannot consume or replay a receipt. Nonmembers, cross-tenant and canary licenses return 404. Keys are random caller operation IDs, not authorization secrets; only their SHA-256 digests are stored or audited. Inputs contain no document text.
+
+A receipt is accounting, not a bearer capability or proof that work executed. A future server-side OCR/AI handler must use one operation ID for both consumption and durable execution deduplication; repeated receipts must never restart work. External execution does not run in retryable database transactions. There are no refunds or offline quota grants in this slice. The portal is read-only for usage, so customers do not accidentally spend allowance while exploring it.
+
+The ledger is append-only for the application role (SELECT/INSERT only), with tenant-qualified foreign keys and unique license/request-hash identity. Raw consumption clients can spend their own organization's allowance but cannot grant paid entitlements or exceed limits. All mutation checks and PostgreSQL adapter contracts cover rollback, concurrency, tenant binding and idempotency.
+
+Each consumption audit event records the resolved plan id/version and effective limit so later plan changes do not erase the policy context for the charge. No document content enters the ledger or audit.

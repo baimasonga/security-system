@@ -120,7 +120,35 @@ export interface LicenseContext {
   subscription: Subscription | undefined;
 }
 
+export interface QuotaCharge {
+  id: string;
+  orgId: string;
+  licenseId: string;
+  userId: string;
+  requestHash: string;
+  entitlement: string;
+  period: string;
+  units: number;
+  createdAt: Date;
+}
 export interface LicensingRepo {
+  listQuotaUsage(
+    orgId: string,
+    licenseId: string,
+    period: string,
+  ): Promise<Array<{ entitlement: string; used: number }>>;
+  findQuotaCharge(
+    orgId: string,
+    licenseId: string,
+    requestHash: string,
+  ): Promise<QuotaCharge | undefined>;
+  getQuotaUsed(
+    orgId: string,
+    licenseId: string,
+    entitlement: string,
+    period: string,
+  ): Promise<number>;
+  insertQuotaCharge(charge: QuotaCharge): Promise<void>;
   insertProduct(p: Product): Promise<void>;
   findProductById(id: string): Promise<Product | undefined>;
   findProductByCode(code: string): Promise<Product | undefined>;

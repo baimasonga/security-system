@@ -339,3 +339,20 @@ All four runs: 80 completed, 80 expected audit appends, zero deadlocks, transact
 Baseline `ce22b18` versus per-chain ordered acquisition. Fresh independent PostgreSQL 17 databases, fsync on, no concurrent test suites. Each soak uses 80 users, 50 requests/second, 15 seconds: 750 launched/completed/successful, zero drops/errors, zero retries/exhaustion/deadlocks. Both audit chains verify; verified event count equals the exact audit row invariant, consumed challenges equal 830 (80 initial activations plus 750 workload requests), and no license exceeds its device limit. Mixed-workload audit and lease counts vary with the sampled operations and are not compared as fixed totals. Baseline p50/p99 27.01/35.48 ms; correction 26.82/33.34 ms.
 
 Hot-license refresh smoke: 32 devices, 50 requests/second, four seconds each on one license and spread across licenses. Both: 200 launched/completed/successful, 200 expected audit appends, zero drops/errors/deadlocks/retry exhaustion. p50/p99: one license 27.49/31.93 ms; spread 27.04/29.90 ms. These short runs establish regression behavior, not capacity or a speedup. Deterministic creation-race and concurrent multi-chain tests cover the corrected lock ordering directly. Local artifacts: `/workspace/.setup/audit-order-{base_soak,new_soak,new_hot}.json`.
+
+### 3.17 Monthly quotas and load-server readiness (2026-10-12)
+
+Baseline `49d7655` versus quota release. Fresh independent PostgreSQL 17 databases, fsync verified on, 40 users, 20 requests/second for four seconds per activation/refresh scenario. Sequential isolated comparison after all application/database tests finished. An earlier overlapping run exposed the tool's occupied-port readiness bug; those measurements are not used here. The tool now requires its own child's private readiness acknowledgement before probing health; a regression test fails against the previous implementation.
+
+| Revision / scenario | p50 ms | p99 ms | Successful / launched |
+| ------------------- | ------ | ------ | --------------------- |
+| base activate       | 60.95  | 79.4   | 80 / 80               |
+| base refresh        | 59.13  | 67.07  | 80 / 80               |
+| new activate        | 60.74  | 75.23  | 80 / 80               |
+| new refresh         | 58.72  | 71.9   | 80 / 80               |
+
+Every comparison run: 80 completed, 80 expected audit appends, zero drops/errors/deadlocks/exhausted transactions. This short smoke does not establish capacity or a speedup. PostgreSQL CPU is unavailable to the local harness and is not interpreted as zero load.
+
+Quota contention after the comparison: one shared license with allowance 20; 50 requests/second for four seconds; each operation is attempted twice. All 200 requests complete: 40 HTTP successes return 20 unique receipts, and 160 expected quota refusals occur. Exact ledger usage is 20, remaining is zero, exactly 20 audit appends occur and the full audit chain verifies. Zero drops, unexpected errors, deadlocks or exhausted transactions. p50/p99 24.39/33 ms. A lighter CI smoke at 20 requests/second separately checks 40 operation IDs, 20 receipts, 40 successes and 40 quota refusals. PostgreSQL mutation testing catches replacing the exclusive license lock with a shared lock, proving the concurrent-budget regression is sensitive to that control.
+
+Artifacts: `/workspace/.setup/quota-load-{base,new}-{activate,refresh}.json` and `/workspace/.setup/quota-final-{light,stress}.json`.
