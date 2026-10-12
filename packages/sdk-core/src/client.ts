@@ -37,6 +37,25 @@ export interface Entitlements {
   refreshAfter: Date | null;
 }
 
+/** Online authoritative usage; timestamps use the API's ISO 8601 wire format. */
+export interface QuotaUsage {
+  license_id: string;
+  period: string;
+  resets_at: string;
+  status: 'valid' | 'unavailable';
+  items: Array<{ entitlement: string; limit: number; used: number; remaining: number }>;
+}
+
+/** Accounting receipt, not an execution capability or proof of completed work. */
+export interface QuotaReceipt {
+  id: string;
+  license_id: string;
+  entitlement: string;
+  period: string;
+  units: number;
+  created_at: string;
+}
+
 const K = {
   lease: 'lease',
   activation: 'activation_id',
@@ -209,6 +228,47 @@ export class TrustPlatformClient {
     await this.#deviceCall('deactivate', '/v1/licenses/deactivate');
     await this.#o.store.delete(K.lease);
     await this.#o.store.delete(K.activation);
+  }
+
+  #usagePath(sessionToken: string, orgId: string, licenseId: string): string {
+    if (!sessionToken || !/^[A-Za-z0-9_-]+$/.test(orgId) || !/^[A-Za-z0-9_-]+$/.test(licenseId))
+      throw new PlatformError(
+        'invalid_request',
+        0,
+        'session and valid organization/license IDs are required',
+      );
+    return `/v1/organizations/${orgId}/licenses/${licenseId}/usage`;
+  }
+
+  /** Online only. Remaining allowance does not authorize execution. */
+  async getUsage(sessionToken: string, orgId: string, licenseId: string): Promise<QuotaUsage> {
+    return this.#call(
+      'GET',
+      this.#usagePath(sessionToken, orgId, licenseId),
+      undefined,
+      sessionToken,
+    );
+  }
+
+  /** Persist one operation ID per logical job and reuse it on retries, including after restart.
+   * No automatic retry: the caller owns durable job deduplication and execution ordering.
+   */
+  async consumeQuota(
+    sessionToken: string,
+    orgId: string,
+    licenseId: string,
+    input: { entitlement: string; units: number; idempotencyKey: string },
+  ): Promise<QuotaReceipt> {
+    return this.#call(
+      'POST',
+      this.#usagePath(sessionToken, orgId, licenseId),
+      {
+        entitlement: input.entitlement,
+        units: input.units,
+        idempotency_key: input.idempotencyKey,
+      },
+      sessionToken,
+    );
   }
 
   /** Offline-capable: answers from the locally stored, locally verified lease. */
