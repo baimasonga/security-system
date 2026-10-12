@@ -96,3 +96,5 @@ The portal supports catalog browsing/trials, licenses and entitlements, device d
 See [feature program](docs/architecture/08-feature-program.md) and [proposed advanced requirements](docs/architecture/09-advanced-feature-requirements.md) for remaining work. Email verification and password recovery are implemented and activate with the optional Resend configuration described in the deployment guide. Billing, MFA/passkeys, hardware trust, signed update roots, workspace storage and privileged dual control remain unfinished.
 
 Provider integration foundations include a tested Resend delivery adapter, explicit local mail capture, and Paddle webhook-signature verification. Recovery routes now use hashed, expiring, single-use PostgreSQL tokens and revoke sessions on password reset. Billing routes still require durable event processing, checkout/account mapping and provider configuration.
+
+Authenticator MFA setup and recovery codes are available in Account when `MFA_ENCRYPTION_KEY` is configured. See [MFA rollout](docs/deploy/first-deploy.md#authenticator-mfa-rollout-adr-017) before enabling operator enforcement.

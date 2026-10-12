@@ -60,3 +60,11 @@ Run migration `0006_identity_recovery` and then `npm run db:grants` before deplo
 To enable password reset and email verification, configure `RESEND_API_KEY` securely, `EMAIL_FROM` with a verified sending domain, and `PUBLIC_ORIGIN` with the exact public HTTPS origin (for example, `https://trustplatform-api-production.up.railway.app`). The origin must have no credentials, extra path or query. With no email configuration, the portal and existing login continue working; recovery stays disabled. Do not set synthetic development keys in production.
 
 Delivery is asynchronous and provider failures are audited without message contents. A durable encrypted outbox is still pending; shutdown flushes in-flight sends, but a crash can require the user to request another link. Email verification is recorded, not yet a compulsory login gate.
+
+## Authenticator MFA rollout (ADR-017)
+
+Before deploying the MFA release, apply migration `0007_authenticator_mfa` with the owner migration connection (`npm run migrate`), then run `npm run db:grants` with `APP_DB_ROLE` and verify `npm run db:check` using the application connection. The application deliberately refuses an outdated schema; use a migration/pre-deploy job, not the API start command.
+
+Set `MFA_ENCRYPTION_KEY` securely in Railway to a newly generated random 32-byte hex key. Generate it in your password manager or trusted local secret tooling; never paste it into chat, source control or logs. Keep this key stable across instances/redeployments and back it up separately from the database. A lost/replaced key blocks MFA login, including recovery codes. MFA setup stays unavailable when the key is absent; ordinary accounts without MFA continue to work.
+
+Enroll every operator from **Account → Set up authenticator**, confirm a code, save the ten recovery codes offline, then sign in with a new code. Confirmation revokes all sessions and consumes the current code, so wait for the next code or use a recovery code. Enable `REQUIRE_OPERATOR_MFA=true` after enrollment. This setting requires the encryption key and blocks administration for unenrolled operators while still allowing enrollment. Default false supports staged rollout. Disabling MFA requires password, unused factor and a reason, and revokes all sessions. Password reset does not disable MFA.

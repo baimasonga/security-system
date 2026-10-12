@@ -25,6 +25,109 @@ tags:
   - { name: admin, description: Platform operators only }
   - { name: keys }
 paths:
+  /v1/auth/mfa/begin:
+    post:
+      summary: MFA begin
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+      responses:
+        '200':
+          description: Manual setup key and ten-minute expiration
+        '400':
+          description: Invalid input
+        '401':
+          description: Invalid credentials, code or session
+        '409':
+          description: MFA unavailable or already enabled
+        '429':
+          description: Rate limit exceeded
+  /v1/auth/mfa/confirm:
+    post:
+      summary: MFA confirm
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - password
+                - code
+              properties:
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                code:
+                  type: string
+                  pattern: ^[0-9]{6}$
+      responses:
+        '200':
+          description: Enabled; ten recovery codes shown once; all sessions revoked
+        '400':
+          description: Invalid input
+        '401':
+          description: Invalid credentials, code or session
+        '409':
+          description: MFA unavailable or already enabled
+        '429':
+          description: Rate limit exceeded
+  /v1/auth/mfa/disable:
+    post:
+      summary: MFA disable
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - password
+                - code
+                - reason
+              properties:
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                code:
+                  type: string
+                  pattern: ^(?:[0-9]{6}|[0-9a-f]{32})$
+                reason:
+                  type: string
+                  minLength: 3
+                  maxLength: 500
+      responses:
+        '204':
+          description: Disabled; all sessions revoked
+        '400':
+          description: Invalid input
+        '401':
+          description: Invalid credentials, code or session
+        '409':
+          description: MFA unavailable or already enabled
+        '429':
+          description: Rate limit exceeded
   /v1/auth/options:
     get:
       summary: auth options
@@ -223,7 +326,30 @@ paths:
     post:
       tags: [auth]
       summary: Create a session. Uniform error for unknown user / wrong password; progressive lockout.
-      requestBody: { $ref: '#/components/requestBodies/Credentials' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  minLength: 1
+                  maxLength: 254
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                code:
+                  type: string
+                  pattern: ^(?:[0-9]{6}|[0-9a-f]{32})$
+                  description: Required when MFA is enabled. Authenticator code or one unused
+                    recovery code.
       responses:
         '200':
           description: Session

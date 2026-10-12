@@ -1,6 +1,7 @@
 import { AuditBuffer } from '@trust/audit';
 import type {
   AuthRepo,
+  MfaState,
   AuthStore,
   IdentityToken,
   AuthTx,
@@ -25,6 +26,7 @@ interface UserRow {
   email: string;
   password_hash: string;
   email_verified_at?: Date | null;
+  mfa_state?: MfaState | null;
   status: 'active' | 'disabled';
   platform_role: PlatformRole;
   created_at: Date;
@@ -55,6 +57,7 @@ const user = (r: UserRow): User => ({
   email: r.email,
   passwordHash: r.password_hash,
   emailVerifiedAt: r.email_verified_at,
+  mfa: r.mfa_state,
   status: r.status,
   platformRole: r.platform_role,
   createdAt: r.created_at,
@@ -86,6 +89,12 @@ class PgAuthRepo implements AuthRepo {
     this.#db = db;
   }
 
+  async setMfa(userId: string, state: MfaState | null) {
+    await this.#db.query('UPDATE users SET mfa_state=$2::jsonb WHERE id=$1', [
+      userId,
+      state ? JSON.stringify(state) : null,
+    ]);
+  }
   async findUserForUpdate(id: string) {
     const result = await this.#db.query<UserRow>('SELECT * FROM users WHERE id=$1 FOR UPDATE', [
       id,
@@ -232,6 +241,10 @@ class PgAuthRepo implements AuthRepo {
       'INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, revoked_at) VALUES ($1,$2,$3,$4,$5,$6)',
       [s.id, s.userId, s.tokenHash, s.createdAt, s.expiresAt, s.revokedAt],
     );
+  }
+  async findSessionById(id: string) {
+    const r = await this.#db.query<SessionRow>('SELECT * FROM sessions WHERE id=$1', [id]);
+    return r.rows[0] ? session(r.rows[0]) : undefined;
   }
   async findSessionByTokenHash(hash: string) {
     const r = await this.#db.query<SessionRow>('SELECT * FROM sessions WHERE token_hash = $1', [

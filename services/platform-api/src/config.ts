@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
-import type { ScryptParams } from '@trust/auth';
+import { MfaCipher, type ScryptParams } from '@trust/auth';
 import { validateAnchorUrl } from './anchors.ts';
 import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 
 export interface PlatformConfig {
   env: 'development' | 'test' | 'production';
+  mfaEncryptionKey?: string;
+  requireOperatorMfa: boolean;
   emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
   host: string;
   port: number;
@@ -72,6 +74,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const mode = (env['NODE_ENV'] ?? 'development') as PlatformConfig['env'];
   if (!['development', 'test', 'production'].includes(mode)) throw new Error('invalid NODE_ENV');
   const prod = mode === 'production';
+  const mfaEncryptionKey = env['MFA_ENCRYPTION_KEY'];
+  if (mfaEncryptionKey) new MfaCipher(mfaEncryptionKey);
+  const requireOperatorMfa = env['REQUIRE_OPERATOR_MFA'] === 'true';
+  if (env['REQUIRE_OPERATOR_MFA'] && !['true', 'false'].includes(env['REQUIRE_OPERATOR_MFA']))
+    throw new Error('REQUIRE_OPERATOR_MFA must be true or false');
+  if (requireOperatorMfa && !mfaEncryptionKey)
+    throw new Error('MFA_ENCRYPTION_KEY is required for operator MFA');
   let emailDelivery: PlatformConfig['emailDelivery'];
   if (env['RESEND_API_KEY']) {
     const from = env['EMAIL_FROM'];
@@ -192,6 +201,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   return {
     env: mode,
     emailDelivery,
+    mfaEncryptionKey,
+    requireOperatorMfa,
     host: env['HOST'] ?? '127.0.0.1',
     port,
     trustProxy: env['TRUST_PROXY'] === '1',

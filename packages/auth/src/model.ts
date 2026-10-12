@@ -2,11 +2,19 @@ import type { AuditEventInput, AuditLog, AuditWriter } from '@trust/audit';
 import { AuditBuffer } from '@trust/audit';
 import type { OrgRole, PlatformRole } from '@trust/shared-types';
 
+export interface MfaState {
+  sealedSecret: string;
+  enabled: boolean;
+  expiresAt: number;
+  lastCounter: number;
+  recoveryHashes: string[];
+}
 export interface User {
   id: string;
   email: string;
   passwordHash: string;
   emailVerifiedAt?: Date | null;
+  mfa?: MfaState | null;
   status: 'active' | 'disabled';
   platformRole: PlatformRole;
   createdAt: Date;
@@ -45,6 +53,7 @@ export interface IdentityToken {
 }
 /** Identity data access. */
 export interface AuthRepo {
+  setMfa(userId: string, state: MfaState | null): Promise<void>;
   findUserForUpdate(id: string): Promise<User | undefined>;
   putIdentityToken(token: IdentityToken): Promise<void>;
   findUserIdentityToken(
@@ -72,6 +81,7 @@ export interface AuthRepo {
   listMembershipsForUser(userId: string): Promise<Membership[]>;
   listMembershipsForOrg(orgId: string): Promise<Membership[]>;
   insertSession(s: Session): Promise<void>;
+  findSessionById(id: string): Promise<Session | undefined>;
   findSessionByTokenHash(hash: string): Promise<Session | undefined>;
   /** `findSessionByTokenHash` plus the session's user in one read (one round trip per authenticated request). */
   findSessionWithUser(hash: string): Promise<{ session: Session; user: User } | undefined>;
@@ -132,6 +142,10 @@ class MemoryRepo implements AuthRepo {
     sessions: new Map(),
   };
 
+  async setMfa(userId: string, state: MfaState | null) {
+    const user = this.s.users.get(userId);
+    if (user) user.mfa = structuredClone(state);
+  }
   async findUserForUpdate(id: string) {
     return this.findUserById(id);
   }
@@ -179,15 +193,15 @@ class MemoryRepo implements AuthRepo {
   async insertUser(u: User) {
     if ([...this.s.users.values()].some((x) => x.email === u.email))
       throw new Error('duplicate_email');
-    this.s.users.set(u.id, { ...u });
+    this.s.users.set(u.id, structuredClone(u));
   }
   async findUserByEmail(email: string) {
     const u = [...this.s.users.values()].find((x) => x.email === email);
-    return u ? { ...u } : undefined;
+    return u ? structuredClone(u) : undefined;
   }
   async findUserById(id: string) {
     const u = this.s.users.get(id);
-    return u ? { ...u } : undefined;
+    return u ? structuredClone(u) : undefined;
   }
   async setPlatformRole(userId: string, role: 'none' | 'platform_admin') {
     const u = this.s.users.get(userId);
@@ -220,6 +234,10 @@ class MemoryRepo implements AuthRepo {
   async insertSession(s: Session) {
     this.s.sessions.set(s.id, { ...s });
   }
+  async findSessionById(id: string) {
+    const s = this.s.sessions.get(id);
+    return s ? structuredClone(s) : undefined;
+  }
   async findSessionByTokenHash(hash: string) {
     const s = [...this.s.sessions.values()].find((x) => x.tokenHash === hash);
     return s ? { ...s } : undefined;
@@ -227,7 +245,7 @@ class MemoryRepo implements AuthRepo {
   async findSessionWithUser(hash: string) {
     const s = [...this.s.sessions.values()].find((x) => x.tokenHash === hash);
     const u = s && this.s.users.get(s.userId);
-    return s && u ? { session: { ...s }, user: { ...u } } : undefined;
+    return s && u ? { session: { ...s }, user: structuredClone(u) } : undefined;
   }
   async findLoginFailure(key: string) {
     const f = this.s.loginFailures.get(key);

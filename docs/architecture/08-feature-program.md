@@ -6,7 +6,7 @@ The requested scope is every intended feature. Inventory source: architecture/01
 
 ## Current slice
 
-Portal, operator console and device demo are implemented locally against existing API flows. Authenticated catalog browsing is added to the API. Chromium verification exercises account/team/provisioning/device workflows; application and PostgreSQL suites verify security boundaries. ResendMailDelivery and MemoryMailDelivery implement a tested delivery seam; PaddleWebhookVerifier validates original-byte HMAC signatures and timestamps. Email verification and password-reset endpoints are implemented, including durable token state and session revocation; they are enabled only when Resend sender/key/origin are configured. Billing and external sign-in are not enabled. MFA, passkeys and durable delivery retry remain pending.
+Portal, operator console and device demo are implemented locally against existing API flows. Authenticated catalog browsing is added to the API. Chromium verification exercises account/team/provisioning/device workflows; application and PostgreSQL suites verify security boundaries. ResendMailDelivery and MemoryMailDelivery implement a tested delivery seam; PaddleWebhookVerifier validates original-byte HMAC signatures and timestamps. Email verification and password-reset endpoints are implemented, including durable token state and session revocation; they are enabled only when Resend sender/key/origin are configured. Billing and external sign-in are not enabled. Authenticator MFA is implemented with encrypted secrets, single-use recovery codes, replay prevention, session revocation and optional operator enforcement (ADR-017). Passkeys and durable delivery retry remain pending.
 
 ## Capability map and delivery order
 

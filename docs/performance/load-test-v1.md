@@ -320,3 +320,16 @@ Compared archived revision `31576fa` with the browser/recovery working tree on t
 | Refresh  | 59.73 / 67.46         | 59.22 / 61.24         |
 
 Login now takes a user-row lock and rechecks the verified password hash before session creation to serialize with recovery; the extra query is on login, not license validation/refresh. PostgreSQL CPU output is unavailable because the probe expects an OS `postgres` user; emitted zero must not be interpreted as measured CPU. Final table statistics are PostgreSQL estimates, not exact business-record counts. Results are saved under `/workspace/.setup/feature-load-{base,new}-{activate,refresh}.json`; regression assertions check completed flow and audit counters explicitly.
+
+### 3.15 Authenticator MFA regression smoke (2026-10-12)
+
+Baseline: `35c4c22`; MFA working tree adds migration 0007, factor consumption under the user lock, and session revocation on factor changes. Fresh independent local PostgreSQL 17 databases; fsync on; 40 seeded users, 20 requests/second for four seconds per activation/refresh scenario. Run sequentially after application/database tests finished; an earlier overlapping run is not used for latency comparison.
+
+| Revision / scenario | p50 ms | p99 ms | Successful / launched | Drops / errors |
+| ------------------- | ------ | ------ | --------------------- | -------------- |
+| base activate       | 62.33  | 94.74  | 80 / 80               | 0              |
+| base refresh        | 60.74  | 76.58  | 80 / 80               | 0              |
+| new activate        | 62.67  | 96.16  | 80 / 80               | 0              |
+| new refresh         | 59.89  | 81.38  | 80 / 80               | 0              |
+
+All four runs: 80 completed, 80 expected audit appends, zero deadlocks, transaction exhaustion or errors. This is a short regression smoke, not a capacity or performance improvement claim, and does not measure MFA login throughput. Authenticator and recovery-code concurrency is separately verified through behavioral tests on both PostgreSQL roles. PostgreSQL CPU reported by this local harness is unavailable; final table row statistics are estimates and are not used as business outcome counts. Local artifacts: `/workspace/.setup/mfa-load-{base,new}-{activate,refresh}.json`.

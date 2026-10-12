@@ -231,6 +231,8 @@ export async function createContainer(
       overrides?.identityDelivery ??
       (config.emailDelivery ? new ResendMailDelivery(config.emailDelivery) : undefined),
     publicOrigin: config.emailDelivery?.publicOrigin,
+    mfaEncryptionKey: config.mfaEncryptionKey,
+    requireOperatorMfa: config.requireOperatorMfa,
     clock,
     audit,
     ...(config.scrypt ? { config: { scrypt: config.scrypt } } : {}),

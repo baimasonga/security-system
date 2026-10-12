@@ -10,7 +10,13 @@ const reason = z.string().min(3).max(500);
 export const registerBody = z
   .object({ email: str(254), password: z.string().min(1).max(256) })
   .strict();
-export const loginBody = registerBody;
+const factorCode = z.string().regex(/^(?:[0-9]{6}|[0-9a-f]{32})$/);
+export const loginBody = registerBody.extend({ code: factorCode.optional() }).strict();
+export const mfaBeginBody = z.object({ password: str(256) }).strict();
+export const mfaConfirmBody = mfaBeginBody
+  .extend({ code: z.string().regex(/^[0-9]{6}$/) })
+  .strict();
+export const mfaDisableBody = mfaBeginBody.extend({ code: factorCode, reason }).strict();
 export const emptyBody = z.object({}).strict();
 export const recoveryRequestBody = z.object({ email: str(254) }).strict();
 export const verificationBody = z.object({ token: str(128) }).strict();

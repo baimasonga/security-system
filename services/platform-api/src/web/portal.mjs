@@ -96,6 +96,7 @@ function fieldsForm(specs, submitText, action) {
       input.value = spec.value ?? '';
       if (spec.type === 'password') input.autocomplete = spec.autocomplete || 'current-password';
       else if (spec.type === 'email') input.autocomplete = 'email';
+      if (spec.autocomplete) input.autocomplete = spec.autocomplete;
     }
     input.name = spec.name;
     input.setAttribute('aria-label', spec.label);
@@ -133,7 +134,7 @@ function fieldsForm(specs, submitText, action) {
   });
   return form;
 }
-function showSecret(secret, heading = 'Save your license key') {
+function showSecret(secret, heading = 'Save your license key', label = 'One-time license key') {
   const box = $('modal-content');
   box.replaceChildren(
     node('h2', heading),
@@ -145,7 +146,7 @@ function showSecret(secret, heading = 'Save your license key') {
   const input = node('input');
   input.value = secret;
   input.readOnly = true;
-  input.setAttribute('aria-label', 'One-time license key');
+  input.setAttribute('aria-label', label);
   box.append(input);
   $('modal').showModal();
   input.focus();
@@ -183,6 +184,16 @@ function renderAuth(register = false) {
           min: register ? 12 : 1,
           autocomplete: register ? 'new-password' : 'current-password',
         },
+        ...(!register
+          ? [
+              {
+                name: 'code',
+                label: 'Authenticator or recovery code (if enabled)',
+                optional: true,
+                autocomplete: 'one-time-code',
+              },
+            ]
+          : []),
       ],
       register ? 'Create account' : 'Sign in',
       async (data, form) => {
@@ -557,6 +568,7 @@ async function renderView(view) {
           email: state.principal.email,
           user_id: state.principal.user_id,
           email_verification: state.principal.email_verified ? 'Verified' : 'Not verified',
+          authenticator_mfa: state.principal.mfa_enabled ? 'Enabled' : 'Not enabled',
         }),
         ...(state.principal.recovery_configured && !state.principal.email_verified
           ? [
@@ -572,9 +584,104 @@ async function renderView(view) {
         ),
         button('Sign out', () => $('signout').click()),
       ),
+      mfaPanel(),
     ];
   if (view === 'Operator console') return operatorView();
   return [];
+}
+function mfaPanel() {
+  if (!state.principal.mfa_configured)
+    return panel(
+      node('h2', 'Authenticator protection'),
+      node('p', 'Authenticator setup is not configured on this deployment.'),
+    );
+  const card = panel(node('h2', 'Authenticator protection'));
+  if (
+    state.principal.operator_mfa_required &&
+    state.principal.platform_role === 'platform_admin' &&
+    !state.principal.mfa_enabled
+  )
+    card.append(node('p', 'Enroll an authenticator before using operator administration.'));
+  if (state.principal.mfa_enabled) {
+    card.append(
+      node(
+        'p',
+        'Disabling protection signs out every session. Your password and an unused authenticator or recovery code are required.',
+      ),
+      fieldsForm(
+        [
+          { name: 'password', label: 'Current password', type: 'password' },
+          { name: 'code', label: 'Authenticator or recovery code', autocomplete: 'one-time-code' },
+          { name: 'reason', label: 'Reason for disabling', min: 3 },
+        ],
+        'Disable authenticator',
+        async (data, form) => {
+          await api('/v1/auth/mfa/disable', 'POST', data);
+          form.reset();
+          state.token = '';
+          state.principal = null;
+          renderAuth();
+          notice('Authenticator disabled. All sessions signed out.');
+        },
+      ),
+    );
+    return card;
+  }
+  card.append(
+    node(
+      'p',
+      'Add a six-digit authenticator such as Microsoft Authenticator, Google Authenticator or a compatible password manager. Keep recovery codes safely offline.',
+    ),
+    fieldsForm(
+      [{ name: 'password', label: 'Current password', type: 'password' }],
+      'Set up authenticator',
+      async (data, form) => {
+        const setup = await api('/v1/auth/mfa/begin', 'POST', data);
+        form.reset();
+        // Setup secret exists only in this view. Navigation removes it; nothing goes to storage or a QR service.
+        const secret = node('input');
+        secret.readOnly = true;
+        secret.value = setup.setup_key;
+        secret.setAttribute('aria-label', 'Authenticator setup key');
+        card.replaceChildren(
+          node('h2', 'Confirm your authenticator'),
+          node(
+            'p',
+            'Add a manual time-based entry named Trust Platform in your authenticator. Use this setup key with six digits and a 30-second period. Setup expires in ten minutes.',
+          ),
+          secret,
+          fieldsForm(
+            [
+              { name: 'password', label: 'Current password', type: 'password' },
+              {
+                name: 'code',
+                label: 'Six-digit authenticator code',
+                autocomplete: 'one-time-code',
+              },
+            ],
+            'Enable authenticator',
+            async (confirm, confirmForm) => {
+              const result = await api('/v1/auth/mfa/confirm', 'POST', confirm);
+              confirmForm.reset();
+              secret.value = '';
+              state.token = '';
+              state.principal = null;
+              renderAuth();
+              showSecret(
+                result.recovery_codes.join(' '),
+                'Save your single-use recovery codes',
+                'One-time recovery codes',
+              );
+              notice(
+                'Authenticator enabled. All sessions signed out. Use a new code or a recovery code to sign in.',
+              );
+            },
+          ),
+        );
+      },
+    ),
+  );
+  return card;
 }
 async function licenseDetail(l) {
   const [license, ent, activations] = await Promise.all([

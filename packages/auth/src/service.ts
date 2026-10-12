@@ -1,9 +1,11 @@
+import { randomBytes } from 'node:crypto';
+import { MfaCipher, base32, matchingCounter } from './mfa.ts';
 import { newId, newSecretToken, sha256Hex } from '@trust/crypto';
 import type { AuditLog } from '@trust/audit';
 import { DomainError, type Clock, type OrgRole, type UserPrincipal } from '@trust/shared-types';
 import { hashPassword, verifyPassword, DEFAULT_SCRYPT, type ScryptParams } from './password.ts';
 import { canGrantRole, roleAllows, type Permission } from './rbac.ts';
-import type { AuthStore, Membership, Organization, User } from './model.ts';
+import type { AuthStore, AuthTx, MfaState, Membership, Organization, User } from './model.ts';
 
 export interface AuthConfig {
   sessionTtlMs: number;
@@ -26,6 +28,8 @@ export interface IdentityDelivery {
   send(message: { id: string; to: string; subject: string; text: string }): Promise<{ id: string }>;
 }
 export class AuthService {
+  readonly #mfa: MfaCipher | undefined;
+  readonly #requireOperatorMfa: boolean;
   readonly #mail: IdentityDelivery | undefined;
   readonly #publicOrigin: string;
   readonly #deliveries = new Set<Promise<void>>();
@@ -42,8 +46,14 @@ export class AuthService {
     config?: Partial<AuthConfig>;
     identityDelivery?: IdentityDelivery;
     publicOrigin?: string;
+    mfaEncryptionKey?: string;
+    requireOperatorMfa?: boolean;
   }) {
     this.#store = deps.store;
+    this.#mfa = deps.mfaEncryptionKey ? new MfaCipher(deps.mfaEncryptionKey) : undefined;
+    this.#requireOperatorMfa = deps.requireOperatorMfa ?? false;
+    if (this.#requireOperatorMfa && !this.#mfa)
+      throw new Error('MFA key required for operator enforcement');
     this.#mail = deps.identityDelivery;
     this.#publicOrigin = deps.publicOrigin ?? 'http://localhost:8080';
     this.#clock = deps.clock;
@@ -112,6 +122,7 @@ export class AuthService {
   async login(input: {
     email: string;
     password: string;
+    code?: string;
   }): Promise<{ token: string; expiresAt: Date; userId: string }> {
     const email = input.email.trim().toLowerCase();
     const now = this.#clock.now();
@@ -147,14 +158,24 @@ export class AuthService {
       });
       throw new DomainError('unauthenticated', BAD_LOGIN);
     }
-    if (fail) await this.#store.clearLoginFailure(failKey);
     const token = newSecretToken('sess');
     const expiresAt = new Date(now.getTime() + this.#cfg.sessionTtlMs);
     const sessionId = newId('ses');
-    await this.#store.transaction(async (tx) => {
+    const issued = await this.#store.transaction(async (tx) => {
       const current = await tx.findUserForUpdate(user.id);
       if (!current || current.status !== 'active' || current.passwordHash !== user.passwordHash)
-        throw new DomainError('unauthenticated', BAD_LOGIN);
+        return false;
+      const locked = await tx.findLoginFailure(failKey);
+      if (locked?.lockedUntil && locked.lockedUntil > this.#clock.now()) return false;
+      if (current.mfa?.enabled) {
+        const updated = this.#consumeFactor(current, input.code ?? '', this.#clock.now());
+        if (!updated) {
+          await this.#recordFactorFailure(tx, user.id, failKey);
+          return false;
+        }
+        await tx.setMfa(user.id, updated);
+      }
+      await tx.clearLoginFailure(failKey);
       await tx.insertSession({
         id: sessionId,
         userId: user.id,
@@ -168,7 +189,9 @@ export class AuthService {
         action: 'user.login_succeeded',
         metadata: { session_id: sessionId },
       });
+      return true;
     });
+    if (!issued) throw new DomainError('unauthenticated', BAD_LOGIN);
     return { token, expiresAt, userId: user.id };
   }
 
@@ -185,7 +208,154 @@ export class AuthService {
       emailVerified: !!user.emailVerifiedAt,
       platformRole: user.platformRole,
       recoveryConfigured: !!this.#mail,
+      mfaConfigured: !!this.#mfa,
+      mfaEnabled: !!user.mfa?.enabled,
+      operatorMfaRequired: this.#requireOperatorMfa,
     };
+  }
+
+  #consumeFactor(user: User, code: string, now: Date): MfaState | undefined {
+    const factor = user.mfa;
+    if (!factor?.enabled || !this.#mfa) return undefined;
+    let secret: Buffer;
+    try {
+      secret = this.#mfa.open(user.id, factor.sealedSecret);
+    } catch {
+      return undefined;
+    }
+    const recoveryHash = sha256Hex(code);
+    if (/^[0-9a-f]{32}$/.test(code) && factor.recoveryHashes.includes(recoveryHash))
+      return { ...factor, recoveryHashes: factor.recoveryHashes.filter((h) => h !== recoveryHash) };
+    const counter = matchingCounter(secret, code, now.getTime(), factor.lastCounter);
+    return counter === undefined ? undefined : { ...factor, lastCounter: counter };
+  }
+  async #recordFactorFailure(tx: AuthTx, userId: string, key: string) {
+    const { count } = await tx.recordLoginFailure(
+      key,
+      this.#clock.now(),
+      this.#cfg.maxFailedLogins,
+      this.#cfg.lockoutMs,
+    );
+    await tx.audit.append({
+      actor: { type: 'user', id: userId },
+      action: 'identity.factor_failed',
+      metadata: { consecutive_failures: count },
+    });
+  }
+  async #failedFactor(userId: string, key: string) {
+    await this.#store.transaction(async (tx) => {
+      await tx.findUserForUpdate(userId);
+      await this.#recordFactorFailure(tx, userId, key);
+    });
+  }
+  async #mfaChange<T>(
+    principal: UserPrincipal,
+    password: string,
+    change: (tx: AuthTx, user: User, now: Date) => Promise<T>,
+  ): Promise<T> {
+    if (!this.#mfa) throw new DomainError('conflict', 'MFA is not configured');
+    const user = await this.#store.findUserById(principal.userId);
+    if (!user) throw new DomainError('unauthenticated', 'authentication required');
+    const key = sha256Hex(user.email);
+    const fail = await this.#store.findLoginFailure(key);
+    const ok = await verifyPassword(password.slice(0, 256), user.passwordHash);
+    if (!ok || (fail?.lockedUntil && fail.lockedUntil > this.#clock.now())) {
+      await this.#failedFactor(user.id, key);
+      throw new DomainError('unauthenticated', 'invalid credentials or code');
+    }
+    const result = await this.#store.transaction(
+      async (tx): Promise<{ ok: true; value: T } | { ok: false }> => {
+        const current = await tx.findUserForUpdate(user.id);
+        // Holding the user lock serializes management with reset, enrollment and login.
+        const session = await tx.findSessionById(principal.sessionId);
+        if (
+          !session ||
+          session.userId !== user.id ||
+          session.revokedAt ||
+          session.expiresAt <= this.#clock.now()
+        )
+          throw new DomainError('unauthenticated', 'authentication required');
+        if (!current || current.status !== 'active' || current.passwordHash !== user.passwordHash)
+          throw new DomainError('unauthenticated', 'invalid credentials or code');
+        const locked = await tx.findLoginFailure(key);
+        if (locked?.lockedUntil && locked.lockedUntil > this.#clock.now())
+          throw new DomainError('unauthenticated', 'invalid credentials or code');
+        try {
+          return { ok: true, value: await change(tx, current, this.#clock.now()) };
+        } catch (e) {
+          if (!(e instanceof DomainError) || e.code !== 'unauthenticated') throw e;
+          await this.#recordFactorFailure(tx, user.id, key);
+          return { ok: false };
+        }
+      },
+    );
+    if (!result.ok) throw new DomainError('unauthenticated', 'invalid credentials or code');
+    return result.value;
+  }
+  async beginMfa(principal: UserPrincipal, password: string) {
+    const secret = randomBytes(20);
+    const sealedSecret = this.#mfa?.seal(principal.userId, secret);
+    return this.#mfaChange(principal, password, async (tx, user, now) => {
+      if (user.mfa?.enabled) throw new DomainError('conflict', 'MFA is already enabled');
+      await tx.setMfa(user.id, {
+        sealedSecret: sealedSecret!,
+        enabled: false,
+        expiresAt: now.getTime() + 600000,
+        lastCounter: -1,
+        recoveryHashes: [],
+      });
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'identity.mfa_enrollment_started',
+      });
+      return { setupKey: base32(secret), expiresAt: new Date(now.getTime() + 600000) };
+    });
+  }
+  async confirmMfa(principal: UserPrincipal, password: string, code: string) {
+    const recoveryCodes = Array.from({ length: 10 }, () => randomBytes(16).toString('hex'));
+    return this.#mfaChange(principal, password, async (tx, user, now) => {
+      const factor = user.mfa;
+      if (!factor || factor.enabled || factor.expiresAt <= now.getTime())
+        throw new DomainError('unauthenticated', 'invalid credentials or code');
+      const counter = matchingCounter(
+        this.#mfa!.open(user.id, factor.sealedSecret),
+        code,
+        now.getTime(),
+        -1,
+      );
+      if (counter === undefined)
+        throw new DomainError('unauthenticated', 'invalid credentials or code');
+      await tx.setMfa(user.id, {
+        ...factor,
+        enabled: true,
+        expiresAt: 0,
+        lastCounter: counter,
+        recoveryHashes: recoveryCodes.map(sha256Hex),
+      });
+      await tx.revokeUserSessions(user.id, now);
+      await tx.clearLoginFailure(sha256Hex(user.email));
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'identity.mfa_enabled',
+      });
+      return { recoveryCodes };
+    });
+  }
+  async disableMfa(principal: UserPrincipal, password: string, code: string, reason: string) {
+    if (reason.trim().length < 3 || reason.length > 500)
+      throw new DomainError('invalid_request', 'a reason is required');
+    return this.#mfaChange(principal, password, async (tx, user, now) => {
+      if (!this.#consumeFactor(user, code, now))
+        throw new DomainError('unauthenticated', 'invalid credentials or code');
+      await tx.setMfa(user.id, null);
+      await tx.revokeUserSessions(user.id, now);
+      await tx.clearLoginFailure(sha256Hex(user.email));
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'identity.mfa_disabled',
+        reason: reason.trim(),
+      });
+    });
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -285,6 +455,7 @@ export class AuthService {
         throw refuse();
       if (hash) {
         await tx.setPasswordHash(user.id, hash);
+        if (current.mfa && !current.mfa.enabled) await tx.setMfa(user.id, null);
         await tx.revokeUserSessions(user.id, now);
         await tx.clearLoginFailure(sha256Hex(user.email));
       } else await tx.markEmailVerified(user.id, now);
@@ -318,6 +489,7 @@ export class AuthService {
 
   async logout(principal: UserPrincipal): Promise<void> {
     await this.#store.transaction(async (tx) => {
+      await tx.findUserForUpdate(principal.userId);
       await tx.revokeSession(principal.sessionId, this.#clock.now());
       await tx.audit.append({
         actor: { type: 'user', id: principal.userId },
@@ -473,7 +645,12 @@ export class AuthService {
   async requirePlatformAdmin(p: UserPrincipal): Promise<void> {
     // Re-read from the store: a revoked operator loses access without waiting for session expiry.
     const u = await this.#store.findUserById(p.userId);
-    if (!u || u.status !== 'active' || u.platformRole !== 'platform_admin') {
+    if (
+      !u ||
+      u.status !== 'active' ||
+      u.platformRole !== 'platform_admin' ||
+      (this.#requireOperatorMfa && !u.mfa?.enabled)
+    ) {
       await this.#audit.append({
         actor: { type: 'user', id: p.userId },
         action: 'admin.access_denied',

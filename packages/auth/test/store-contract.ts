@@ -21,6 +21,37 @@ const user = (n: string, over = {}) => ({
 /** One definition of correct AuthStore behaviour, run against every adapter. */
 export function authStoreContract(name: string, make: () => AuthHarness | Promise<AuthHarness>) {
   describe(`AuthStore contract: ${name}`, () => {
+    it('persists MFA state as copies and rolls factor changes back with audit', async () => {
+      const h = await make();
+      const u = user('mfa');
+      await h.store.insertUser(u);
+      const factor = {
+        sealedSecret: 'ciphertext',
+        enabled: true,
+        expiresAt: 0,
+        lastCounter: 42,
+        recoveryHashes: ['digest'],
+      };
+      await h.store.transaction(async (tx) => {
+        await tx.findUserForUpdate(u.id);
+        await tx.setMfa(u.id, factor);
+        await tx.audit.append({ actor: { type: 'user', id: u.id }, action: 'mfa.enabled' });
+      });
+      factor.recoveryHashes.push('external');
+      const found = (await h.store.findUserById(u.id))!;
+      expect(found.mfa?.recoveryHashes).toEqual(['digest']);
+      found.mfa!.recoveryHashes.push('reader');
+      expect((await h.store.findUserByEmail(u.email))?.mfa?.recoveryHashes).toEqual(['digest']);
+      await expect(
+        h.store.transaction(async (tx) => {
+          await tx.setMfa(u.id, null);
+          throw new Error('rollback factor');
+        }),
+      ).rejects.toThrow('rollback factor');
+      expect((await h.store.findUserById(u.id))?.mfa?.enabled).toBe(true);
+      await h.store.setMfa(u.id, null);
+      expect((await h.store.findUserById(u.id))?.mfa).toBeNull();
+    });
     it('holds the user lock until the transaction completes', async () => {
       const { store: s } = await make();
       const u = user('locking');
@@ -180,6 +211,8 @@ export function authStoreContract(name: string, make: () => AuthHarness | Promis
         revokedAt: null,
       });
       expect(await s.findSessionByTokenHash('ses_1')).toBeUndefined();
+      expect(await s.findSessionById('ses_1')).toMatchObject({ userId: 'usr_a' });
+      expect(await s.findSessionById('missing')).toBeUndefined();
       const first = new Date(T.getTime() + 1000);
       await s.revokeSession('ses_1', first);
       await s.revokeSession('ses_1', new Date(T.getTime() + 9000));

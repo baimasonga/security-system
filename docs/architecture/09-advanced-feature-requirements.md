@@ -4,7 +4,7 @@ The original brief is absent and the user has no further acceptance criteria. Th
 
 ## Identity
 
-Verification and reset links are single-use, expire, are stored only as hashes, and do not reveal whether an email is registered. Password reset revokes all existing sessions atomically. TOTP enrolls only after password reauthentication and first-code verification; recovery codes are hashed and consumed once. Operators require MFA before privileged actions. Passkeys use WebAuthn with challenge expiry, origin/RP binding and verified signature counters; no custom protocol. Supabase federated identities map explicitly to local accounts and organization memberships; matching an email alone cannot link accounts.
+Verification and reset links are single-use, expire, are stored only as hashes, and do not reveal whether an email is registered. Password reset revokes all existing sessions atomically. TOTP enrolls only after password reauthentication and first-code verification; recovery codes are hashed and consumed once. Operator MFA enforcement is implemented as a staged rollout setting (`REQUIRE_OPERATOR_MFA=true`); enable it after enrolling all operators (ADR-017). Passkeys use WebAuthn with challenge expiry, origin/RP binding and verified signature counters; no custom protocol. Supabase federated identities map explicitly to local accounts and organization memberships; matching an email alone cannot link accounts.
 
 ## Billing, capabilities, usage and seats
 

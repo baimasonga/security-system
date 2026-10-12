@@ -3,6 +3,9 @@ import type { Container } from '../container.ts';
 import { authenticated, parse, principalOf, toWire } from '../http.ts';
 import {
   loginBody,
+  mfaBeginBody,
+  mfaConfirmBody,
+  mfaDisableBody,
   registerBody,
   recoveryRequestBody,
   recoveryCompleteBody,
@@ -12,6 +15,23 @@ import {
 
 export function registerAuthRoutes(app: FastifyInstance, c: Container): void {
   const rl = c.config.rateLimits;
+  const mfaOptions = {
+    preHandler: authenticated(c),
+    config: { rateLimit: { max: rl.login, timeWindow: '1 minute' } },
+  };
+  app.post('/v1/auth/mfa/begin', mfaOptions, async (req) => {
+    const body = parse(mfaBeginBody, req.body);
+    return toWire(await c.auth.beginMfa(principalOf(req), body.password));
+  });
+  app.post('/v1/auth/mfa/confirm', mfaOptions, async (req) => {
+    const body = parse(mfaConfirmBody, req.body);
+    return toWire(await c.auth.confirmMfa(principalOf(req), body.password, body.code));
+  });
+  app.post('/v1/auth/mfa/disable', mfaOptions, async (req, reply) => {
+    const body = parse(mfaDisableBody, req.body);
+    await c.auth.disableMfa(principalOf(req), body.password, body.code, body.reason);
+    return reply.status(204).send();
+  });
   app.get('/v1/auth/options', async () => ({
     email_recovery_configured: c.auth.deliveryConfigured,
   }));
