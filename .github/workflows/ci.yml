@@ -40,6 +40,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx vitest run --project unit packages/sdk-core/test/windows-dpapi.native.test.ts
+      - name: Diagnose native failure with a disposable non-secret fixture
+        if: failure()
+        run: node tools/diagnose-windows-store.ts
 
   database:
     name: PostgreSQL migration and schema tests
