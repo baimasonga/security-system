@@ -86,3 +86,13 @@ Dependency direction is enforced mechanically (`npm run lint`); see
 
 Start at [docs/README.md](docs/README.md). Security reporting: [SECURITY.md](SECURITY.md).
 Contributor/agent rules: [CLAUDE.md](CLAUDE.md).
+
+## Browser portal
+
+Open the service root `/` after startup. It serves the customer portal and, for platform operators, the operator console. The browser and API share an origin, so Railway needs no separate frontend service or CORS override. Login sessions remain in memory; reloading signs the browser out. New accounts have personal workspaces. The first operator still requires the audited `npm run bootstrap:operator` procedure; registration cannot grant operator privileges.
+
+The portal supports catalog browsing/trials, licenses and entitlements, device deactivation, teams and members, operator catalog/subscription/license provisioning, audit/metrics/anchors, and an Ed25519 device demo. The demo caches a non-extractable browser key and lease in IndexedDB and verifies signature/bindings offline. It demonstrates software device identity, not hardware attestation. It activates one license at a time and does not store account session tokens or license keys persistently.
+
+See [feature program](docs/architecture/08-feature-program.md) and [proposed advanced requirements](docs/architecture/09-advanced-feature-requirements.md) for remaining work. Email verification and password recovery are implemented and activate with the optional Resend configuration described in the deployment guide. Billing, MFA/passkeys, hardware trust, signed update roots, workspace storage and privileged dual control remain unfinished.
+
+Provider integration foundations include a tested Resend delivery adapter, explicit local mail capture, and Paddle webhook-signature verification. Recovery routes now use hashed, expiring, single-use PostgreSQL tokens and revoke sessions on password reset. Billing routes still require durable event processing, checkout/account mapping and provider configuration.

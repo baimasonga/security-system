@@ -3,6 +3,29 @@ import tseslint from 'typescript-eslint';
 import security from 'eslint-plugin-security';
 
 export default tseslint.config(
+  {
+    files: ['services/platform-api/src/web/*.mjs'],
+    languageOptions: {
+      globals: Object.fromEntries(
+        [
+          'document',
+          'location',
+          'history',
+          'URLSearchParams',
+          'fetch',
+          'Node',
+          'confirm',
+          'crypto',
+          'indexedDB',
+          'navigator',
+          'btoa',
+          'atob',
+          'TextEncoder',
+          'TextDecoder',
+        ].map((name) => [name, 'readonly']),
+      ),
+    },
+  },
   { ignores: ['node_modules', 'coverage', 'dist'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -38,7 +61,11 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
   {
-    files: ['services/platform-api/src/config.ts', 'services/platform-api/src/db/migrate.ts'],
+    files: [
+      'services/platform-api/src/config.ts',
+      'services/platform-api/src/db/migrate.ts',
+      'services/platform-api/src/routes/portal.ts',
+    ],
     rules: { 'security/detect-non-literal-fs-filename': 'off' }, // paths come from operator-controlled env/CLI arguments, by design
   },
   {

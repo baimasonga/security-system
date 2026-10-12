@@ -1,10 +1,61 @@
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.ts';
-import { authenticated, parse, principalOf } from '../http.ts';
-import { loginBody, registerBody } from '../schemas.ts';
+import { authenticated, parse, principalOf, toWire } from '../http.ts';
+import {
+  loginBody,
+  registerBody,
+  recoveryRequestBody,
+  recoveryCompleteBody,
+  verificationBody,
+  emptyBody,
+} from '../schemas.ts';
 
 export function registerAuthRoutes(app: FastifyInstance, c: Container): void {
   const rl = c.config.rateLimits;
+  app.get('/v1/auth/options', async () => ({
+    email_recovery_configured: c.auth.deliveryConfigured,
+  }));
+  app.post(
+    '/v1/auth/password/request',
+    { config: { rateLimit: { max: rl.register, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const { email } = parse(recoveryRequestBody, req.body);
+      await c.auth.requestPasswordReset(email);
+      return reply
+        .status(202)
+        .send({ message: 'If the account can receive email, a recovery link will be sent.' });
+    },
+  );
+  app.post(
+    '/v1/auth/password/reset',
+    { config: { rateLimit: { max: rl.login, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const { token, password } = parse(recoveryCompleteBody, req.body);
+      await c.auth.completeIdentityToken(token, 'reset', password);
+      return reply.status(204).send();
+    },
+  );
+  app.post(
+    '/v1/auth/email/request',
+    {
+      preHandler: authenticated(c),
+      config: { rateLimit: { max: rl.register, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      parse(emptyBody, req.body);
+      await c.auth.requestEmailVerification(principalOf(req));
+      return reply.status(202).send({ message: 'A verification link will be sent when needed.' });
+    },
+  );
+  app.post(
+    '/v1/auth/email/verify',
+    { config: { rateLimit: { max: rl.login, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const { token } = parse(verificationBody, req.body);
+      await c.auth.completeIdentityToken(token, 'verify');
+      return reply.status(204).send();
+    },
+  );
 
   app.post(
     '/v1/auth/register',
@@ -36,6 +87,6 @@ export function registerAuthRoutes(app: FastifyInstance, c: Container): void {
 
   app.get('/v1/auth/me', { preHandler: authenticated(c) }, async (req) => {
     const p = principalOf(req);
-    return { user_id: p.userId, platform_role: p.platformRole };
+    return toWire(await c.auth.account(p));
   });
 }

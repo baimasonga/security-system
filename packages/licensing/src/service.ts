@@ -1008,6 +1008,16 @@ export class LicensingService {
     return out;
   }
 
+  async catalogProducts(): Promise<Product[]> {
+    return (await this.#d.store.listProducts()).filter((p) => p.status === 'active');
+  }
+
+  async catalogPlans(productId: string): Promise<Plan[]> {
+    const product = await this.#d.store.findProductById(productId);
+    if (!product || product.status !== 'active') throw new DomainError('not_found', 'not found');
+    return this.#d.store.listPlans(productId);
+  }
+
   trustBundle() {
     return this.#d.keyring.trustBundle('license');
   }

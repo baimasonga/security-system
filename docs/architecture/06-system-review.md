@@ -1,6 +1,6 @@
 # System behavior and review
 
-The system is a backend trust and licensing API. Railway runs the Node/Fastify service; Supabase provides PostgreSQL. The root URL has no UI. `/healthz` confirms the HTTP process responds, not ongoing database connectivity.
+The system is a backend trust and licensing API. Railway runs the Node/Fastify service; Supabase provides PostgreSQL. The root URL serves the same-origin customer portal, operator console and device demo (ADR-015). `/healthz` confirms the HTTP process responds, not ongoing database connectivity.
 
 ## Request and trust flow
 

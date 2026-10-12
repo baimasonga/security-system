@@ -17,6 +17,7 @@ const ALL: Priv[] = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   schema_migrations: R, // read by the startup guard; only the owner migrates
   users: RIU,
+  identity_tokens: ALL, // expiring single-use reset/verification hashes
   organizations: RI,
   memberships: RI,
   sessions: RIU,

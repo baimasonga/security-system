@@ -1,4 +1,5 @@
-import { AuthService, InMemoryAuthStore, type AuthStore } from '@trust/auth';
+import { ResendMailDelivery } from './integrations/mail.ts';
+import { AuthService, InMemoryAuthStore, type AuthStore, type IdentityDelivery } from '@trust/auth';
 import { InMemoryAuditLog, type AuditLog } from '@trust/audit';
 import { KeyRing, kidForPublicKey, type KeyRecord } from '@trust/crypto';
 import {
@@ -67,6 +68,7 @@ export interface Container {
 
 export interface ContainerOverrides {
   clock?: Clock;
+  identityDelivery?: IdentityDelivery;
   licensing?: Partial<LicensingConfig>;
   /** Test seam: a ready-made pool (e.g. schema-scoped). Implies postgres persistence. */
   pool?: PgPool;
@@ -225,6 +227,10 @@ export async function createContainer(
 
   const auth = new AuthService({
     store: authStore,
+    identityDelivery:
+      overrides?.identityDelivery ??
+      (config.emailDelivery ? new ResendMailDelivery(config.emailDelivery) : undefined),
+    publicOrigin: config.emailDelivery?.publicOrigin,
     clock,
     audit,
     ...(config.scrypt ? { config: { scrypt: config.scrypt } } : {}),
@@ -309,6 +315,7 @@ export async function createContainer(
     async close() {
       if (closed) return;
       closed = true;
+      await auth.flushIdentityMail();
       await writes.flush().catch(() => undefined);
       await (telemetrySink as { flush?: () => Promise<void> }).flush?.().catch(() => undefined);
       if (usePg) setTransactionObserver({});

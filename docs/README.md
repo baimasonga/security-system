@@ -36,3 +36,12 @@ Architecture decision records:
 10. [ADR-010 — External audit anchor](adr/ADR-010-external-audit-anchor.md)
 11. [ADR-011 — Shared abuse-control state](adr/ADR-011-shared-abuse-control-state.md)
 12. [ADR-012 — Managed PostgreSQL profile (Supabase)](adr/ADR-012-managed-postgres-profile.md) · [Supabase deployment guide](deploy/supabase.md) · [First deploy checklist](deploy/first-deploy.md)
+
+Current browser and identity work:
+
+- [ADR-015 — Browser portal](adr/ADR-015-browser-portal.md)
+- [ADR-016 — Email verification and password recovery](adr/ADR-016-identity-recovery.md)
+- [Feature implementation program](architecture/08-feature-program.md)
+- [Proposed advanced requirements](architecture/09-advanced-feature-requirements.md)
+
+Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Advanced billing, MFA/passkeys, device trust, update roots, workspace and dual-control capabilities are still tracked as remaining work, not completed features.

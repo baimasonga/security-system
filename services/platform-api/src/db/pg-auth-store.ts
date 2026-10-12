@@ -2,6 +2,7 @@ import { AuditBuffer } from '@trust/audit';
 import type {
   AuthRepo,
   AuthStore,
+  IdentityToken,
   AuthTx,
   Membership,
   Organization,
@@ -23,6 +24,7 @@ interface UserRow {
   id: string;
   email: string;
   password_hash: string;
+  email_verified_at?: Date | null;
   status: 'active' | 'disabled';
   platform_role: PlatformRole;
   created_at: Date;
@@ -52,6 +54,7 @@ const user = (r: UserRow): User => ({
   id: r.id,
   email: r.email,
   passwordHash: r.password_hash,
+  emailVerifiedAt: r.email_verified_at,
   status: r.status,
   platformRole: r.platform_role,
   createdAt: r.created_at,
@@ -83,6 +86,78 @@ class PgAuthRepo implements AuthRepo {
     this.#db = db;
   }
 
+  async findUserForUpdate(id: string) {
+    const result = await this.#db.query<UserRow>('SELECT * FROM users WHERE id=$1 FOR UPDATE', [
+      id,
+    ]);
+    return result.rows[0] ? user(result.rows[0]) : undefined;
+  }
+  async putIdentityToken(t: IdentityToken) {
+    await this.#db.query(
+      `INSERT INTO identity_tokens (user_id,purpose,token_hash,created_at,expires_at,used_at) VALUES ($1,$2,$3,$4,$5,NULL) ON CONFLICT(user_id,purpose) DO UPDATE SET token_hash=EXCLUDED.token_hash,created_at=EXCLUDED.created_at,expires_at=EXCLUDED.expires_at,used_at=NULL`,
+      [t.userId, t.purpose, t.tokenHash, t.createdAt, t.expiresAt],
+    );
+  }
+  async findUserIdentityToken(
+    userId: string,
+    purpose: IdentityToken['purpose'],
+  ): Promise<IdentityToken | undefined> {
+    const result = await this.#db.query(
+      'SELECT * FROM identity_tokens WHERE user_id=$1 AND purpose=$2',
+      [userId, purpose],
+    );
+    const r = result.rows[0];
+    return r
+      ? {
+          userId: r.user_id,
+          purpose: r.purpose,
+          tokenHash: r.token_hash,
+          createdAt: r.created_at,
+          expiresAt: r.expires_at,
+          usedAt: r.used_at,
+        }
+      : undefined;
+  }
+  async findIdentityToken(hash: string): Promise<IdentityToken | undefined> {
+    const result = await this.#db.query('SELECT * FROM identity_tokens WHERE token_hash=$1', [
+      hash,
+    ]);
+    const r = result.rows[0];
+    return r
+      ? {
+          userId: r.user_id,
+          purpose: r.purpose,
+          tokenHash: r.token_hash,
+          createdAt: r.created_at,
+          expiresAt: r.expires_at,
+          usedAt: r.used_at,
+        }
+      : undefined;
+  }
+  async consumeIdentityToken(
+    userId: string,
+    purpose: IdentityToken['purpose'],
+    hash: string,
+    now: Date,
+  ) {
+    const result = await this.#db.query(
+      'UPDATE identity_tokens SET used_at=$4 WHERE user_id=$1 AND purpose=$2 AND token_hash=$3 AND used_at IS NULL AND expires_at>$4 RETURNING user_id',
+      [userId, purpose, hash, now],
+    );
+    return !!result.rowCount;
+  }
+  async setPasswordHash(userId: string, hash: string) {
+    await this.#db.query('UPDATE users SET password_hash=$2 WHERE id=$1', [userId, hash]);
+  }
+  async markEmailVerified(userId: string, now: Date) {
+    await this.#db.query('UPDATE users SET email_verified_at=$2 WHERE id=$1', [userId, now]);
+  }
+  async revokeUserSessions(userId: string, now: Date) {
+    await this.#db.query(
+      'UPDATE sessions SET revoked_at=$2 WHERE user_id=$1 AND revoked_at IS NULL',
+      [userId, now],
+    );
+  }
   async insertUser(u: User): Promise<void> {
     try {
       await this.#db.query(

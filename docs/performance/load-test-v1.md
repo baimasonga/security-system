@@ -309,3 +309,14 @@ case; tables stayed small (≤ 130k audit rows) — the audit index and verifica
    synchronized reconnect storms after outages.
 6. **Capacity planning for storage:** audit growth is the only unbounded table; plan archival or partitioning by time
    once real volumes are known (1 M devices ≈ 14 GB/year of audit at the modelled refresh rate).
+
+### 3.14 Portal and identity-recovery transaction check
+
+Compared archived revision `31576fa` with the browser/recovery working tree on the same cloud host using separate fresh databases for each scenario, `--users 40 --rps 20 --seconds 4 --assert-clean`. All four runs completed 80/80 flows with zero errors, drops, deadlocks or exhausted retries; each measured flow produced its expected audit append. This is a low-load regression smoke, not capacity or statistically significant speed evidence.
+
+| Scenario | Baseline p50/p99 (ms) | Recovery p50/p99 (ms) |
+| -------- | --------------------- | --------------------- |
+| Activate | 62.67 / 87.97         | 61.56 / 82.53         |
+| Refresh  | 59.73 / 67.46         | 59.22 / 61.24         |
+
+Login now takes a user-row lock and rechecks the verified password hash before session creation to serialize with recovery; the extra query is on login, not license validation/refresh. PostgreSQL CPU output is unavailable because the probe expects an OS `postgres` user; emitted zero must not be interpreted as measured CPU. Final table statistics are PostgreSQL estimates, not exact business-record counts. Results are saved under `/workspace/.setup/feature-load-{base,new}-{activate,refresh}.json`; regression assertions check completed flow and audit counters explicitly.

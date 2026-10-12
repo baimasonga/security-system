@@ -52,3 +52,11 @@ built in CI or on a Docker daemon (see the status document). Treat the first dep
 
 Backup + restore drill (then `tools/verify-anchor.ts` on the restored copy); a real witness; a load test from the same region;
 rotate the owner password out of any shell history; decide who may reach the owner credential (R-13).
+
+## Optional email recovery
+
+Run migration `0006_identity_recovery` and then `npm run db:grants` before deploying the browser/recovery release. Do not change existing signing keys or the license-key pepper.
+
+To enable password reset and email verification, configure `RESEND_API_KEY` securely, `EMAIL_FROM` with a verified sending domain, and `PUBLIC_ORIGIN` with the exact public HTTPS origin (for example, `https://trustplatform-api-production.up.railway.app`). The origin must have no credentials, extra path or query. With no email configuration, the portal and existing login continue working; recovery stays disabled. Do not set synthetic development keys in production.
+
+Delivery is asynchronous and provider failures are audited without message contents. A durable encrypted outbox is still pending; shutdown flushes in-flight sends, but a crash can require the user to request another link. Email verification is recorded, not yet a compulsory login gate.

@@ -118,11 +118,16 @@ export function installErrorHandling(app: FastifyInstance): void {
 }
 
 export function installSecurityHeaders(app: FastifyInstance, production: boolean): void {
-  app.addHook('onSend', async (_req, reply) => {
+  app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('cache-control', 'no-store');
     reply.header('referrer-policy', 'no-referrer');
-    reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+    reply.header(
+      'content-security-policy',
+      req.routeOptions.url === '/'
+        ? "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        : "default-src 'none'; frame-ancestors 'none'",
+    );
     reply.header('cross-origin-resource-policy', 'same-origin');
     if (production)
       reply.header('strict-transport-security', 'max-age=63072000; includeSubDomains');

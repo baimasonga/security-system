@@ -5,6 +5,7 @@ import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 
 export interface PlatformConfig {
   env: 'development' | 'test' | 'production';
+  emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
   host: string;
   port: number;
   /** Behind a reverse proxy/CDN, trust X-Forwarded-For for client IP (rate limiting). */
@@ -71,6 +72,29 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const mode = (env['NODE_ENV'] ?? 'development') as PlatformConfig['env'];
   if (!['development', 'test', 'production'].includes(mode)) throw new Error('invalid NODE_ENV');
   const prod = mode === 'production';
+  let emailDelivery: PlatformConfig['emailDelivery'];
+  if (env['RESEND_API_KEY']) {
+    const from = env['EMAIL_FROM'];
+    const origin = env['PUBLIC_ORIGIN'];
+    if (!from || /[\r\n]/.test(from) || !origin)
+      throw new Error('EMAIL_FROM and PUBLIC_ORIGIN are required with RESEND_API_KEY');
+    let url: URL;
+    try {
+      url = new URL(origin);
+    } catch {
+      throw new Error('PUBLIC_ORIGIN is not a valid origin');
+    }
+    if (
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash ||
+      (prod ? url.protocol !== 'https:' : !['http:', 'https:'].includes(url.protocol))
+    )
+      throw new Error('PUBLIC_ORIGIN must be an origin (HTTPS in production)');
+    emailDelivery = { apiKey: env['RESEND_API_KEY']!, from, publicOrigin: url.origin };
+  }
 
   const need = (name: string, fallbackLabel: string): string => {
     const v = env[name];
@@ -167,6 +191,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
 
   return {
     env: mode,
+    emailDelivery,
     host: env['HOST'] ?? '127.0.0.1',
     port,
     trustProxy: env['TRUST_PROXY'] === '1',

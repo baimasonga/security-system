@@ -25,6 +25,185 @@ tags:
   - { name: admin, description: Platform operators only }
   - { name: keys }
 paths:
+  /v1/auth/options:
+    get:
+      summary: auth options
+      security: []
+      responses:
+        '200':
+          description: Public recovery configuration
+  /v1/auth/password/request:
+    post:
+      summary: password request
+      security: []
+      responses:
+        '202':
+          description: Generic delivery acceptance
+        '400':
+          description: Invalid input or invalid/expired token
+        '409':
+          description: Email delivery not configured
+        '429':
+          description: Rate limit exceeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  minLength: 1
+                  maxLength: 254
+  /v1/auth/password/reset:
+    post:
+      summary: password reset
+      security: []
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Invalid input or invalid/expired token
+        '429':
+          description: Rate limit exceeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - password
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                password:
+                  type: string
+                  minLength: 12
+                  maxLength: 256
+  /v1/auth/email/request:
+    post:
+      summary: email request
+      security:
+        - bearer: []
+      responses:
+        '202':
+          description: Generic delivery acceptance
+        '400':
+          description: Invalid input or invalid/expired token
+        '401':
+          description: Authentication required
+        '409':
+          description: Email delivery not configured
+        '429':
+          description: Rate limit exceeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+  /v1/auth/email/verify:
+    post:
+      summary: email verify
+      security: []
+      responses:
+        '204':
+          description: Completed
+        '400':
+          description: Invalid input or invalid/expired token
+        '429':
+          description: Rate limit exceeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+  /:
+    get:
+      summary: Public portal asset
+      security: []
+      responses:
+        '200':
+          description: Portal content with no account or tenant data
+          content:
+            text/html:
+              schema: { type: string }
+  /portal.css:
+    get:
+      summary: Public portal asset
+      security: []
+      responses:
+        '200':
+          description: Portal content with no account or tenant data
+          content:
+            text/css:
+              schema: { type: string }
+  /portal.mjs:
+    get:
+      summary: Public portal asset
+      security: []
+      responses:
+        '200':
+          description: Portal content with no account or tenant data
+          content:
+            text/javascript:
+              schema: { type: string }
+  /device.mjs:
+    get:
+      summary: Public portal asset
+      security: []
+      responses:
+        '200':
+          description: Portal content with no account or tenant data
+          content:
+            text/javascript:
+              schema: { type: string }
+  /v1/catalog/products:
+    get:
+      operationId: catalogProducts
+      summary: Browse active products
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Active product catalog
+        '401':
+          description: Authentication required
+  /v1/catalog/products/{productId}/plans:
+    get:
+      operationId: catalogPlans
+      summary: Browse a product's plans
+      security: [{ bearer: [] }]
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Plan catalog
+        '401':
+          description: Authentication required
+        '404':
+          description: Product not found
   /healthz:
     get:
       summary: Liveness

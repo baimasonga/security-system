@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.ts';
 import { authenticated, parse, principalOf, toWire } from '../http.ts';
 import {
+  productParams,
   activationParams,
   entitlementsQuery,
   licenseParams,
@@ -12,6 +13,14 @@ import {
 /** Customer self-service. Every route is tenant-scoped and authorized by org membership/role. */
 export function registerLicenseRoutes(app: FastifyInstance, c: Container): void {
   const pre = { preHandler: authenticated(c) };
+
+  app.get('/v1/catalog/products', pre, async () => ({
+    items: toWire(await c.licensing.catalogProducts()),
+  }));
+  app.get('/v1/catalog/products/:productId/plans', pre, async (req) => {
+    const { productId } = parse(productParams, req.params);
+    return { items: toWire(await c.licensing.catalogPlans(productId)) };
+  });
 
   app.get('/v1/organizations/:orgId/licenses', pre, async (req) => {
     const { orgId } = parse(orgParams, req.params);

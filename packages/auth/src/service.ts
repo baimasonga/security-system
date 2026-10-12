@@ -22,7 +22,13 @@ export const DEFAULT_AUTH_CONFIG: AuthConfig = {
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,63}$/;
 const BAD_LOGIN = 'invalid email or password';
 
+export interface IdentityDelivery {
+  send(message: { id: string; to: string; subject: string; text: string }): Promise<{ id: string }>;
+}
 export class AuthService {
+  readonly #mail: IdentityDelivery | undefined;
+  readonly #publicOrigin: string;
+  readonly #deliveries = new Set<Promise<void>>();
   readonly #store: AuthStore;
   readonly #clock: Clock;
   readonly #audit: AuditLog;
@@ -34,8 +40,12 @@ export class AuthService {
     clock: Clock;
     audit: AuditLog;
     config?: Partial<AuthConfig>;
+    identityDelivery?: IdentityDelivery;
+    publicOrigin?: string;
   }) {
     this.#store = deps.store;
+    this.#mail = deps.identityDelivery;
+    this.#publicOrigin = deps.publicOrigin ?? 'http://localhost:8080';
     this.#clock = deps.clock;
     this.#audit = deps.audit;
     this.#cfg = { ...DEFAULT_AUTH_CONFIG, ...deps.config };
@@ -142,6 +152,9 @@ export class AuthService {
     const expiresAt = new Date(now.getTime() + this.#cfg.sessionTtlMs);
     const sessionId = newId('ses');
     await this.#store.transaction(async (tx) => {
+      const current = await tx.findUserForUpdate(user.id);
+      if (!current || current.status !== 'active' || current.passwordHash !== user.passwordHash)
+        throw new DomainError('unauthenticated', BAD_LOGIN);
       await tx.insertSession({
         id: sessionId,
         userId: user.id,
@@ -157,6 +170,130 @@ export class AuthService {
       });
     });
     return { token, expiresAt, userId: user.id };
+  }
+
+  get deliveryConfigured() {
+    return !!this.#mail;
+  }
+
+  async account(principal: UserPrincipal) {
+    const user = await this.#store.findUserById(principal.userId);
+    if (!user) throw new DomainError('unauthenticated', 'authentication required');
+    return {
+      userId: user.id,
+      email: user.email,
+      emailVerified: !!user.emailVerifiedAt,
+      platformRole: user.platformRole,
+      recoveryConfigured: !!this.#mail,
+    };
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    await this.#requestIdentityToken(email, 'reset');
+  }
+  async requestEmailVerification(principal: UserPrincipal): Promise<void> {
+    const user = await this.#store.findUserById(principal.userId);
+    if (!user) throw new DomainError('unauthenticated', 'authentication required');
+    if (user.emailVerifiedAt) return;
+    await this.#requestIdentityToken(user.email, 'verify');
+  }
+  async #requestIdentityToken(email: string, purpose: 'reset' | 'verify') {
+    if (!this.#mail) throw new DomainError('conflict', 'email recovery is not configured');
+    const user = await this.#store.findUserByEmail(email.trim().toLowerCase());
+    if (!user || user.status !== 'active') return;
+    const token = newSecretToken('recover');
+    const tokenHash = sha256Hex(token);
+    const now = this.#clock.now();
+    const issued = await this.#store.transaction(async (tx) => {
+      const current = await tx.findUserForUpdate(user.id);
+      if (!current || current.status !== 'active') return false;
+      const prior = await tx.findUserIdentityToken(user.id, purpose);
+      if (prior && now.getTime() - prior.createdAt.getTime() < 60000) return false;
+      await tx.putIdentityToken({
+        userId: user.id,
+        purpose,
+        tokenHash,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + 15 * 60000),
+        usedAt: null,
+      });
+      await tx.audit.append({
+        actor: { type: 'anonymous' },
+        action: `identity.${purpose}_requested`,
+        target: { type: 'user', id: user.id },
+      });
+      return true;
+    });
+    if (!issued) return;
+    // Delivery is outside retryable transactions and the public response does not await provider latency.
+    const pending = this.#mail
+      .send({
+        id: tokenHash,
+        to: user.email,
+        subject:
+          purpose === 'reset'
+            ? 'Reset your Trust Platform password'
+            : 'Verify your Trust Platform email',
+        text: `Open ${this.#publicOrigin}/#${purpose}=${token} within 15 minutes. If you did not request this, ignore this message.`,
+      })
+      .then(() => undefined)
+      .catch(async () => {
+        await this.#audit
+          .append({
+            actor: { type: 'system' },
+            action: 'identity.delivery_failed',
+            target: { type: 'user', id: user.id },
+            metadata: { purpose },
+          })
+          .catch(() => undefined);
+      });
+    this.#deliveries.add(pending);
+    void pending.finally(() => this.#deliveries.delete(pending));
+  }
+  async flushIdentityMail() {
+    await Promise.all([...this.#deliveries]);
+  }
+  async completeIdentityToken(token: string, purpose: 'reset' | 'verify', password?: string) {
+    if (token.length > 128)
+      throw new DomainError('invalid_request', 'invalid or expired recovery link');
+    const tokenHash = sha256Hex(token);
+    const found = await this.#store.findIdentityToken(tokenHash);
+    const refuse = () => new DomainError('invalid_request', 'invalid or expired recovery link');
+    if (!found || found.purpose !== purpose) throw refuse();
+    const user = await this.#store.findUserById(found.userId);
+    if (!user || user.status !== 'active') throw refuse();
+    if (
+      purpose === 'reset' &&
+      (!password ||
+        password.length < 12 ||
+        password.length > 256 ||
+        password.toLowerCase() === user.email)
+    )
+      throw new DomainError(
+        'invalid_request',
+        'password must be 12-256 characters and not equal the email',
+      );
+    const hash = purpose === 'reset' ? await hashPassword(password!, this.#cfg.scrypt) : undefined;
+    const now = this.#clock.now();
+    await this.#store.transaction(async (tx) => {
+      const current = await tx.findUserForUpdate(user.id);
+      if (
+        !current ||
+        current.status !== 'active' ||
+        !(await tx.consumeIdentityToken(user.id, purpose, tokenHash, now))
+      )
+        throw refuse();
+      if (hash) {
+        await tx.setPasswordHash(user.id, hash);
+        await tx.revokeUserSessions(user.id, now);
+        await tx.clearLoginFailure(sha256Hex(user.email));
+      } else await tx.markEmailVerified(user.id, now);
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: purpose === 'reset' ? 'identity.password_reset' : 'identity.email_verified',
+        target: { type: 'user', id: user.id },
+      });
+    });
   }
 
   async authenticate(token: string | undefined): Promise<UserPrincipal> {

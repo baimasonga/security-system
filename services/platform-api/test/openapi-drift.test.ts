@@ -48,16 +48,26 @@ describe('OpenAPI ↔ implementation drift', () => {
         if (METHODS.includes(m) && !(op.security && op.security.length)) open.push(`${m} ${path}`);
       }
     }
-    expect(open.sort()).toEqual([
-      'get /healthz',
-      'get /v1/keys/trust-bundle',
-      'post /v1/auth/login',
-      'post /v1/auth/register',
-      'post /v1/devices/challenges',
-      'post /v1/licenses/deactivate',
-      'post /v1/licenses/refresh',
-      'post /v1/licenses/validate',
-    ]);
+    expect(open.sort()).toEqual(
+      [
+        'get /',
+        'get /device.mjs',
+        'get /healthz',
+        'get /portal.css',
+        'get /portal.mjs',
+        'get /v1/auth/options',
+        'get /v1/keys/trust-bundle',
+        'post /v1/auth/login',
+        'post /v1/auth/register',
+        'post /v1/auth/password/request',
+        'post /v1/auth/password/reset',
+        'post /v1/auth/email/verify',
+        'post /v1/devices/challenges',
+        'post /v1/licenses/deactivate',
+        'post /v1/licenses/refresh',
+        'post /v1/licenses/validate',
+      ].sort(),
+    );
   });
 
   it('every admin route is documented as authenticated', () => {

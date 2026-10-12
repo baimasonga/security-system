@@ -8,6 +8,7 @@ import { registerAuthRoutes } from './routes/auth.ts';
 import { registerOrgRoutes } from './routes/organizations.ts';
 import { registerLicenseRoutes } from './routes/licenses.ts';
 import { registerDeviceRoutes } from './routes/devices.ts';
+import { registerPortalRoutes } from './routes/portal.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
 
 export interface AppOptions {
@@ -53,6 +54,8 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
       ? { store: fastifyRateStore(c.rateBackend) as unknown as FastifyRateLimitStoreCtor }
       : {}),
   });
+
+  registerPortalRoutes(app);
 
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 

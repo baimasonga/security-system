@@ -6,6 +6,7 @@ export interface User {
   id: string;
   email: string;
   passwordHash: string;
+  emailVerifiedAt?: Date | null;
   status: 'active' | 'disabled';
   platformRole: PlatformRole;
   createdAt: Date;
@@ -34,8 +35,32 @@ export interface Session {
   revokedAt: Date | null;
 }
 
+export interface IdentityToken {
+  userId: string;
+  purpose: 'reset' | 'verify';
+  tokenHash: string;
+  createdAt: Date;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
 /** Identity data access. */
 export interface AuthRepo {
+  findUserForUpdate(id: string): Promise<User | undefined>;
+  putIdentityToken(token: IdentityToken): Promise<void>;
+  findUserIdentityToken(
+    userId: string,
+    purpose: IdentityToken['purpose'],
+  ): Promise<IdentityToken | undefined>;
+  findIdentityToken(hash: string): Promise<IdentityToken | undefined>;
+  consumeIdentityToken(
+    userId: string,
+    purpose: IdentityToken['purpose'],
+    hash: string,
+    now: Date,
+  ): Promise<boolean>;
+  setPasswordHash(userId: string, hash: string): Promise<void>;
+  markEmailVerified(userId: string, now: Date): Promise<void>;
+  revokeUserSessions(userId: string, now: Date): Promise<void>;
   insertUser(u: User): Promise<void>;
   findUserByEmail(email: string): Promise<User | undefined>;
   findUserById(id: string): Promise<User | undefined>;
@@ -89,6 +114,7 @@ export interface AuthStore extends AuthRepo {
 }
 
 interface State {
+  identityTokens: Map<string, IdentityToken>;
   loginFailures: Map<string, LoginFailure & { updatedAt: Date }>;
   users: Map<string, User>;
   orgs: Map<string, Organization>;
@@ -98,6 +124,7 @@ interface State {
 
 class MemoryRepo implements AuthRepo {
   readonly s: State = {
+    identityTokens: new Map(),
     loginFailures: new Map(),
     users: new Map(),
     orgs: new Map(),
@@ -105,6 +132,50 @@ class MemoryRepo implements AuthRepo {
     sessions: new Map(),
   };
 
+  async findUserForUpdate(id: string) {
+    return this.findUserById(id);
+  }
+  async putIdentityToken(token: IdentityToken) {
+    if (!this.s.users.has(token.userId)) throw new Error('user_not_found');
+    this.s.identityTokens.set(`${token.userId}|${token.purpose}`, structuredClone(token));
+  }
+  async findUserIdentityToken(userId: string, purpose: IdentityToken['purpose']) {
+    const token = this.s.identityTokens.get(`${userId}|${purpose}`);
+    return token ? structuredClone(token) : undefined;
+  }
+  async findIdentityToken(hash: string) {
+    const token = [...this.s.identityTokens.values()].find((t) => t.tokenHash === hash);
+    return token ? structuredClone(token) : undefined;
+  }
+  async consumeIdentityToken(
+    userId: string,
+    purpose: IdentityToken['purpose'],
+    hash: string,
+    now: Date,
+  ) {
+    const token = this.s.identityTokens.get(`${userId}|${purpose}`);
+    if (
+      !token ||
+      token.tokenHash !== hash ||
+      token.usedAt ||
+      token.expiresAt.getTime() <= now.getTime()
+    )
+      return false;
+    token.usedAt = now;
+    return true;
+  }
+  async setPasswordHash(userId: string, hash: string) {
+    const user = this.s.users.get(userId);
+    if (user) user.passwordHash = hash;
+  }
+  async markEmailVerified(userId: string, now: Date) {
+    const user = this.s.users.get(userId);
+    if (user) user.emailVerifiedAt = now;
+  }
+  async revokeUserSessions(userId: string, now: Date) {
+    for (const session of this.s.sessions.values())
+      if (session.userId === userId && !session.revokedAt) session.revokedAt = now;
+  }
   async insertUser(u: User) {
     if ([...this.s.users.values()].some((x) => x.email === u.email))
       throw new Error('duplicate_email');

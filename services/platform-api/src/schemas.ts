@@ -11,6 +11,12 @@ export const registerBody = z
   .object({ email: str(254), password: z.string().min(1).max(256) })
   .strict();
 export const loginBody = registerBody;
+export const emptyBody = z.object({}).strict();
+export const recoveryRequestBody = z.object({ email: str(254) }).strict();
+export const verificationBody = z.object({ token: str(128) }).strict();
+export const recoveryCompleteBody = z
+  .object({ token: str(128), password: z.string().min(12).max(256) })
+  .strict();
 export const orgBody = z.object({ name: str(200) }).strict();
 export const memberBody = z.object({ email: str(254), role: z.enum(ORG_ROLES) }).strict();
 export const orgParams = z.object({ orgId: id }).strict();

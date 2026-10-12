@@ -269,3 +269,24 @@ describe('organizations and RBAC', () => {
     expect(JSON.stringify(await audit.list())).not.toMatch(/sess_|scrypt\$/);
   });
 });
+
+it('refuses a login verified against credentials that changed before session creation', async () => {
+  const { auth, store } = make();
+  const registered = await auth.register({ email: 'reset-race@example.test', password: PW });
+  const find = store.findUserByEmail.bind(store);
+  let changed = false;
+  store.findUserByEmail = async (email) => {
+    const snapshot = await find(email);
+    if (!changed && snapshot) {
+      changed = true;
+      await store.setPasswordHash(
+        registered.user.id,
+        await hashPassword('changed password here', FAST),
+      );
+    }
+    return snapshot;
+  };
+  await expect(auth.login({ email: 'reset-race@example.test', password: PW })).rejects.toThrow(
+    'invalid email or password',
+  );
+});

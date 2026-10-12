@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppOptions } from '../src/app.ts';
 import { loadConfig, type PlatformConfig } from '../src/config.ts';
 import { createContainer, type Container } from '../src/container.ts';
+import type { IdentityDelivery } from '@trust/auth';
 import type { LicensingConfig } from '@trust/licensing';
 import { createSchemaPool, pgTestEnabled } from '../../../tests/support/pg.ts';
 
@@ -37,6 +38,7 @@ export interface Env {
 
 export async function makeEnv(over?: {
   config?: Partial<PlatformConfig>;
+  identityDelivery?: IdentityDelivery;
   licensing?: Partial<LicensingConfig>;
   app?: AppOptions;
 }): Promise<Env> {
@@ -61,6 +63,7 @@ export async function makeEnv(over?: {
   const pool = pgTestEnabled() ? createSchemaPool() : undefined;
   const c = await createContainer(config, {
     clock,
+    identityDelivery: over?.identityDelivery,
     ...(over?.licensing ? { licensing: over.licensing } : {}),
     ...(pool ? { pool } : {}),
   });

@@ -21,6 +21,95 @@ const user = (n: string, over = {}) => ({
 /** One definition of correct AuthStore behaviour, run against every adapter. */
 export function authStoreContract(name: string, make: () => AuthHarness | Promise<AuthHarness>) {
   describe(`AuthStore contract: ${name}`, () => {
+    it('holds the user lock until the transaction completes', async () => {
+      const { store: s } = await make();
+      const u = user('locking');
+      await s.insertUser(u);
+      let release!: () => void;
+      let ready!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const acquired = new Promise<void>((resolve) => (ready = resolve));
+      let secondLocked = false;
+      const first = s.transaction(async (tx) => {
+        await tx.findUserForUpdate(u.id);
+        ready();
+        await gate;
+      });
+      await acquired;
+      const second = s.transaction(async (tx) => {
+        await tx.findUserForUpdate(u.id);
+        secondLocked = true;
+      });
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(secondLocked).toBe(false);
+      } finally {
+        release();
+        await Promise.all([first, second]);
+      }
+      expect(secondLocked).toBe(true);
+    });
+    it('rolls back token use, password changes and session revocation together', async () => {
+      const { store: s } = await make();
+      const u = user('rollback_recovery');
+      await s.insertUser(u);
+      const token = {
+        userId: u.id,
+        purpose: 'reset' as const,
+        tokenHash: 'd'.repeat(64),
+        createdAt: T,
+        expiresAt: new Date(T.getTime() + 60000),
+        usedAt: null,
+      };
+      await s.putIdentityToken(token);
+      await s.insertSession({
+        id: 'ses_recovery_rollback',
+        userId: u.id,
+        tokenHash: 'e'.repeat(64),
+        createdAt: T,
+        expiresAt: new Date(T.getTime() + 60000),
+        revokedAt: null,
+      });
+      await expect(
+        s.transaction(async (tx) => {
+          await tx.findUserForUpdate(u.id);
+          await tx.consumeIdentityToken(u.id, 'reset', token.tokenHash, T);
+          await tx.setPasswordHash(u.id, 'changed');
+          await tx.revokeUserSessions(u.id, T);
+          throw new Error('rollback recovery');
+        }),
+      ).rejects.toThrow('rollback recovery');
+      expect((await s.findIdentityToken(token.tokenHash))?.usedAt).toBeNull();
+      expect((await s.findUserById(u.id))?.passwordHash).toBe('h');
+      expect((await s.findSessionByTokenHash('e'.repeat(64)))?.revokedAt).toBeNull();
+    });
+
+    it('identity tokens expire, are bound to purpose/user, and can be consumed only once', async () => {
+      const { store: s } = await make();
+      await s.insertUser(user('recovery'));
+      const u = user('recovery');
+      const token = {
+        userId: u.id,
+        purpose: 'reset' as const,
+        tokenHash: 'a'.repeat(64),
+        createdAt: T,
+        expiresAt: new Date(T.getTime() + 60000),
+        usedAt: null,
+      };
+      await s.putIdentityToken(token);
+      expect((await s.findIdentityToken(token.tokenHash))?.userId).toBe(u.id);
+      expect(await s.consumeIdentityToken('other', 'reset', token.tokenHash, T)).toBe(false);
+      expect(await s.consumeIdentityToken(u.id, 'verify', token.tokenHash, T)).toBe(false);
+      expect(await s.consumeIdentityToken(u.id, 'reset', token.tokenHash, token.expiresAt)).toBe(
+        false,
+      );
+      const results = await Promise.all([
+        s.consumeIdentityToken(u.id, 'reset', token.tokenHash, T),
+        s.consumeIdentityToken(u.id, 'reset', token.tokenHash, T),
+      ]);
+      expect(results.sort()).toEqual([false, true]);
+    });
+
     it('stores users; email is unique; lookups by id and email; platform role is updatable', async () => {
       const { store: s } = await make();
       await s.insertUser(user('a'));
