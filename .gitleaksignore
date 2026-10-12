@@ -1,0 +1,15 @@
+# Public ADR-002 lease test vectors, signed with disposable fixture keys.
+# Exact historical findings only; no rule, file or whole commit is excluded.
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:57
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:65
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:73
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:81
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:89
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:97
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:106
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:115
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:124
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:133
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:145
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:157
+331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:169

@@ -18,3 +18,7 @@ data you do not own; do not exfiltrate customer data.
 ## Non-negotiable invariants
 
 See [docs/security/invariants-traceability.md](docs/security/invariants-traceability.md).
+
+## Secret-scanning fixture exceptions
+
+Gitleaks retains its default rules. The quota guide's exact public example operation ID is exempt only in that file and only from the generic API-key rule. Public ADR-002 lease vectors are covered by exact historical finding fingerprints in `.gitleaksignore`; this does not exempt an entire file, rule or commit. Regenerated vectors require review. Synthetic credential checks confirm that another credential in the quota guide is still detected. Real credential findings require rotation and remediation, not a fixture exception.

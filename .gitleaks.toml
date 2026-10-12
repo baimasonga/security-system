@@ -1,0 +1,14 @@
+title = "Security system secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Documented non-secret quota operation ID; no access authority"
+condition = "AND"
+regexTarget = "secret"
+regexes = ['''^unique-operation-id-001$''']
+paths = ['''^docs/api/monthly-quotas\.md$''']
