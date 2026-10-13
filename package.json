@@ -24,6 +24,7 @@
     "db:grants": "node tools/db-grants.ts",
     "db:check": "node tools/db-check.ts",
     "bootstrap:operator": "node tools/bootstrap-operator.ts",
+    "provision:sierra": "node tools/provision-sierra-business.ts",
     "loadtest": "PG_FSYNC=on node tools/with-postgres.mjs node tools/loadtest/run.ts",
     "audit:deps": "npm audit --omit=dev --audit-level=high"
   },
