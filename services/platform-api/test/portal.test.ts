@@ -8,6 +8,11 @@ it('serves an account-free portal with strict same-origin assets and preserves A
   expect(page.statusCode).toBe(200);
   expect(page.headers['content-type']).toContain('text/html');
   expect(page.body).toContain('Rokela Bai Bureh Warrior');
+  expect(page.body).toContain('href="/rokela-icon.png"');
+  const icon = await env.app.inject({ url: '/rokela-icon.png' });
+  expect(icon.statusCode).toBe(200);
+  expect(icon.headers['content-type']).toBe('image/png');
+  expect(icon.rawPayload.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   expect(page.body).not.toContain('sess_');
   expect(page.body).not.toMatch(/<script[^>]*>[^<]+<\/script>/);
   expect(page.headers['content-security-policy']).toContain("script-src 'self'");
