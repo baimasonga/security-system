@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import type { BillingConfig } from './billing.ts';
 import { PaddleCheckoutProvider, PaddleWebhookVerifier } from './integrations/billing.ts';
-import { MfaCipher, type ScryptParams } from '@trust/auth';
+import { IdentityMailCipher, MfaCipher, type ScryptParams } from '@trust/auth';
 import { validateAnchorUrl } from './anchors.ts';
 import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 
 export interface PlatformConfig {
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
+  identityMailEncryptionKey?: string;
   requireOperatorMfa: boolean;
   emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
   billing?: BillingConfig;
@@ -176,6 +177,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       portalOrigin,
     };
   }
+  const identityMailEncryptionKey = env['MAIL_OUTBOX_ENCRYPTION_KEY'];
+  if (identityMailEncryptionKey) {
+    new IdentityMailCipher(identityMailEncryptionKey);
+    if (!env['RESEND_API_KEY'])
+      throw new Error('RESEND_API_KEY required with MAIL_OUTBOX_ENCRYPTION_KEY');
+    if (identityMailEncryptionKey.toLowerCase() === env['MFA_ENCRYPTION_KEY']?.toLowerCase())
+      throw new Error('identity mail key must be separate from MFA key');
+  }
   let emailDelivery: PlatformConfig['emailDelivery'];
   if (env['RESEND_API_KEY']) {
     const from = env['EMAIL_FROM'];
@@ -296,6 +305,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   return {
     env: mode,
     emailDelivery,
+    identityMailEncryptionKey,
     billing,
     mfaEncryptionKey,
     requireOperatorMfa,

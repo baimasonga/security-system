@@ -235,6 +235,8 @@ export async function createContainer(
 
   const auth = new AuthService({
     store: authStore,
+    identityMailEncryptionKey: config.identityMailEncryptionKey,
+    identityMailOutcome: (outcome) => metrics.inc('identity_mail_outcomes_total', { outcome }),
     identityDelivery:
       overrides?.identityDelivery ??
       (config.emailDelivery ? new ResendMailDelivery(config.emailDelivery) : undefined),
@@ -340,7 +342,7 @@ export async function createContainer(
     async close() {
       if (closed) return;
       closed = true;
-      await auth.flushIdentityMail();
+      await auth.closeIdentityMail();
       await writes.flush().catch(() => undefined);
       await (telemetrySink as { flush?: () => Promise<void> }).flush?.().catch(() => undefined);
       if (usePg) setTransactionObserver({});

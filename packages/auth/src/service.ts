@@ -1,3 +1,4 @@
+import { IdentityMailOutbox } from './identity-outbox.ts';
 import { randomBytes } from 'node:crypto';
 import { MfaCipher, base32, matchingCounter } from './mfa.ts';
 import { newId, newSecretToken, sha256Hex } from '@trust/crypto';
@@ -31,6 +32,7 @@ export class AuthService {
   readonly #mfa: MfaCipher | undefined;
   readonly #requireOperatorMfa: boolean;
   readonly #mail: IdentityDelivery | undefined;
+  readonly #outbox: IdentityMailOutbox | undefined;
   readonly #publicOrigin: string;
   readonly #deliveries = new Set<Promise<void>>();
   readonly #store: AuthStore;
@@ -45,6 +47,8 @@ export class AuthService {
     audit: AuditLog;
     config?: Partial<AuthConfig>;
     identityDelivery?: IdentityDelivery;
+    identityMailEncryptionKey?: string;
+    identityMailOutcome?: (outcome: 'sent' | 'retried' | 'discarded') => void;
     publicOrigin?: string;
     mfaEncryptionKey?: string;
     requireOperatorMfa?: boolean;
@@ -55,6 +59,18 @@ export class AuthService {
     if (this.#requireOperatorMfa && !this.#mfa)
       throw new Error('MFA key required for operator enforcement');
     this.#mail = deps.identityDelivery;
+    if (deps.identityMailEncryptionKey && !this.#mail)
+      throw new Error('identity mail delivery required for durable outbox');
+    this.#outbox =
+      deps.identityMailEncryptionKey && this.#mail
+        ? new IdentityMailOutbox({
+            store: deps.store,
+            clock: deps.clock,
+            delivery: this.#mail,
+            key: deps.identityMailEncryptionKey,
+            onOutcome: deps.identityMailOutcome,
+          })
+        : undefined;
     this.#publicOrigin = deps.publicOrigin ?? 'http://localhost:8080';
     this.#clock = deps.clock;
     this.#audit = deps.audit;
@@ -374,6 +390,28 @@ export class AuthService {
     const token = newSecretToken('recover');
     const tokenHash = sha256Hex(token);
     const now = this.#clock.now();
+    const message = {
+      id: tokenHash,
+      to: user.email,
+      subject:
+        purpose === 'reset'
+          ? 'Reset your Trust Platform password'
+          : 'Verify your Trust Platform email',
+      text: `Open ${this.#publicOrigin}/#${purpose}=${token} within 15 minutes. If you did not request this, ignore this message.`,
+    };
+    const row = {
+      userId: user.id,
+      purpose,
+      tokenHash,
+      sealed: '',
+      createdAt: now,
+      expiresAt: new Date(+now + 15 * 60000),
+      nextAttemptAt: now,
+      attempts: 0,
+      claim: null,
+      lockedUntil: null,
+    };
+    if (this.#outbox) row.sealed = this.#outbox.cipher.seal(row, message);
     const issued = await this.#store.transaction(async (tx) => {
       const current = await tx.findUserForUpdate(user.id);
       if (!current || current.status !== 'active') return false;
@@ -387,6 +425,7 @@ export class AuthService {
         expiresAt: new Date(now.getTime() + 15 * 60000),
         usedAt: null,
       });
+      if (this.#outbox) await tx.putIdentityMail(row);
       await tx.audit.append({
         actor: { type: 'anonymous' },
         action: `identity.${purpose}_requested`,
@@ -395,17 +434,18 @@ export class AuthService {
       return true;
     });
     if (!issued) return;
+    if (this.#outbox) {
+      const pending = this.#outbox
+        .runOnce()
+        .then(() => undefined)
+        .catch(() => undefined);
+      this.#deliveries.add(pending);
+      void pending.finally(() => this.#deliveries.delete(pending));
+      return;
+    }
     // Delivery is outside retryable transactions and the public response does not await provider latency.
     const pending = this.#mail
-      .send({
-        id: tokenHash,
-        to: user.email,
-        subject:
-          purpose === 'reset'
-            ? 'Reset your Trust Platform password'
-            : 'Verify your Trust Platform email',
-        text: `Open ${this.#publicOrigin}/#${purpose}=${token} within 15 minutes. If you did not request this, ignore this message.`,
-      })
+      .send(message)
       .then(() => undefined)
       .catch(async () => {
         await this.#audit
@@ -421,6 +461,14 @@ export class AuthService {
     void pending.finally(() => this.#deliveries.delete(pending));
   }
   async flushIdentityMail() {
+    await Promise.all([...this.#deliveries]);
+    await this.#outbox?.runOnce();
+  }
+  async processIdentityMail() {
+    return this.#outbox ? this.#outbox.runOnce() : { sent: 0, retried: 0, discarded: 0 };
+  }
+  async closeIdentityMail() {
+    await this.#outbox?.stop();
     await Promise.all([...this.#deliveries]);
   }
   async completeIdentityToken(token: string, purpose: 'reset' | 'verify', password?: string) {

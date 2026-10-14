@@ -21,6 +21,81 @@ const user = (n: string, over = {}) => ({
 /** One definition of correct AuthStore behaviour, run against every adapter. */
 export function authStoreContract(name: string, make: () => AuthHarness | Promise<AuthHarness>) {
   describe(`AuthStore contract: ${name}`, () => {
+    it('persists bounded due mail as copies and atomically replaces superseded messages', async () => {
+      const { store: s } = await make();
+      const u = user('mail');
+      await s.insertUser(u);
+      const row = {
+        userId: u.id,
+        purpose: 'reset' as const,
+        tokenHash: 'a'.repeat(64),
+        sealed: 'encrypted-fixture',
+        createdAt: T,
+        expiresAt: new Date(+T + 900000),
+        nextAttemptAt: T,
+        attempts: 0,
+        claim: null,
+        lockedUntil: null,
+      };
+      await s.transaction(async (tx) => {
+        await tx.findUserForUpdate(u.id);
+        await tx.putIdentityMail(row);
+      });
+      const due = await s.listDueIdentityMail(T, 1);
+      expect(due).toHaveLength(1);
+      due[0]!.sealed = 'mutated copy';
+      expect((await s.findIdentityMailForUpdate(row.tokenHash))?.sealed).toBe('encrypted-fixture');
+      await s.transaction(async (tx) => {
+        await tx.findUserForUpdate(u.id);
+        await tx.putIdentityMail({
+          ...row,
+          tokenHash: 'b'.repeat(64),
+          lockedUntil: new Date(+T + 60000),
+          claim: 'worker',
+        });
+      });
+      expect(await s.findIdentityMailForUpdate(row.tokenHash)).toBeUndefined();
+      expect(await s.listDueIdentityMail(T, 10)).toEqual([]);
+      expect(await s.listDueIdentityMail(new Date(+T + 60000), 10)).toHaveLength(1);
+      await s.deleteIdentityMail('b'.repeat(64));
+      expect(await s.listDueIdentityMail(new Date(+T + 60000), 10)).toEqual([]);
+    });
+    it('rolls queued mail back with token and audit failure', async () => {
+      const h = await make();
+      const s = h.store,
+        u = user('mail_rollback');
+      await s.insertUser(u);
+      await expect(
+        s.transaction(async (tx) => {
+          await tx.findUserForUpdate(u.id);
+          await tx.putIdentityToken({
+            userId: u.id,
+            purpose: 'verify',
+            tokenHash: 'c'.repeat(64),
+            createdAt: T,
+            expiresAt: new Date(+T + 900000),
+            usedAt: null,
+          });
+          await tx.putIdentityMail({
+            userId: u.id,
+            purpose: 'verify',
+            tokenHash: 'c'.repeat(64),
+            sealed: 'encrypted-fixture',
+            createdAt: T,
+            expiresAt: new Date(+T + 900000),
+            nextAttemptAt: T,
+            attempts: 0,
+            claim: null,
+            lockedUntil: null,
+          });
+          await tx.audit.append({ actor: { type: 'system' }, action: 'test.mail' });
+          throw new Error('abort');
+        }),
+      ).rejects.toThrow('abort');
+      expect(await s.findIdentityToken('c'.repeat(64))).toBeUndefined();
+      expect(await s.listDueIdentityMail(T, 10)).toEqual([]);
+      expect(await h.audited()).not.toContain('test.mail');
+    });
     it('persists MFA state as copies and rolls factor changes back with audit', async () => {
       const h = await make();
       const u = user('mfa');

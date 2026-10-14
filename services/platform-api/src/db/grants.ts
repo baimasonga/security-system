@@ -18,6 +18,7 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   schema_migrations: R, // read by the startup guard; only the owner migrates
   users: RIU,
   identity_tokens: ALL, // expiring single-use reset/verification hashes
+  identity_mail_outbox: ALL, // encrypted short-lived recovery messages and fenced worker leases
   organizations: RI,
   memberships: RI,
   sessions: RIU,
