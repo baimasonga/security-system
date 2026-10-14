@@ -1,3 +1,4 @@
+import { startIdentityMailWorker } from './identity-mail-worker.ts';
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { createContainer } from './container.ts';
@@ -27,6 +28,10 @@ if (
 }
 
 for (const w of container.dbWarnings) app.log.warn(`database role: ${w}`);
+if (config.emailDelivery && !config.identityMailEncryptionKey)
+  app.log.warn(
+    'identity email uses direct delivery without durable retry; enable MAIL_OUTBOX_ENCRYPTION_KEY after migration 0010 and app grants',
+  );
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(
@@ -47,6 +52,12 @@ const maintenance = startMaintenance(container, {
     ),
 });
 app.addHook('onClose', async () => maintenance.stop());
+if (config.identityMailEncryptionKey) {
+  const mail = startIdentityMailWorker(container, {
+    onError: () => app.log.error('identity mail worker failed; pending work remains queued'),
+  });
+  app.addHook('onClose', async () => mail.stop());
+}
 if (container.anchors && config.auditAnchor) {
   const anchoring = startAnchoring(container.anchors, {
     everyMs: config.auditAnchor.intervalSeconds * 1000,

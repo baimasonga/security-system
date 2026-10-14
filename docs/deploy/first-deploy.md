@@ -57,6 +57,8 @@ rotate the owner password out of any shell history; decide who may reach the own
 
 ## Optional email recovery
 
+For durable delivery, run migration `0010_identity_mail_outbox` and `npm run db:grants` from the new source/image using the owner connection before deploying the corresponding application build. The currently running older image does not contain that migration or its grant policy. The startup guard requires the schema to match the build. Generate a **separate**, stable random 32-byte hex `MAIL_OUTBOX_ENCRYPTION_KEY` in your secret manager; store it as a server environment secret alongside the existing Resend configuration. Do not reuse the MFA key or put any key in source/chat. With this key enabled, reset/verification emails are encrypted and queued atomically, retried after outages/restarts and discarded when their original links expire. Without it, the previous direct-delivery mode remains and does not guarantee retries. See [outbox design, concurrency and rotation limits](../adr/ADR-020-identity-mail-outbox.md).
+
 Run migration `0006_identity_recovery` and then `npm run db:grants` before deploying the browser/recovery release. Do not change existing signing keys or the license-key pepper.
 
 To enable password reset and email verification, configure `RESEND_API_KEY` securely, `EMAIL_FROM` with a verified sending domain, and `PUBLIC_ORIGIN` with the exact public HTTPS origin (for example, `https://trustplatform-api-production.up.railway.app`). The origin must have no credentials, extra path or query. With no email configuration, the portal and existing login continue working; recovery stays disabled. Do not set synthetic development keys in production.

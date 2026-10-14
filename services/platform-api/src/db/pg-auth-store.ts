@@ -4,6 +4,7 @@ import type {
   MfaState,
   AuthStore,
   IdentityToken,
+  IdentityMail,
   AuthTx,
   Membership,
   Organization,
@@ -83,6 +84,29 @@ const session = (r: SessionRow): Session => ({
   revokedAt: r.revoked_at,
 });
 
+const mailRow = (r: {
+  user_id: string;
+  purpose: IdentityMail['purpose'];
+  token_hash: string;
+  sealed: string;
+  created_at: Date;
+  expires_at: Date;
+  next_attempt_at: Date;
+  attempts: number;
+  claim: string | null;
+  locked_until: Date | null;
+}): IdentityMail => ({
+  userId: r.user_id,
+  purpose: r.purpose,
+  tokenHash: r.token_hash,
+  sealed: r.sealed,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
+  nextAttemptAt: r.next_attempt_at,
+  attempts: r.attempts,
+  claim: r.claim,
+  lockedUntil: r.locked_until,
+});
 class PgAuthRepo implements AuthRepo {
   readonly #db: Queryable;
   constructor(db: Queryable) {
@@ -106,6 +130,40 @@ class PgAuthRepo implements AuthRepo {
       `INSERT INTO identity_tokens (user_id,purpose,token_hash,created_at,expires_at,used_at) VALUES ($1,$2,$3,$4,$5,NULL) ON CONFLICT(user_id,purpose) DO UPDATE SET token_hash=EXCLUDED.token_hash,created_at=EXCLUDED.created_at,expires_at=EXCLUDED.expires_at,used_at=NULL`,
       [t.userId, t.purpose, t.tokenHash, t.createdAt, t.expiresAt],
     );
+  }
+  async putIdentityMail(r: IdentityMail) {
+    await this.#db.query(
+      `INSERT INTO identity_mail_outbox(user_id,purpose,token_hash,sealed,created_at,expires_at,next_attempt_at,attempts,claim,locked_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id,purpose) DO UPDATE SET token_hash=EXCLUDED.token_hash,sealed=EXCLUDED.sealed,created_at=EXCLUDED.created_at,expires_at=EXCLUDED.expires_at,next_attempt_at=EXCLUDED.next_attempt_at,attempts=EXCLUDED.attempts,claim=EXCLUDED.claim,locked_until=EXCLUDED.locked_until`,
+      [
+        r.userId,
+        r.purpose,
+        r.tokenHash,
+        r.sealed,
+        r.createdAt,
+        r.expiresAt,
+        r.nextAttemptAt,
+        r.attempts,
+        r.claim,
+        r.lockedUntil,
+      ],
+    );
+  }
+  async listDueIdentityMail(now: Date, limit: number): Promise<IdentityMail[]> {
+    const r = await this.#db.query<Parameters<typeof mailRow>[0]>(
+      'SELECT * FROM identity_mail_outbox WHERE next_attempt_at<=$1 AND (locked_until IS NULL OR locked_until<=$1) ORDER BY next_attempt_at,token_hash LIMIT $2',
+      [now, Math.max(1, Math.min(100, Math.floor(limit)))],
+    );
+    return r.rows.map(mailRow);
+  }
+  async findIdentityMailForUpdate(hash: string): Promise<IdentityMail | undefined> {
+    const r = await this.#db.query<Parameters<typeof mailRow>[0]>(
+      'SELECT * FROM identity_mail_outbox WHERE token_hash=$1 FOR UPDATE',
+      [hash],
+    );
+    return r.rows[0] ? mailRow(r.rows[0]) : undefined;
+  }
+  async deleteIdentityMail(hash: string) {
+    await this.#db.query('DELETE FROM identity_mail_outbox WHERE token_hash=$1', [hash]);
   }
   async findUserIdentityToken(
     userId: string,

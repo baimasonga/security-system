@@ -52,7 +52,24 @@ export interface IdentityToken {
   usedAt: Date | null;
 }
 /** Identity data access. */
+export interface IdentityMail {
+  userId: string;
+  purpose: IdentityToken['purpose'];
+  tokenHash: string;
+  sealed: string;
+  createdAt: Date;
+  expiresAt: Date;
+  nextAttemptAt: Date;
+  attempts: number;
+  claim: string | null;
+  lockedUntil: Date | null;
+}
 export interface AuthRepo {
+  putIdentityMail(row: IdentityMail): Promise<void>;
+  listDueIdentityMail(now: Date, limit: number): Promise<IdentityMail[]>;
+  /** Inside a transaction, acquire the user's lock before the message lock. */
+  findIdentityMailForUpdate(tokenHash: string): Promise<IdentityMail | undefined>;
+  deleteIdentityMail(tokenHash: string): Promise<void>;
   setMfa(userId: string, state: MfaState | null): Promise<void>;
   findUserForUpdate(id: string): Promise<User | undefined>;
   putIdentityToken(token: IdentityToken): Promise<void>;
@@ -124,6 +141,7 @@ export interface AuthStore extends AuthRepo {
 }
 
 interface State {
+  identityMail: Map<string, IdentityMail>;
   identityTokens: Map<string, IdentityToken>;
   loginFailures: Map<string, LoginFailure & { updatedAt: Date }>;
   users: Map<string, User>;
@@ -134,6 +152,7 @@ interface State {
 
 class MemoryRepo implements AuthRepo {
   readonly s: State = {
+    identityMail: new Map(),
     identityTokens: new Map(),
     loginFailures: new Map(),
     users: new Map(),
@@ -141,6 +160,26 @@ class MemoryRepo implements AuthRepo {
     memberships: new Map(),
     sessions: new Map(),
   };
+
+  async putIdentityMail(row: IdentityMail) {
+    if (!this.s.users.has(row.userId)) throw new Error('user_not_found');
+    this.s.identityMail.set(`${row.userId}|${row.purpose}`, structuredClone(row));
+  }
+  async listDueIdentityMail(now: Date, limit: number) {
+    return [...this.s.identityMail.values()]
+      .filter((r) => r.nextAttemptAt <= now && (!r.lockedUntil || r.lockedUntil <= now))
+      .sort((a, b) => +a.nextAttemptAt - +b.nextAttemptAt || a.tokenHash.localeCompare(b.tokenHash))
+      .slice(0, Math.max(1, Math.min(100, Math.floor(limit))))
+      .map((r) => structuredClone(r));
+  }
+  async findIdentityMailForUpdate(hash: string) {
+    const row = [...this.s.identityMail.values()].find((r) => r.tokenHash === hash);
+    return row ? structuredClone(row) : undefined;
+  }
+  async deleteIdentityMail(hash: string) {
+    const row = [...this.s.identityMail.values()].find((r) => r.tokenHash === hash);
+    if (row) this.s.identityMail.delete(`${row.userId}|${row.purpose}`);
+  }
 
   async setMfa(userId: string, state: MfaState | null) {
     const user = this.s.users.get(userId);
