@@ -399,6 +399,16 @@ paths:
           content:
             text/html:
               schema: { type: string }
+  /rokela-icon.png:
+    get:
+      summary: Public Rokela Bai Bureh Warrior brand icon
+      security: []
+      responses:
+        '200':
+          description: Public brand artwork with no account or tenant data
+          content:
+            image/png:
+              schema: { type: string, format: binary }
   /portal.css:
     get:
       summary: Public portal asset

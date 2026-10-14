@@ -382,7 +382,7 @@ async function navigate(view) {
     const page = await renderView(view);
     if (version === state.version && state.token) {
       content.replaceChildren(...page);
-      document.title = `${view} · Trust Platform`;
+      document.title = `${view} · Rokela Bai Bureh Warrior`;
     }
   } catch (e) {
     if (version === state.version) {
@@ -649,7 +649,7 @@ function mfaPanel() {
           node('h2', 'Confirm your authenticator'),
           node(
             'p',
-            'Add a manual time-based entry named Trust Platform in your authenticator. Use this setup key with six digits and a 30-second period. Setup expires in ten minutes.',
+            'Add a manual time-based entry named Rokela Bai Bureh Warrior in your authenticator. Use this setup key with six digits and a 30-second period. Setup expires in ten minutes.',
           ),
           secret,
           fieldsForm(

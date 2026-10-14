@@ -10,6 +10,7 @@ export function registerPortalRoutes(app: FastifyInstance, billing?: BillingConf
   const checkoutHtml = readFileSync(new URL('../web/checkout.html', import.meta.url), 'utf8');
   const checkoutJs = readFileSync(new URL('../web/checkout.mjs', import.meta.url), 'utf8');
   const device = readFileSync(new URL('../web/device.mjs', import.meta.url), 'utf8');
+  const icon = readFileSync(new URL('../web/rokela-icon.png', import.meta.url));
   for (const [url, type, body] of [
     ['/', 'text/html; charset=utf-8', html],
     ['/checkout', 'text/html; charset=utf-8', checkoutHtml],
@@ -17,6 +18,7 @@ export function registerPortalRoutes(app: FastifyInstance, billing?: BillingConf
     ['/portal.css', 'text/css; charset=utf-8', css],
     ['/portal.mjs', 'text/javascript; charset=utf-8', js],
     ['/device.mjs', 'text/javascript; charset=utf-8', device],
+    ['/rokela-icon.png', 'image/png', icon],
   ] as const) {
     app.get(url, async (req, reply) => {
       // Use the actual Host header, not a client-supplied forwarded host, for browser-origin routing.

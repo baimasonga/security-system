@@ -110,6 +110,11 @@ aside {
   text-decoration: none;
   margin: 0 10px 38px;
 }
+.brand img {
+  flex: 0 0 40px;
+  border-radius: 10px;
+  object-fit: cover;
+}
 .brand:first-letter {
   color: #087f8c;
 }
