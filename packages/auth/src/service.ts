@@ -395,8 +395,8 @@ export class AuthService {
       to: user.email,
       subject:
         purpose === 'reset'
-          ? 'Reset your Trust Platform password'
-          : 'Verify your Trust Platform email',
+          ? 'Reset your Rokela Bai Bureh Warrior password'
+          : 'Verify your Rokela Bai Bureh Warrior email',
       text: `Open ${this.#publicOrigin}/#${purpose}=${token} within 15 minutes. If you did not request this, ignore this message.`,
     };
     const row = {

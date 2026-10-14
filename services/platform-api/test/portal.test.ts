@@ -7,7 +7,7 @@ it('serves an account-free portal with strict same-origin assets and preserves A
   const page = await env.app.inject({ url: '/' });
   expect(page.statusCode).toBe(200);
   expect(page.headers['content-type']).toContain('text/html');
-  expect(page.body).toContain('Trust Platform');
+  expect(page.body).toContain('Rokela Bai Bureh Warrior');
   expect(page.body).not.toContain('sess_');
   expect(page.body).not.toMatch(/<script[^>]*>[^<]+<\/script>/);
   expect(page.headers['content-security-policy']).toContain("script-src 'self'");
