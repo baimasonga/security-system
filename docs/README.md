@@ -35,7 +35,7 @@ Architecture decision records:
 9. [ADR-009 — Fewer database round trips per device flow](adr/ADR-009-fewer-database-round-trips.md)
 10. [ADR-010 — External audit anchor](adr/ADR-010-external-audit-anchor.md)
 11. [ADR-011 — Shared abuse-control state](adr/ADR-011-shared-abuse-control-state.md)
-12. [ADR-012 — Managed PostgreSQL profile (Supabase)](adr/ADR-012-managed-postgres-profile.md) · [Supabase deployment guide](deploy/supabase.md) · [First deploy checklist](deploy/first-deploy.md)
+12. [ADR-012 — Managed PostgreSQL profile (Supabase)](adr/ADR-012-managed-postgres-profile.md) · [Supabase deployment guide](deploy/supabase.md) · [First deploy checklist](deploy/first-deploy.md) · [Railway + R2](deploy/railway.md)
 
 Current browser and identity work:
 

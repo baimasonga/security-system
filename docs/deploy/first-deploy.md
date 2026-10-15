@@ -1,5 +1,7 @@
 # First deploy checklist (any container host; Railway notes inline)
 
+On Railway with Cloudflare R2, follow [railway.md](railway.md): `railway.json` automates the build, pre-deploy migrations/grants and the health check.
+
 For Sierra Business catalog preparation, customer provisioning and activation acceptance, follow the [Sierra Business rollout](sierra-business-rollout.md) after completing the platform setup below.
 
 Status: written from the code and configuration guards; **not yet exercised on a live host**. The Dockerfile has never been
