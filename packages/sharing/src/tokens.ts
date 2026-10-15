@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, randomInt } from 'node:crypto';
 import { constantTimeEqual, sha256Hex } from '@trust/crypto';
 
 /**
@@ -69,6 +69,7 @@ export const newSubmissionSecret = () => `sub_${randomBytes(32).toString('base64
 export function newPublicCode(): string {
   const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
   let out = '';
-  for (const b of randomBytes(8)) out += alphabet[b % alphabet.length];
+  // randomInt draws uniformly (no modulo bias).
+  for (let i = 0; i < 8; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
 }

@@ -6,6 +6,7 @@ import { once } from 'node:events';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import Fastify, { type FastifyInstance } from 'fastify';
+import rateLimit from '@fastify/rate-limit';
 import { constantTimeEqual } from '@trust/crypto';
 import {
   contentDisposition,
@@ -20,6 +21,7 @@ import {
 // for valid, unexpired signatures and never sees sessions or cookies.
 
 const MAX_PART = 5 * 1024 ** 3;
+const SIGNED_PARAMS = ['k', 'u', 'n', 'b', 'e', 'd', 't'] as const;
 
 export class LocalObjectStore implements ObjectStore {
   readonly kind = 'local';
@@ -63,9 +65,13 @@ export class LocalObjectStore implements ObjectStore {
   }
   /** Returns the verified parameters, or undefined for a bad or expired signature. */
   verify(query: Record<string, unknown>, nowMs: number): Record<string, string> | undefined {
-    const params: Record<string, string> = {};
-    for (const [k, v] of Object.entries(query))
-      if (typeof v === 'string' && k !== 's') params[k] = v;
+    // Only the parameters this store signs are read, into a prototype-free object: an attacker-chosen
+    // query key (e.g. `__proto__`) can never become a property name.
+    const params: Record<string, string> = Object.create(null) as Record<string, string>;
+    for (const k of SIGNED_PARAMS) {
+      const v = query[k];
+      if (typeof v === 'string') params[k] = v;
+    }
     const sig = typeof query['s'] === 'string' ? query['s'] : '';
     if (!sig || !constantTimeEqual(this.sign(params), sig)) return undefined;
     if (!/^\d+$/.test(params['e'] ?? '') || Number(params['e']) * 1000 <= nowMs) return undefined;
@@ -253,10 +259,17 @@ export function untrustedContentHeaders(
  */
 export async function buildContentApp(
   store: LocalObjectStore,
-  opts: { allowedOrigin: string; now?: () => number; logger?: boolean },
+  opts: {
+    allowedOrigin: string;
+    now?: () => number;
+    logger?: boolean;
+    rateLimitPerMinute?: number;
+  },
 ): Promise<FastifyInstance> {
   const now = opts.now ?? Date.now;
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 });
+  // Per-IP limit: signature checks are cheap, but every request may touch the filesystem.
+  await app.register(rateLimit, { max: opts.rateLimitPerMinute ?? 1200, timeWindow: '1 minute' });
   app.removeAllContentTypeParsers();
   app.addContentTypeParser('*', (_req, payload, done) => done(null, payload));
   const cors = (origin: string | undefined) =>

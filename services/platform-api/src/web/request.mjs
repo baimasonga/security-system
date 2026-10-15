@@ -14,24 +14,13 @@ import { fileKey, uploadFile } from './uploader.mjs';
 
 const token = location.pathname.split('/').pop();
 const base = `/v1/public/upload-requests/${encodeURIComponent(token)}`;
-// The submission secret lets this browser resume its own submission after a reload. It only grants access to the
-// files this submitter uploaded, never to anyone else's.
-const SECRET_KEY = `rokela-submission:${token}`;
+// The submission secret is held in memory only (never in browser storage): an interrupted upload resumes within this
+// page, but a reload starts a new submission. It grants access only to this submitter's own files.
 let info;
 let secret = '';
 let password = '';
-try {
-  secret = localStorage.getItem(SECRET_KEY) || '';
-} catch {
-  secret = '';
-}
 const remember = (v) => {
-  try {
-    if (v) localStorage.setItem(SECRET_KEY, v);
-    else localStorage.removeItem(SECRET_KEY);
-  } catch {
-    /* unavailable: resume across reloads is not possible */
-  }
+  secret = v;
 };
 const h = () => ({ 'x-submission-secret': secret });
 
@@ -82,14 +71,6 @@ async function open() {
     return content().replaceChildren(
       panel(node('h1', 'Request not found'), node('p', 'Check that you copied the whole link.')),
     );
-  }
-  if (secret) {
-    try {
-      return await render(await api(`${base}/submission`, 'GET', undefined, h()));
-    } catch {
-      secret = '';
-      remember('');
-    }
   }
   start();
 }

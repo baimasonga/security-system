@@ -590,6 +590,40 @@ describe('sharing: isolated content origin', () => {
     expect((await env.content('GET', url.replace('/o/part', '/o/get'))).status).toBe(403);
   });
 
+  it('reads only signed parameters (no prototype pollution) and rate-limits the content origin', async () => {
+    env = await sharingEnv();
+    const store = env.c.sharingLocalStore!;
+    const now = env.clock.now().getTime();
+    const exp = String(Math.floor(now / 1000) + 60);
+    const good = { k: 'o/org_x/blb_x', e: exp, d: 'attachment', t: 'application/pdf' };
+    const sig = store.sign(good);
+    // Extra or hostile keys are ignored, so they cannot alter the parameters or Object.prototype.
+    const v = store.verify(
+      { ...good, s: sig, ['__proto__']: 'polluted', constructor: 'x' } as Record<string, unknown>,
+      now,
+    );
+    expect(v && { ...v }).toEqual(good);
+    expect(Object.getPrototypeOf(v)).toBeNull();
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+    const polluted = await env.content(
+      'GET',
+      `${store.contentOrigin}/o/get?__proto__[x]=1&k=a&e=${exp}&s=bad`,
+    );
+    expect(polluted.status).toBe(403);
+    expect(({} as Record<string, unknown>)['x']).toBeUndefined();
+
+    const { buildContentApp } = await import('../src/integrations/object-store-local.ts');
+    const limited = await buildContentApp(store, {
+      allowedOrigin: 'http://127.0.0.1:8080',
+      rateLimitPerMinute: 2,
+    });
+    const codes = [];
+    for (let i = 0; i < 3; i++)
+      codes.push((await limited.inject({ url: '/o/get?k=a&e=1&s=x' })).statusCode);
+    expect(codes).toEqual([403, 403, 429]);
+    await limited.close();
+  });
+
   it('keeps the API and portal free of file bytes and serves pages with a strict CSP', async () => {
     env = await sharingEnv();
     const page = await env.app.inject({ url: `/s/${'a'.repeat(43)}` });
