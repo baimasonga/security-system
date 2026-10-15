@@ -1,4 +1,5 @@
 import { BrowserDevice } from './device.mjs';
+import { filesView } from './files.mjs';
 const $ = (id) => document.getElementById(id);
 const state = {
   token: '',
@@ -308,7 +309,15 @@ function renderShell() {
   $('identity').textContent =
     state.principal.platform_role === 'platform_admin' ? 'Platform operator' : 'Customer workspace';
   $('signout').hidden = false;
-  const views = ['Licenses', 'Devices', 'Organization', 'Catalog', 'Device demo', 'Account'];
+  const views = [
+    'Licenses',
+    'Files & links',
+    'Devices',
+    'Organization',
+    'Catalog',
+    'Device demo',
+    'Account',
+  ];
   if (state.principal.platform_role === 'platform_admin') views.push('Operator console');
   $('navigation').replaceChildren(...views.map((view) => button(view, () => navigate(view))));
 }
@@ -558,6 +567,34 @@ async function renderView(view) {
       ...(state.products.length ? [] : [panel(empty('No products published yet.'))]),
     ];
   }
+  if (view === 'Files & links')
+    return filesView({
+      api,
+      node,
+      panel,
+      button,
+      title,
+      table,
+      badge,
+      empty,
+      details,
+      fieldsForm,
+      notice,
+      errorMessage,
+      content,
+      orgPath,
+      orgId: () => state.orgId,
+      modal: (...children) => {
+        $('modal-content').replaceChildren(...children);
+        $('modal').showModal();
+      },
+      // Authorized fetch of a small binary resource (QR codes) for display and download.
+      blob: async (path) => {
+        const r = await fetch(path, { headers: { authorization: `Bearer ${state.token}` } });
+        if (!r.ok) throw new Error('Could not load the file.');
+        return r.blob();
+      },
+    });
   if (view === 'Device demo') return deviceView();
   if (view === 'Account')
     return [

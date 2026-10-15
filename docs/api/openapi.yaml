@@ -24,6 +24,12 @@ tags:
   - { name: devices, description: Device-facing protocol }
   - { name: admin, description: Platform operators only }
   - { name: keys }
+  - {
+      name: sharing,
+      description: File sharing,
+      documents,
+      short links and upload requests (ADR-021; docs/api/sharing.md),
+    }
 paths:
   /checkout:
     get:
@@ -941,6 +947,1017 @@ paths:
             },
         }
 
+  /v1/organizations/{orgId}/sharing/overview:
+    get:
+      tags: [sharing]
+      summary: Sharing limits (resolved from valid licenses, never client state) and this month's separately metered usage - storage, bandwidth, API mutations, processing, uploads
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Limits and usage }
+        '404': { description: Not a member }
+  /v1/organizations/{orgId}/sharing/documents:
+    get:
+      tags: [sharing]
+      summary: List workspace documents (private drafts and exported versions)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Documents }
+    post:
+      tags: [sharing]
+      summary: Create a document; optional require_approval gates publication on an independent approval
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingDocument' }
+      responses:
+        '201': { description: Created }
+  /v1/organizations/{orgId}/sharing/documents/{id}:
+    get:
+      tags: [sharing]
+      summary: Document with draft state, immutable versions, publication and review counts
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Document }
+        '404': { description: Not found }
+  /v1/organizations/{orgId}/sharing/documents/{id}/export:
+    post:
+      tags: [sharing]
+      summary: Workflow 1 — create an immutable version from the private draft (quota-checked)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingExport' }
+      responses:
+        '201': { description: Version }
+        '409': { description: No ready draft, no changes, or storage over allowance }
+  /v1/organizations/{orgId}/sharing/documents/{id}/publish:
+    post:
+      tags: [sharing]
+      summary: Workflows 2/5 — explicitly publish a version; latest links follow only this. With require_approval, needs an approval from someone other than the author
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingPublish' }
+      responses:
+        '200': { description: Published version }
+        '409': { description: Approval required }
+  /v1/organizations/{orgId}/sharing/documents/{id}/delete:
+    post:
+      tags: [sharing]
+      summary: Delete a document; its objects are removed by background jobs once unreferenced
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Deleted }
+  /v1/organizations/{orgId}/sharing/documents/{id}/versions/{versionId}/review:
+    get:
+      tags: [sharing]
+      summary: Review comments and decisions on a version
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+        - { name: versionId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Thread }
+  /v1/organizations/{orgId}/sharing/transfers:
+    get:
+      tags: [sharing]
+      summary: List transfers
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Transfers }
+    post:
+      tags: [sharing]
+      summary: Create a temporary (files deleted at expiry) or persistent (plan feature) transfer
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingTransfer' }
+      responses:
+        '201': { description: Transfer }
+        '403': { description: Persistent sharing not in plan }
+        '409': { description: Retention beyond plan limit }
+  /v1/organizations/{orgId}/sharing/transfers/{id}:
+    get:
+      tags: [sharing]
+      summary: Transfer with files - uploading / processing / available / rejected, revision and replacement notes
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Transfer }
+    patch:
+      tags: [sharing]
+      summary: Update title, message or expiry (within plan retention)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingTransferPatch' }
+      responses:
+        '200': { description: Transfer }
+  /v1/organizations/{orgId}/sharing/transfers/{id}/revoke:
+    post:
+      tags: [sharing]
+      summary: Revoke - every link to the transfer stops working on its next request. Copies already downloaded cannot be recalled
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/OptionalReason' }
+      responses:
+        '200': { description: Revoked }
+  /v1/organizations/{orgId}/sharing/transfers/{id}/delete:
+    post:
+      tags: [sharing]
+      summary: Delete; files are removed by the next retention pass
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Deleted }
+  /v1/organizations/{orgId}/sharing/transfers/{id}/files/{fileId}/remove:
+    post:
+      tags: [sharing]
+      summary: Remove one file from a transfer
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+        - { name: fileId, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Removed }
+  /v1/organizations/{orgId}/sharing/uploads:
+    post:
+      tags: [sharing]
+      summary: Begin a resumable multipart upload (file, folder entry, replacement or draft). Size, storage and processing quotas apply before any byte is accepted
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingUpload' }
+      responses:
+        '201': { description: Upload session (part size and count) }
+        '400': { description: File type not permitted }
+        '409': { description: Quota exceeded }
+  /v1/organizations/{orgId}/sharing/uploads/{id}/parts:
+    post:
+      tags: [sharing]
+      summary: Short-lived signed URLs for direct PUTs of exact part sizes to private object storage (isolated origin)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingParts' }
+      responses:
+        '200': { description: Signed part URLs }
+  /v1/organizations/{orgId}/sharing/uploads/{id}:
+    get:
+      tags: [sharing]
+      summary: Resume point after an interruption - parts storage already holds
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Upload status }
+  /v1/organizations/{orgId}/sharing/uploads/{id}/complete:
+    post:
+      tags: [sharing]
+      summary: Complete; the object enters quarantine and is checked before it can be served
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Processing }
+        '409': { description: Missing parts (listed) }
+  /v1/organizations/{orgId}/sharing/uploads/{id}/abort:
+    post:
+      tags: [sharing]
+      summary: Cancel an unfinished upload and release its reservation
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Aborted }
+  /v1/organizations/{orgId}/sharing/files/download:
+    post:
+      tags: [sharing]
+      summary: Owner download of a checked workspace object (draft, version, transfer or submission file); bandwidth metered
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingOwnerFile' }
+      responses:
+        '200': { description: Signed URL valid for 60 seconds }
+  /v1/organizations/{orgId}/sharing/links:
+    get:
+      tags: [sharing]
+      summary: List share links with their effective state and the version they serve
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - { name: target_id, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Links }
+    post:
+      tags: [sharing]
+      summary: Create a share link (unpredictable 256-bit token) - transfer, or document in `latest` (follows explicit publication) or `fixed` (pinned version) mode; view/download/review; optional password, expiry, download limit, members-only or named verified recipients
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingLink' }
+      responses:
+        '201': { description: Link with URL }
+  /v1/organizations/{orgId}/sharing/links/{id}:
+    get:
+      tags: [sharing]
+      summary: Link
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Link }
+    patch:
+      tags: [sharing]
+      summary: Change expiry, limit, password, recipients, permission or the pinned version (audited)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingLinkPatch' }
+      responses:
+        '200': { description: Link }
+  /v1/organizations/{orgId}/sharing/links/{id}/status:
+    post:
+      tags: [sharing]
+      summary: Revoke (terminal), suspend or resume. Operator holds cannot be lifted by owners
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingStatus' }
+      responses:
+        '200': { description: Link }
+        '403': { description: Operator hold }
+        '409': { description: Revoked }
+  /v1/organizations/{orgId}/sharing/links/{id}/activity:
+    get:
+      tags: [sharing]
+      summary: Delivery receipts - distinct visit, authenticated access, view, download, acknowledgement events; bots counted separately. A visit is not proof of reading
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Receipts and totals }
+  /v1/organizations/{orgId}/sharing/short-links:
+    get:
+      tags: [sharing]
+      summary: Search short links by text, folder, tag and status
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: folder, in: query, schema: { type: string } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Short links }
+    post:
+      tags: [sharing]
+      summary: Create a public marketing link (alias or generated code, external http(s) destination, optional password/sign-in) or a confidential link (unpredictable code to a share link or upload request). Destinations are validated, never fetched
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingShortLink' }
+      responses:
+        '201': { description: Short link }
+        '409': { description: Alias not available }
+  /v1/organizations/{orgId}/sharing/short-links/bulk:
+    post:
+      tags: [sharing]
+      summary: Bulk revoke/suspend/resume/move/tag/untag (all-or-nothing within the organization)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingBulk' }
+      responses:
+        '200': { description: Updated count }
+  /v1/organizations/{orgId}/sharing/short-links/{id}:
+    get:
+      tags: [sharing]
+      summary: Short link
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Short link }
+    patch:
+      tags: [sharing]
+      summary: Edit destination (recorded in history and audit), expiry, password, folder, tags
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingShortLinkPatch' }
+      responses:
+        '200': { description: Short link }
+  /v1/organizations/{orgId}/sharing/short-links/{id}/status:
+    post:
+      tags: [sharing]
+      summary: Revoke, suspend or resume
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingStatus' }
+      responses:
+        '200': { description: Short link }
+  /v1/organizations/{orgId}/sharing/short-links/{id}/history:
+    get:
+      tags: [sharing]
+      summary: Destination history
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: History }
+  /v1/organizations/{orgId}/sharing/short-links/{id}/stats:
+    get:
+      tags: [sharing]
+      summary: Aggregate visits (bots separate); approximate referral hosts on advanced analytics plans
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Aggregates }
+  /v1/organizations/{orgId}/sharing/short-links/{id}/qr.svg:
+    get:
+      tags: [sharing]
+      summary: Downloadable QR code (SVG) of the short URL
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: image/svg+xml attachment }
+  /v1/organizations/{orgId}/sharing/upload-requests:
+    get:
+      tags: [sharing]
+      summary: List upload requests
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Requests }
+    post:
+      tags: [sharing]
+      summary: Workflow 4 — request files - requirements, deadline, size limits, optional password, retention (plan feature)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingUploadRequest' }
+      responses:
+        '201': { description: Request with URL }
+        '403': { description: Not in plan }
+  /v1/organizations/{orgId}/sharing/upload-requests/{id}:
+    get:
+      tags: [sharing]
+      summary: Request with submissions (self-declared, unverified names) and file statuses
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      responses:
+        '200': { description: Request }
+  /v1/organizations/{orgId}/sharing/upload-requests/{id}/status:
+    post:
+      tags: [sharing]
+      summary: Close, or delete (files removed by the next retention pass)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/SharingRequestAction' }
+      responses:
+        '200': { description: Request }
+  /v1/organizations/{orgId}/sharing/notifications:
+    get:
+      tags: [sharing]
+      summary: Your sharing notifications in this organization
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Notifications }
+  /v1/organizations/{orgId}/sharing/notifications/read:
+    post:
+      tags: [sharing]
+      summary: Mark notifications read
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingIds' }
+      responses:
+        '200': { description: Count }
+  /v1/organizations/{orgId}/sharing/branding:
+    get:
+      tags: [sharing]
+      summary: Branding settings and whether the plan includes branded pages
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Branding }
+    put:
+      tags: [sharing]
+      summary: Set download-page branding (admin/owner; plan feature)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingBranding' }
+      responses:
+        '200': { description: Branding }
+  /v1/organizations/{orgId}/sharing/domains:
+    get:
+      tags: [sharing]
+      summary: Custom domains with verification instructions
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      responses:
+        '200': { description: Domains }
+    post:
+      tags: [sharing]
+      summary: Register a custom short-link domain (admin/owner; plan feature)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+      requestBody: { $ref: '#/components/requestBodies/SharingDomain' }
+      responses:
+        '201': { description: Pending domain and TXT record }
+  /v1/organizations/{orgId}/sharing/domains/{id}/verify:
+    post:
+      tags: [sharing]
+      summary: Check the DNS TXT ownership record (DNS lookup only)
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Verification result }
+  /v1/organizations/{orgId}/sharing/domains/{id}/remove:
+    post:
+      tags: [sharing]
+      summary: Remove an unused custom domain
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Removed }
+  /s/{token}:
+    get:
+      tags: [sharing]
+      summary: Public share page (static HTML; the token is read by the page script)
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: HTML }
+  /r/{token}:
+    get:
+      tags: [sharing]
+      summary: Public upload-request page
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: HTML }
+  /l/{code}:
+    get:
+      tags: [sharing]
+      summary: Public short link - 302 to the destination, or an unlock page when a password or sign-in is required
+      security: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '302': { description: Redirect }
+        '404': { description: Unknown }
+        '410': { description: Expired, suspended or revoked }
+  /d/{code}:
+    get:
+      tags: [sharing]
+      summary: Confidential short link - 302 to its share or request page (whose own policy then applies)
+      security: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        '302': { description: Redirect }
+  /files.mjs:
+    get:
+      tags: [sharing]
+      summary: Workspace files-and-links module
+      security: []
+      responses:
+        '200': { description: JavaScript }
+  /uploader.mjs:
+    get:
+      tags: [sharing]
+      summary: Resumable direct-upload helper
+      security: []
+      responses:
+        '200': { description: JavaScript }
+  /share.mjs:
+    get:
+      tags: [sharing]
+      summary: Public share page script
+      security: []
+      responses:
+        '200': { description: JavaScript }
+  /request.mjs:
+    get:
+      tags: [sharing]
+      summary: Public upload-request page script
+      security: []
+      responses:
+        '200': { description: JavaScript }
+  /public.mjs:
+    get:
+      tags: [sharing]
+      summary: Shared helpers for public sharing pages
+      security: []
+      responses:
+        '200': { description: JavaScript }
+  /link.mjs:
+    get:
+      tags: [sharing]
+      summary: Short-link unlock page script
+      security: []
+      responses:
+        '200': { description: JavaScript }
+  /v1/public/short-links/{code}/unlock:
+    post:
+      tags: [sharing]
+      summary: Unlock a password/sign-in public short link (rate-limited, attempt lockout)
+      security: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/PublicPassword' }
+      responses:
+        '200': { description: Destination }
+        '401': { description: Password or sign-in required }
+  /v1/public/shares/{token}/open:
+    post:
+      tags: [sharing]
+      summary: Open a share link - state, restriction (optional bearer session) and password checks; returns the manifest, version label (fixed vs latest), notices and a 15-minute grant
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicPassword' }
+      responses:
+        '200': { description: Manifest and grant }
+        '401': { description: Sign-in or password required }
+        '403': { description: Not a permitted recipient }
+        '410': { description: Revoked, suspended, expired or not published }
+        '429': { description: Too many attempts }
+  /v1/public/shares/{token}/files/url:
+    post:
+      tags: [sharing]
+      summary: Signed 60-second URL for one checked file (inline for view, attachment for download); re-checks the link on every call and enforces download limits atomically
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicFileUrl' }
+      responses:
+        '200': { description: Signed URL on the isolated content origin }
+        '409': { description: Not available yet }
+        '410': { description: No longer available }
+  /v1/public/shares/{token}/acknowledge:
+    post:
+      tags: [sharing]
+      summary: Explicit acknowledgement (separate receipt; unauthenticated names are marked unverified)
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicAcknowledge' }
+      responses:
+        '200': { description: Recorded }
+  /v1/public/shares/{token}/comments:
+    get:
+      tags: [sharing]
+      summary: Review thread (review links; grant in x-share-grant header; authenticated reviewer)
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      responses:
+        '200': { description: Comments and decisions }
+    post:
+      tags: [sharing]
+      summary: Add a review comment
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicComment' }
+      responses:
+        '201': { description: Comment }
+  /v1/public/shares/{token}/review:
+    post:
+      tags: [sharing]
+      summary: Approve or request changes
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicDecision' }
+      responses:
+        '200': { description: Decision }
+  /v1/public/upload-requests/{token}/open:
+    post:
+      tags: [sharing]
+      summary: Open an upload request - requirements, deadline, limits and a grant
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicPassword' }
+      responses:
+        '200': { description: Request }
+        '410': { description: Closed or past deadline }
+  /v1/public/upload-requests/{token}/submissions:
+    post:
+      tags: [sharing]
+      summary: Start a submission; returns a submission secret the uploader keeps (only its hash is stored)
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicSubmission' }
+      responses:
+        '201': { description: Submission id and secret }
+  /v1/public/upload-requests/{token}/submission:
+    get:
+      tags: [sharing]
+      summary: The submitter's own files only (x-submission-secret header)
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      responses:
+        '200': { description: Own submission }
+  /v1/public/upload-requests/{token}/submission/submit:
+    post:
+      tags: [sharing]
+      summary: Send the submission once required files are present
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Submitted }
+        '409': { description: Missing required files }
+  /v1/public/upload-requests/{token}/uploads:
+    post:
+      tags: [sharing]
+      summary: Begin a resumable upload for a requirement (type, size and storage limits apply)
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/PublicSubmissionUpload' }
+      responses:
+        '201': { description: Upload session }
+  /v1/public/upload-requests/{token}/uploads/{uploadId}/parts:
+    post:
+      tags: [sharing]
+      summary: Signed part URLs
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/SharingParts' }
+      responses:
+        '200': { description: Signed part URLs }
+  /v1/public/upload-requests/{token}/uploads/{uploadId}:
+    get:
+      tags: [sharing]
+      summary: Resume point
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Upload status }
+  /v1/public/upload-requests/{token}/uploads/{uploadId}/complete:
+    post:
+      tags: [sharing]
+      summary: Complete; enters quarantine
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Processing }
+  /v1/public/upload-requests/{token}/uploads/{uploadId}/abort:
+    post:
+      tags: [sharing]
+      summary: Cancel an unfinished upload
+      security: []
+      parameters:
+        - {
+            name: token,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
+          }
+        - { name: uploadId, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        '200': { description: Aborted }
+  /v1/public/abuse-reports:
+    post:
+      tags: [sharing]
+      summary: Report phishing, malware or spam (same response whether or not the reference exists)
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/PublicAbuse' }
+      responses:
+        '202': { description: Received }
+  /v1/admin/sharing/abuse-reports:
+    get:
+      tags: [sharing]
+      summary: Abuse reports across tenants for operator review
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Reports }
+  /v1/admin/sharing/abuse-reports/{id}/resolve:
+    post:
+      tags: [sharing]
+      summary: Suspend the reported item (operator hold) or dismiss; reason required, audited
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/AdminAbuseResolve' }
+      responses:
+        '200': { description: Resolved }
+  /v1/admin/organizations/{orgId}/sharing/{type}/{id}/hold:
+    post:
+      tags: [sharing]
+      summary: Place or lift an operator hold on a short link, share link or upload request; reason required, audited
+      security: [{ bearer: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/OrgId' }
+        - {
+            name: type,
+            in: path,
+            required: true,
+            schema: { type: string, enum: [short, share, request] },
+          }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
+          }
+      requestBody: { $ref: '#/components/requestBodies/AdminHold' }
+      responses:
+        '200': { description: Hold state }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }
@@ -960,6 +1977,421 @@ components:
         schema: { type: string, pattern: '^lic_[0-9a-f]{24}$' },
       }
   requestBodies:
+    Empty:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+    OptionalReason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              reason: { type: string, maxLength: 500 }
+    SharingDocument:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [title]
+            properties:
+              title: { type: string, maxLength: 200 }
+              require_approval: { type: boolean }
+    SharingExport:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              note: { type: string, maxLength: 1000 }
+              file_name: { type: string, maxLength: 200 }
+    SharingPublish:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [version_id]
+            properties:
+              version_id: { type: string }
+              replacement_note:
+                {
+                  type: string,
+                  maxLength: 1000,
+                  description: Explanation shown to recipients of latest links,
+                }
+    SharingTransfer:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [title, kind]
+            properties:
+              title: { type: string }
+              message: { type: string, maxLength: 2000 }
+              kind: { type: string, enum: [temporary, persistent] }
+              expires_at: { type: [string, 'null'], format: date-time }
+    SharingTransferPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              title: { type: string }
+              message: { type: [string, 'null'] }
+              expires_at: { type: [string, 'null'], format: date-time }
+    SharingUpload:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [target, name, size]
+            properties:
+              target: { type: string, enum: [transfer, replace, draft] }
+              transfer_id: { type: string }
+              file_id: { type: string, description: File to replace (same type; link preserved) }
+              document_id: { type: string }
+              name: { type: string, maxLength: 255 }
+              folder_path: { type: string, description: Relative folder for folder uploads }
+              size: { type: integer, minimum: 1 }
+              note: { type: string, maxLength: 1000, description: Replacement explanation }
+    SharingParts:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [part_numbers]
+            properties:
+              part_numbers: { type: array, items: { type: integer, minimum: 1 }, maxItems: 100 }
+    SharingOwnerFile:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [type, id]
+            properties:
+              type: { type: string, enum: [draft, version, transfer_file, submission_file] }
+              id: { type: string }
+    SharingLink:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [target_type, target_id, permission]
+            properties:
+              target_type: { type: string, enum: [transfer, document] }
+              target_id: { type: string }
+              version_mode: { type: string, enum: [latest, fixed] }
+              version_id: { type: string }
+              permission: { type: string, enum: [view, download, review] }
+              password: { type: string, minLength: 8, maxLength: 128 }
+              expires_at: { type: string, format: date-time }
+              max_downloads: { type: integer, minimum: 1, maximum: 100000 }
+              restriction: { type: string, enum: [none, members, recipients] }
+              recipients:
+                {
+                  type: array,
+                  items: { type: string },
+                  maxItems: 50,
+                  description: Verified account emails,
+                }
+              notify_on_access: { type: boolean }
+              label: { type: string, maxLength: 200 }
+    SharingLinkPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              label: { type: [string, 'null'] }
+              expires_at: { type: [string, 'null'], format: date-time }
+              max_downloads: { type: [integer, 'null'] }
+              password: { type: [string, 'null'] }
+              restriction: { type: string, enum: [none, members, recipients] }
+              recipients: { type: array, items: { type: string } }
+              notify_on_access: { type: boolean }
+              permission: { type: string, enum: [view, download, review] }
+              version_id: { type: string }
+    SharingStatus:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [action]
+            properties:
+              action: { type: string, enum: [revoke, suspend, resume] }
+              reason: { type: string, maxLength: 500 }
+    SharingShortLink:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [kind, destination_type]
+            properties:
+              kind: { type: string, enum: [public, confidential] }
+              destination_type: { type: string, enum: [external, share, request] }
+              destination_url: { type: string, maxLength: 2048 }
+              target_id: { type: string }
+              alias: { type: string, description: Public links only }
+              domain_id: { type: string }
+              expires_at: { type: string, format: date-time }
+              password: { type: string }
+              require_auth: { type: boolean }
+              label: { type: string }
+              folder: { type: string }
+              tags: { type: array, items: { type: string } }
+    SharingShortLinkPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              destination_url: { type: string }
+              target_id: { type: string }
+              reason: { type: string }
+              expires_at: { type: [string, 'null'] }
+              password: { type: [string, 'null'] }
+              require_auth: { type: boolean }
+              label: { type: [string, 'null'] }
+              folder: { type: string }
+              tags: { type: array, items: { type: string } }
+    SharingBulk:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [ids, action]
+            properties:
+              ids: { type: array, items: { type: string }, maxItems: 100 }
+              action: { type: string, enum: [revoke, suspend, resume, move, tag, untag] }
+              folder: { type: string }
+              tag: { type: string }
+              reason: { type: string }
+    SharingUploadRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [title, requirements, deadline, max_file_bytes, max_total_bytes]
+            properties:
+              title: { type: string }
+              instructions: { type: string, maxLength: 4000 }
+              requirements:
+                {
+                  type: array,
+                  maxItems: 20,
+                  items:
+                    {
+                      type: object,
+                      additionalProperties: false,
+                      required: [key, label],
+                      properties:
+                        {
+                          key: { type: string },
+                          label: { type: string },
+                          accept: { type: array, items: { type: string } },
+                          required: { type: boolean },
+                          max_files: { type: integer },
+                        },
+                    },
+                }
+              deadline: { type: string, format: date-time }
+              max_file_bytes: { type: integer }
+              max_total_bytes: { type: integer }
+              password: { type: string }
+              notify: { type: boolean }
+              retention_days: { type: [integer, 'null'] }
+    SharingRequestAction:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [action]
+            properties:
+              action: { type: string, enum: [close, delete] }
+    SharingIds:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [ids]
+            properties:
+              ids: { type: array, items: { type: string }, maxItems: 100 }
+    SharingBranding:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [display_name, accent_color]
+            properties:
+              display_name: { type: string }
+              accent_color: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+    SharingDomain:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [hostname]
+            properties:
+              hostname: { type: string }
+    PublicPassword:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              password: { type: string, maxLength: 128 }
+    PublicFileUrl:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [grant, file_id, disposition]
+            properties:
+              grant: { type: string }
+              file_id: { type: string }
+              disposition: { type: string, enum: [inline, attachment] }
+    PublicAcknowledge:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [grant]
+            properties:
+              grant: { type: string }
+              declared_name: { type: string, maxLength: 100 }
+    PublicComment:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [grant, body]
+            properties:
+              grant: { type: string }
+              body: { type: string, maxLength: 2000 }
+              page: { type: integer }
+    PublicDecision:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [grant, decision]
+            properties:
+              grant: { type: string }
+              decision: { type: string, enum: [approved, changes_requested] }
+              note: { type: string }
+    PublicSubmission:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [grant, name]
+            properties:
+              grant: { type: string }
+              name: { type: string }
+              email: { type: string, description: Self-declared, unverified }
+    PublicSubmissionUpload:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [requirement_key, name, size]
+            properties:
+              requirement_key: { type: string }
+              name: { type: string }
+              size: { type: integer }
+    PublicAbuse:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [reference, category]
+            properties:
+              reference: { type: string, description: Short, share or request URL }
+              category: { type: string, enum: [phishing, malware, spam, other] }
+              details: { type: string }
+              email: { type: string }
+    AdminAbuseResolve:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [action, reason]
+            properties:
+              action: { type: string, enum: [suspend, dismiss] }
+              reason: { type: string, minLength: 3, maxLength: 500 }
+    AdminHold:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [hold, reason]
+            properties:
+              hold: { type: boolean }
+              reason: { type: string, minLength: 3, maxLength: 500 }
     Credentials:
       required: true
       content:

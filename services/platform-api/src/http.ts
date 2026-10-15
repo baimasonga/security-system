@@ -117,7 +117,18 @@ export function installErrorHandling(app: FastifyInstance): void {
   );
 }
 
-export function installSecurityHeaders(app: FastifyInstance, production: boolean): void {
+const PAGES = new Set(['/', '/s/:token', '/r/:token', '/l/:code']);
+
+/**
+ * `contentOrigin` is the isolated origin that receives direct uploads (sharing); pages may connect to it, nothing
+ * else changes. It never appears in script-src: content from it is never executed by the portal.
+ */
+export function installSecurityHeaders(
+  app: FastifyInstance,
+  production: boolean,
+  contentOrigin?: string,
+): void {
+  const connect = contentOrigin ? `'self' ${contentOrigin}` : "'self'";
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('cache-control', 'no-store');
@@ -126,8 +137,8 @@ export function installSecurityHeaders(app: FastifyInstance, production: boolean
       'content-security-policy',
       req.routeOptions.url === '/checkout'
         ? "default-src 'none'; script-src 'self' https://cdn.paddle.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.paddle.com; frame-src https://*.paddle.com; img-src 'self' data: https://*.paddle.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-        : req.routeOptions.url === '/'
-          ? "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        : PAGES.has(req.routeOptions.url ?? '')
+          ? `default-src 'none'; script-src 'self'; style-src 'self'; connect-src ${connect}; img-src 'self' blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`
           : "default-src 'none'; frame-ancestors 'none'",
     );
     reply.header('cross-origin-resource-policy', 'same-origin');

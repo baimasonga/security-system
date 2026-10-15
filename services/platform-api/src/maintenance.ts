@@ -24,6 +24,10 @@ export function startMaintenance(
       const r = await c.licensing.runMaintenance();
       const auth = await c.auth.runMaintenance();
       const windows = (await c.rateBackend?.purgeExpired()) ?? 0;
+      const sharing = await c.sharing?.runRetention();
+      if (sharing)
+        for (const [table, n] of Object.entries(sharing))
+          c.metrics.inc('maintenance_deleted_total', { table: `sharing_${table}` }, n);
       c.metrics.inc('maintenance_deleted_total', { table: 'login_failures' }, auth.loginFailures);
       c.metrics.inc('maintenance_deleted_total', { table: 'rate_limits' }, windows);
       c.metrics.inc('maintenance_runs_total', { outcome: 'ok' });

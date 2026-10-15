@@ -562,6 +562,23 @@ export class LicensingService {
     return { licenseId, status: 'valid', entitlements: resolveEntitlements(plan, lic.overrides) };
   }
 
+  /**
+   * Resolved entitlements of the organization's currently valid licenses (canaries excluded). Internal: for
+   * server-side limit resolution by other bounded contexts (e.g. sharing quotas), which authorize the caller
+   * first. Never derived from client-supplied plan state.
+   */
+  async validEntitlements(orgId: string): Promise<Array<Record<string, unknown>>> {
+    const out: Array<Record<string, unknown>> = [];
+    for (const lic of await this.#d.store.listLicenses(orgId)) {
+      if (lic.kind === 'canary') continue;
+      const ctx = await this.#d.store.findLicenseContext(orgId, lic.id, 'none');
+      if (!ctx?.plan || this.#evaluate(ctx.license, ctx.subscription).outcome.decision !== 'ALLOW')
+        continue;
+      out.push(resolveEntitlements(ctx.plan, ctx.license.overrides).entitlements);
+    }
+    return out;
+  }
+
   async getUsage(p: UserPrincipal, orgId: string, licenseId: string) {
     await this.#d.authorize(p, orgId, 'license:read');
     return this.#d.store.transaction(async (tx) => {

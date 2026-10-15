@@ -5,7 +5,30 @@ import {
   type CheckoutProvider,
 } from './integrations/billing.ts';
 import { ResendMailDelivery } from './integrations/mail.ts';
-import { AuthService, InMemoryAuthStore, type AuthStore, type IdentityDelivery } from '@trust/auth';
+import {
+  AuthService,
+  InMemoryAuthStore,
+  hashPassword,
+  verifyPassword,
+  type AuthStore,
+  type IdentityDelivery,
+} from '@trust/auth';
+import { resolveTxt } from 'node:dns/promises';
+import {
+  BasicContentScanner,
+  ChainedScanner,
+  DEFAULT_SHARING_CONFIG,
+  InMemorySharingStore,
+  SharingKeys,
+  SharingService,
+  type FileScanner,
+  type ObjectStore,
+  type SharingStore,
+} from '@trust/sharing';
+import { ClamdScanner } from './integrations/clamd.ts';
+import { LocalObjectStore } from './integrations/object-store-local.ts';
+import { S3ObjectStore } from './integrations/object-store-s3.ts';
+import { PgSharingStore } from './db/pg-sharing-store.ts';
 import { InMemoryAuditLog, type AuditLog } from '@trust/audit';
 import { KeyRing, kidForPublicKey, type KeyRecord } from '@trust/crypto';
 import {
@@ -57,6 +80,10 @@ export interface Container {
   auth: AuthService;
   licensing: LicensingService;
   billing: BillingService | undefined;
+  /** File sharing and short links (ADR-021); undefined when not configured. */
+  sharing: SharingService | undefined;
+  /** The local signed-URL store, when sharing uses it (served by the separate content origin). */
+  sharingLocalStore: LocalObjectStore | undefined;
   keyring: KeyRing;
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
@@ -82,6 +109,12 @@ export interface ContainerOverrides {
   pool?: PgPool;
   /** Test seam: replaces the HTTPS witness. */
   anchorSink?: AnchorSink;
+  /** Test seams for sharing. */
+  sharingObjects?: ObjectStore;
+  sharingScanner?: FileScanner;
+  sharingResolveTxt?: (name: string) => Promise<string[][]>;
+  sharingMailer?: IdentityDelivery;
+  sharingConfig?: Partial<typeof DEFAULT_SHARING_CONFIG>;
 }
 
 /** Serializes background writes (key persistence, key audit) and surfaces failures at `flush()`. */
@@ -288,6 +321,64 @@ export async function createContainer(
       })
     : undefined;
 
+  let sharing: SharingService | undefined;
+  let sharingLocalStore: LocalObjectStore | undefined;
+  const sc = config.sharing;
+  if (sc) {
+    const sharingStore: SharingStore = pool
+      ? new PgSharingStore(pool, clock, { auditShards: shards })
+      : new InMemorySharingStore({ audit });
+    let objects: ObjectStore | undefined = overrides?.sharingObjects;
+    if (!objects) {
+      if (sc.storage.kind === 'local') {
+        sharingLocalStore = new LocalObjectStore({
+          root: sc.storage.root,
+          signingSecret: sc.secret,
+          contentOrigin: sc.storage.contentOrigin,
+          ...(config.env === 'production' ? {} : { minPartBytes: 1 }),
+        });
+        objects = sharingLocalStore;
+      } else objects = new S3ObjectStore(sc.storage, { now: () => clock.now() });
+    }
+    const basic = new BasicContentScanner();
+    const scanner =
+      overrides?.sharingScanner ??
+      (sc.clamd ? new ChainedScanner([basic, new ClamdScanner(sc.clamd)]) : basic);
+    const scrypt = config.scrypt;
+    const mailer =
+      overrides?.sharingMailer ??
+      (config.emailDelivery ? new ResendMailDelivery(config.emailDelivery) : undefined);
+    sharing = new SharingService({
+      store: sharingStore,
+      objects,
+      scanner,
+      keys: new SharingKeys(sc.secret),
+      clock,
+      config: {
+        ...DEFAULT_SHARING_CONFIG,
+        eventRetentionDays: sc.eventRetentionDays,
+        ...(config.env === 'production' ? {} : { partBytes: 5 * 1024 * 1024 }),
+        ...overrides?.sharingConfig,
+        publicOrigin: sc.publicOrigin,
+        shortOrigin: sc.shortOrigin,
+      },
+      destinations: {
+        reservedHosts: [new URL(sc.publicOrigin).hostname, new URL(sc.shortOrigin).hostname],
+        blockedHosts: sc.blockedHosts,
+      },
+      authorize: async (p, orgId, perm) => void (await auth.requireOrgPermission(p, orgId, perm)),
+      identity: (userId) => auth.contact(userId),
+      isMember: (orgId, userId) => auth.isMember(orgId, userId),
+      entitlements: (orgId) => licensing.validEntitlements(orgId),
+      passwords: {
+        hash: (pw) => hashPassword(pw, scrypt),
+        verify: (pw, h) => verifyPassword(pw, h),
+      },
+      ...(mailer ? { mailer } : {}),
+      resolveTxt: overrides?.sharingResolveTxt ?? ((name) => resolveTxt(name)),
+    });
+  }
+
   const anchorStore: AnchorStore = pool ? new PgAnchorStore(pool) : new InMemoryAnchorStore();
   const sink =
     overrides?.anchorSink ??
@@ -331,6 +422,8 @@ export async function createContainer(
     auth,
     licensing,
     billing,
+    sharing,
+    sharingLocalStore,
     keyring,
     telemetry,
     telemetrySink,

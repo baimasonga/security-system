@@ -54,3 +54,10 @@ erDiagram
 - Test: `npm run test:db` runs the migration/constraint tests, the PostgreSQL adapter tests,
   the port contract suites, and re-runs the licensing, API, security and end-to-end suites
   against PostgreSQL (each test in its own migrated schema).
+
+## File sharing (migration 0011)
+
+Transfers, documents/versions, share links, short links, upload requests, receipts, aggregates, jobs, domains,
+branding, abuse reports and usage: see [10-file-sharing-and-short-links §4](10-file-sharing-and-short-links.md#4-data-model-migration-0011).
+The same rules apply: composite `(id, org_id)` foreign keys, hashes instead of secrets, CHECK constraints for every
+state machine and for the public/confidential short-link separation.

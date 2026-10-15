@@ -23,6 +23,13 @@ export default tseslint.config(
           'atob',
           'TextEncoder',
           'TextDecoder',
+          'localStorage',
+          'setTimeout',
+          'Blob',
+          'URL',
+          'Uint8Array',
+          'prompt',
+          'File',
         ].map((name) => [name, 'readonly']),
       ),
     },
@@ -68,6 +75,12 @@ export default tseslint.config(
       'services/platform-api/src/routes/portal.ts',
     ],
     rules: { 'security/detect-non-literal-fs-filename': 'off' }, // paths come from operator-controlled env/CLI arguments, by design
+  },
+  {
+    // Local object store: every path is <operator root>/<sha256 digest | random hex id>, built by the store itself;
+    // tenant-supplied names never reach the filesystem.
+    files: ['services/platform-api/src/integrations/object-store-local.ts'],
+    rules: { 'security/detect-non-literal-fs-filename': 'off' },
   },
   {
     files: ['**/*.mjs', 'tools/**'],

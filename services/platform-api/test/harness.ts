@@ -6,6 +6,11 @@ import type { CheckoutProvider } from '../src/integrations/billing.ts';
 import type { IdentityDelivery } from '@trust/auth';
 import type { LicensingConfig } from '@trust/licensing';
 import { createSchemaPool, pgTestEnabled } from '../../../tests/support/pg.ts';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildContentApp } from '../src/integrations/object-store-local.ts';
+import type { ContainerOverrides } from '../src/container.ts';
 
 export const DAY = 86_400_000;
 export const PW = 'correct horse battery staple';
@@ -20,6 +25,13 @@ export interface Env {
     opts?: { token?: string; body?: unknown; headers?: Record<string, string> },
   ) => Promise<{ status: number; body: any; headers: Record<string, unknown> }>;
   register: (email: string) => Promise<{ userId: string; orgId: string; token: string }>;
+  /** Sends a request to a signed object URL on the isolated content origin (local store). */
+  content: (
+    method: 'PUT' | 'GET' | 'OPTIONS',
+    url: string,
+    body?: Buffer,
+    headers?: Record<string, string>,
+  ) => Promise<{ status: number; body: Buffer; headers: Record<string, unknown> }>;
   login: (email: string) => Promise<string>;
   operatorToken: () => Promise<string>;
   /** Security signals recorded so far, from whichever backend is active. */
@@ -43,6 +55,7 @@ export async function makeEnv(over?: {
   checkoutProvider?: CheckoutProvider;
   licensing?: Partial<LicensingConfig>;
   app?: AppOptions;
+  container?: Partial<ContainerOverrides>;
 }): Promise<Env> {
   let t = new Date('2026-03-01T00:00:00Z');
   const clock = {
@@ -59,9 +72,18 @@ export async function makeEnv(over?: {
       register: 100_000,
       challenge: 100_000,
       activate: 100_000,
+      sharing: 100_000,
     },
     ...over?.config,
   };
+  if (config.sharing?.storage.kind === 'local' && !over?.config?.sharing)
+    config.sharing = {
+      ...config.sharing,
+      storage: {
+        ...config.sharing.storage,
+        root: mkdtempSync(join(tmpdir(), 'rokela-share-test-')),
+      },
+    };
   const pool = pgTestEnabled() ? createSchemaPool() : undefined;
   const c = await createContainer(config, {
     clock,
@@ -69,9 +91,32 @@ export async function makeEnv(over?: {
     checkoutProvider: over?.checkoutProvider,
     ...(over?.licensing ? { licensing: over.licensing } : {}),
     ...(pool ? { pool } : {}),
+    ...over?.container,
   });
   const app = await buildApp(c, over?.app);
   await app.ready();
+  const contentApp = c.sharingLocalStore
+    ? await buildContentApp(c.sharingLocalStore, {
+        allowedOrigin: config.sharing!.publicOrigin,
+        now: () => clock.now().getTime(),
+      })
+    : undefined;
+  const content: Env['content'] = async (method, url, body, headers) => {
+    if (!contentApp) throw new Error('no local content origin');
+    const u = new URL(url);
+    const res = await contentApp.inject({
+      method,
+      url: `${u.pathname}${u.search}`,
+      headers: {
+        ...(body
+          ? { 'content-length': String(body.length), 'content-type': 'application/octet-stream' }
+          : {}),
+        ...headers,
+      },
+      ...(body ? { payload: body } : {}),
+    });
+    return { status: res.statusCode, body: res.rawPayload, headers: res.headers };
+  };
 
   const call: Env['call'] = async (method, url, opts) => {
     const res = await app.inject({
@@ -169,5 +214,5 @@ export async function makeEnv(over?: {
     return r.rows as Array<{ kind: string; severity: string }>;
   };
 
-  return { app, c, clock, call, register, login, operatorToken, provision, signals };
+  return { app, c, clock, call, register, login, operatorToken, provision, signals, content };
 }
