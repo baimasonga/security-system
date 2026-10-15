@@ -42,6 +42,31 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   security_events: RI,
   telemetry_events: RI,
   rate_limits: ALL, // disposable counters
+  // File sharing and short links (ADR-021). Immutable history (versions' blobs, destination history, comments)
+  // cannot be rewritten or deleted by the application; only disposable state is deletable.
+  share_accounts: RIU, // lock anchor for per-organization quota checks (row locks need UPDATE; no mutable data)
+  share_blobs: RIU, // object metadata; deletion is a status change, the row stays as a tombstone
+  share_documents: RIU,
+  share_versions: RIU, // publication timestamps only; blob and number never change (no DELETE)
+  share_transfers: RIU,
+  share_transfer_files: RIU,
+  share_links: RIU,
+  share_comments: RI,
+  share_reviews: RIU,
+  short_links: RIU,
+  short_link_destinations: RI, // destination history is append-only
+  upload_requests: RIU,
+  upload_submissions: RIU,
+  upload_submission_files: RIU,
+  share_events: ['SELECT', 'INSERT', 'DELETE'], // receipts; retention deletes expired rows, never edits them
+  share_stats: ALL, // aggregates: upsert + retention
+  share_notifications: ALL, // read markers + retention
+  share_jobs: ALL, // fenced work queue; finished jobs are deleted
+  share_domains: ALL, // a tenant may remove an unused custom domain
+  share_brands: RIU,
+  abuse_reports: RIU,
+  share_usage: RIU,
+  share_attempts: ALL, // password-attempt counters; purged by maintenance
 };
 
 /** Roles that a managed platform's auto-generated API uses. They must have no access to the platform's data. */

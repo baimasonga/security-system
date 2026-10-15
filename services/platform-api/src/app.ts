@@ -11,6 +11,7 @@ import { registerLicenseRoutes } from './routes/licenses.ts';
 import { registerDeviceRoutes } from './routes/devices.ts';
 import { registerPortalRoutes } from './routes/portal.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
+import { registerSharingRoutes } from './routes/sharing.ts';
 
 export interface AppOptions {
   logger?: boolean;
@@ -43,7 +44,12 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
     });
   }
 
-  installSecurityHeaders(app, prod);
+  const sc = c.config.sharing;
+  installSecurityHeaders(
+    app,
+    prod,
+    sc ? (sc.storage.kind === 'local' ? sc.storage.contentOrigin : sc.storage.endpoint) : undefined,
+  );
   installErrorHandling(app);
   app.addHook('onSend', async (req, reply) => void reply.header('x-request-id', req.id));
 
@@ -56,7 +62,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
       : {}),
   });
 
-  registerPortalRoutes(app, c.config.billing);
+  const pages = registerPortalRoutes(app, c.config.billing);
 
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 
@@ -79,5 +85,6 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   registerLicenseRoutes(app, c);
   registerDeviceRoutes(app, c);
   registerAdminRoutes(app, c);
+  registerSharingRoutes(app, c, pages);
   return app;
 }

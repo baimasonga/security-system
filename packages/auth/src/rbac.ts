@@ -8,12 +8,23 @@ export const PERMISSIONS = [
   'trial:start',
   'device:read',
   'device:deactivate',
+  'share:read',
+  'share:create',
+  'share:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 // Deny by default: a permission not listed for a role is not granted.
 const GRANTS: Record<OrgRole, readonly Permission[]> = {
-  member: ['org:read', 'license:read', 'license:activate', 'trial:start', 'device:read'],
+  member: [
+    'org:read',
+    'license:read',
+    'license:activate',
+    'trial:start',
+    'device:read',
+    'share:read',
+    'share:create',
+  ],
   admin: [
     'org:read',
     'org:manage_members',
@@ -22,6 +33,9 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
     'trial:start',
     'device:read',
     'device:deactivate',
+    'share:read',
+    'share:create',
+    'share:manage',
   ],
   owner: [
     'org:read',
@@ -31,6 +45,9 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
     'trial:start',
     'device:read',
     'device:deactivate',
+    'share:read',
+    'share:create',
+    'share:manage',
   ],
 };
 

@@ -1,5 +1,7 @@
 # First deploy checklist (any container host; Railway notes inline)
 
+On Railway with Cloudflare R2, follow [railway.md](railway.md): `railway.json` automates the build, pre-deploy migrations/grants and the health check.
+
 For Sierra Business catalog preparation, customer provisioning and activation acceptance, follow the [Sierra Business rollout](sierra-business-rollout.md) after completing the platform setup below.
 
 Status: written from the code and configuration guards; **not yet exercised on a live host**. The Dockerfile has never been
@@ -86,3 +88,24 @@ Apply migration `0009_billing_checkout`, then run owner-side `npm run db:grants`
 Billing stays disabled until the complete Paddle setting group is present. Configure sandbox credentials, an approved payment hostname separate from `PUBLIC_ORIGIN`, server-owned price mapping and signed notification destination first. To use the built-in payment page, add that payment hostname to Railway, set `PADDLE_PAYMENT_URL` to its HTTPS `/checkout` URL, and set the public `PADDLE_CLIENT_TOKEN` for sandbox/live mode. Prove a complete sandbox payment and uncertain-outcome recovery before live mode. See [billing checkout](../api/billing-checkout.md). Seller/payout availability for Sierra Leone must be confirmed with Paddle.
 
 The Node SDK now supports Windows DPAPI protected storage and native asynchronous key providers. DPAPI is not TPM attestation. Signed updates require an independently trusted root, release signing custody, root-approved immutable hosting, and a Windows installer/recovery flow. See [secure updates](../api/secure-updates.md). No update-signing secret is required by the API server; production signing belongs in the release pipeline, separate from license signing.
+
+## File sharing rollout (ADR-021)
+
+Sharing is **off in production** until configured. Apply migration `0011_file_sharing`, then `npm run db:grants` and
+`npm run db:check`. Set:
+
+- `SHARING_STORAGE=s3`, `SHARING_S3_ENDPOINT` (e.g. `https://<account>.r2.cloudflarestorage.com`), `SHARING_S3_REGION`
+  (`auto` for R2), `SHARING_S3_BUCKET`, `SHARING_S3_ACCESS_KEY_ID`, `SHARING_S3_SECRET_ACCESS_KEY` (secrets; a
+  bucket-scoped token with object read/write only).
+- `SHARING_SECRET` (≥ 32 random characters, distinct from other keys; changing it changes every share URL).
+- `SHARING_PUBLIC_ORIGIN` (or `PUBLIC_ORIGIN`), optional `SHARING_SHORT_ORIGIN` for a short-link host.
+- `CLAMD_HOST`/`CLAMD_PORT` for a private ClamAV daemon (StreamMaxLength ≥ the largest plan file size), or
+  `SHARING_MALWARE_SCAN_DISABLED=true` to accept structural checks only.
+- Optional: `SHARING_BLOCKED_HOSTS`, `SHARING_EVENT_RETENTION_DAYS` (default 180), `SHARING_JOB_INTERVAL_SECONDS`
+  (default 5), `RATE_LIMIT_SHARING` (default 60/min per IP).
+
+Bucket: private, versioning off, no public access, CORS allowing `PUT` and `GET` from the portal origin only with
+`ETag` exposed, lifecycle rule aborting incomplete multipart uploads after 2 days (see
+[sharing-retention](../security/sharing-retention.md)). Grant plan entitlements (`share_*`, see
+[api/sharing.md](../api/sharing.md)) for paid features. Before customers: run one upload/download against the live
+bucket, confirm an EICAR file is rejected, and confirm expired temporary files disappear from the bucket.

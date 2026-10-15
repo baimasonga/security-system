@@ -100,3 +100,14 @@ Provider integration foundations include a tested Resend delivery adapter, expli
 Authenticator MFA setup and recovery codes are available in Account when `MFA_ENCRYPTION_KEY` is configured. See [MFA rollout](docs/deploy/first-deploy.md#authenticator-mfa-rollout-adr-017) before enabling operator enforcement.
 
 [Monthly quota accounting](docs/api/monthly-quotas.md) provides current usage, atomic consumption and retry-safe receipts; processing services and payment settlement remain separate capabilities.
+
+## File sharing and short links
+
+The portal's **Files & links** view lets users edit (compose) a PDF, save a private draft, export immutable versions,
+publish explicitly, and share through controlled links (latest published or fixed version; password, expiry, download
+limit, named verified recipients, review/approval), plus transfers with resumable file/folder uploads, upload requests,
+short links with QR codes, receipts and notifications. Bytes go directly to private object storage on a separate
+origin (local signed-URL store in development on port 8081; S3/R2 in production) and are checked before they can be
+served. See [ADR-021](docs/adr/ADR-021-file-sharing-and-short-links.md) and
+[architecture/10](docs/architecture/10-file-sharing-and-short-links.md). In development open the portal at
+`http://127.0.0.1:8080` (the content origin allows that origin only).

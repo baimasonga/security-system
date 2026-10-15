@@ -9,6 +9,8 @@ import { PgAnchorStore } from '../../src/db/pg-anchor-store.ts';
 import { auditLogContract } from '../../../../packages/audit/test/log-contract.ts';
 import { authStoreContract } from '../../../../packages/auth/test/store-contract.ts';
 import { licensingStoreContract } from '../../../../packages/licensing/test/store-contract.ts';
+import { sharingStoreContract } from '../../../../packages/sharing/test/store-contract.ts';
+import { PgSharingStore } from '../../src/db/pg-sharing-store.ts';
 import { createSchemaPool } from '../../../../tests/support/pg.ts';
 import { loadConfig } from '../../src/config.ts';
 import { createContainer } from '../../src/container.ts';
@@ -49,6 +51,27 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
           "INSERT INTO users (id, email, password_hash) VALUES ($1, $1 || '@x.test', 'x')",
           [id],
         )),
+    };
+  });
+
+  sharingStoreContract('postgres', () => {
+    const pool = createSchemaPool();
+    let n = 0;
+    return {
+      store: new PgSharingStore(pool, clock),
+      audited: auditedOf(pool),
+      seed: async () => {
+        const s = `${Date.now().toString(36)}${(++n).toString(36)}${Math.random().toString(16).slice(2, 8)}`;
+        const ids = { orgId: `org_${s}`, userId: `usr_${s}` };
+        await pool.query("INSERT INTO organizations (id, name, kind) VALUES ($1,$1,'team')", [
+          ids.orgId,
+        ]);
+        await pool.query(
+          "INSERT INTO users (id, email, password_hash) VALUES ($1, $1 || '@x.test', 'x')",
+          [ids.userId],
+        );
+        return ids;
+      },
     };
   });
 

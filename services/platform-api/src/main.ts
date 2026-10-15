@@ -5,6 +5,8 @@ import { createContainer } from './container.ts';
 import { describeConnectionTarget } from './db/connection.ts';
 import { startAnchoring } from './anchors.ts';
 import { startMaintenance } from './maintenance.ts';
+import { startSharingWorker } from './sharing-worker.ts';
+import { buildContentApp } from './integrations/object-store-local.ts';
 
 const config = loadConfig();
 if (config.persistence === 'postgres' && config.databaseUrl) {
@@ -81,6 +83,30 @@ if (container.anchors && config.auditAnchor) {
   app.log.warn(
     'audit anchoring is DISABLED: a database superuser could rewrite history undetected (R-13)',
   );
+}
+if (container.sharing && config.sharing) {
+  const worker = startSharingWorker(container, {
+    everyMs: config.sharing.jobIntervalSeconds * 1000,
+    onError: () => app.log.error('sharing worker failed; pending jobs remain queued'),
+  });
+  app.addHook('onClose', async () => worker.stop());
+  if (!config.sharing.clamd)
+    app.log.warn(
+      'sharing uploads get structural checks only; set CLAMD_HOST to add antivirus scanning',
+    );
+  const st = config.sharing.storage;
+  if (st.kind === 'local' && container.sharingLocalStore) {
+    // The isolated content origin: a separate listener that serves only signed object URLs.
+    const content = await buildContentApp(container.sharingLocalStore, {
+      allowedOrigin: config.sharing.publicOrigin,
+      logger: false,
+    });
+    await content.listen({ host: st.contentHost, port: st.contentPort });
+    app.addHook('onClose', async () => content.close());
+    app.log.warn(
+      `sharing uses LOCAL object storage (development only); content origin ${st.contentOrigin}`,
+    );
+  }
 }
 await app.listen({ host: config.host, port: config.port });
 

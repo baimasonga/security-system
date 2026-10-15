@@ -1,4 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { validateHostname } from '@trust/sharing';
 import type { BillingConfig } from './billing.ts';
 import { PaddleCheckoutProvider, PaddleWebhookVerifier } from './integrations/billing.ts';
 import { IdentityMailCipher, MfaCipher, type ScryptParams } from '@trust/auth';
@@ -56,6 +59,166 @@ export interface PlatformConfig {
     register: number;
     challenge: number;
     activate: number;
+    /** Public share/short-link/upload-request opens and password attempts, per IP per minute (default 60). */
+    sharing?: number;
+  };
+  /** File sharing and short links (ADR-021). Undefined = disabled (the production default until configured). */
+  sharing: SharingSettings | undefined;
+}
+
+export interface SharingSettings {
+  secret: string;
+  publicOrigin: string;
+  shortOrigin: string;
+  storage:
+    | {
+        kind: 'local';
+        root: string;
+        contentOrigin: string;
+        contentHost: string;
+        contentPort: number;
+      }
+    | {
+        kind: 's3';
+        endpoint: string;
+        region: string;
+        bucket: string;
+        accessKeyId: string;
+        secretAccessKey: string;
+      };
+  clamd: { host: string; port: number } | undefined;
+  blockedHosts: string[];
+  eventRetentionDays: number;
+  jobIntervalSeconds: number;
+}
+
+function httpOrigin(raw: string, name: string, prod: boolean): string {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new Error(`${name} must be an origin`);
+  }
+  if (
+    u.username ||
+    u.password ||
+    u.pathname !== '/' ||
+    u.search ||
+    u.hash ||
+    (prod ? u.protocol !== 'https:' : !['http:', 'https:'].includes(u.protocol))
+  )
+    throw new Error(`${name} must be an origin (HTTPS in production)`);
+  return u.origin;
+}
+
+/**
+ * Sharing fails closed in production: no local storage, a dedicated secret, HTTPS origins, and antivirus unless the
+ * operator explicitly accepts structural checks only (SHARING_MALWARE_SCAN_DISABLED=true).
+ */
+function loadSharing(
+  env: NodeJS.ProcessEnv,
+  prod: boolean,
+  port: number,
+  otherSecrets: string[],
+): SharingSettings | undefined {
+  const kind = env['SHARING_STORAGE'] ?? (prod ? 'off' : 'local');
+  if (kind === 'off') return undefined;
+  if (kind !== 'local' && kind !== 's3')
+    throw new Error('SHARING_STORAGE must be local, s3 or off');
+  if (prod && kind === 'local')
+    throw new Error('production sharing requires SHARING_STORAGE=s3 (private object storage)');
+  const secret = env['SHARING_SECRET'] ?? (prod ? '' : ephemeral('sharing'));
+  if (secret.length < 32) throw new Error('SHARING_SECRET must be set (>= 32 chars)');
+  if (prod && otherSecrets.includes(secret))
+    throw new Error('SHARING_SECRET must be separate from other keys');
+  const publicRaw =
+    env['SHARING_PUBLIC_ORIGIN'] ??
+    env['PUBLIC_ORIGIN'] ??
+    (prod ? '' : `http://127.0.0.1:${port}`);
+  if (!publicRaw)
+    throw new Error('SHARING_PUBLIC_ORIGIN (or PUBLIC_ORIGIN) is required for sharing');
+  const publicOrigin = httpOrigin(publicRaw, 'SHARING_PUBLIC_ORIGIN', prod);
+  const shortOrigin = env['SHARING_SHORT_ORIGIN']
+    ? httpOrigin(env['SHARING_SHORT_ORIGIN'], 'SHARING_SHORT_ORIGIN', prod)
+    : publicOrigin;
+  let storage: SharingSettings['storage'];
+  if (kind === 'local') {
+    const contentPort = Number(env['SHARING_CONTENT_PORT'] ?? 8081);
+    if (!Number.isInteger(contentPort) || contentPort < 0 || contentPort > 65535)
+      throw new Error('invalid SHARING_CONTENT_PORT');
+    const contentOrigin = httpOrigin(
+      env['SHARING_CONTENT_ORIGIN'] ?? `http://127.0.0.1:${contentPort}`,
+      'SHARING_CONTENT_ORIGIN',
+      false,
+    );
+    if (contentOrigin === publicOrigin)
+      throw new Error('the content origin must differ from the portal origin');
+    storage = {
+      kind,
+      root: env['SHARING_LOCAL_DIR'] ?? join(tmpdir(), 'rokela-sharing-dev'),
+      contentOrigin,
+      contentHost: env['SHARING_CONTENT_HOST'] ?? '127.0.0.1',
+      contentPort,
+    };
+  } else {
+    const names = [
+      'SHARING_S3_ENDPOINT',
+      'SHARING_S3_BUCKET',
+      'SHARING_S3_ACCESS_KEY_ID',
+      'SHARING_S3_SECRET_ACCESS_KEY',
+    ];
+    if (names.some((n) => !env[n]))
+      throw new Error(`${names.join(', ')} are required with SHARING_STORAGE=s3`);
+    const endpoint = httpOrigin(env['SHARING_S3_ENDPOINT']!, 'SHARING_S3_ENDPOINT', prod);
+    if (endpoint === publicOrigin)
+      throw new Error('object storage must be a separate origin from the portal');
+    if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(env['SHARING_S3_BUCKET']!))
+      throw new Error('invalid SHARING_S3_BUCKET');
+    storage = {
+      kind,
+      endpoint,
+      region: env['SHARING_S3_REGION'] ?? 'auto',
+      bucket: env['SHARING_S3_BUCKET']!,
+      accessKeyId: env['SHARING_S3_ACCESS_KEY_ID']!,
+      secretAccessKey: env['SHARING_S3_SECRET_ACCESS_KEY']!,
+    };
+  }
+  let clamd: SharingSettings['clamd'];
+  if (env['CLAMD_HOST']) {
+    const p = Number(env['CLAMD_PORT'] ?? 3310);
+    if (!Number.isInteger(p) || p < 1 || p > 65535) throw new Error('invalid CLAMD_PORT');
+    clamd = { host: env['CLAMD_HOST'], port: p };
+  } else if (prod && env['SHARING_MALWARE_SCAN_DISABLED'] !== 'true')
+    throw new Error(
+      'CLAMD_HOST is required for production sharing (set SHARING_MALWARE_SCAN_DISABLED=true to accept structural checks only)',
+    );
+  const blockedHosts = (env['SHARING_BLOCKED_HOSTS'] ?? '')
+    .split(',')
+    .map((h) => h.trim())
+    .filter(Boolean)
+    .map((h) => {
+      try {
+        return validateHostname(h);
+      } catch {
+        throw new Error('invalid SHARING_BLOCKED_HOSTS');
+      }
+    });
+  const int = (name: string, min: number, max: number, fallback: number) => {
+    const raw = env[name];
+    if (raw === undefined) return fallback;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < min || n > max) throw new Error(`invalid ${name}`);
+    return n;
+  };
+  return {
+    secret,
+    publicOrigin,
+    shortOrigin,
+    storage,
+    clamd,
+    blockedHosts,
+    eventRetentionDays: int('SHARING_EVENT_RETENTION_DAYS', 1, 3650, 180),
+    jobIntervalSeconds: int('SHARING_JOB_INTERVAL_SECONDS', 1, 3600, 5),
   };
 }
 
@@ -335,6 +498,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       register: limit(env, 'RATE_LIMIT_REGISTER', 5),
       challenge: limit(env, 'RATE_LIMIT_CHALLENGE', 60),
       activate: limit(env, 'RATE_LIMIT_ACTIVATE', 20),
+      sharing: limit(env, 'RATE_LIMIT_SHARING', 60),
     },
+    sharing: loadSharing(env, prod, port, [licenseKeyPepper, pseudonymKey]),
   };
 }

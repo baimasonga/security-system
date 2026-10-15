@@ -60,6 +60,10 @@ export const ERROR_STATUS = {
   device_key_conflict: 409,
   activation_not_found: 404,
   trial_not_available: 409,
+  // Sharing outcomes
+  quota_exceeded: 409,
+  link_unavailable: 410,
+  password_required: 401,
   internal: 500,
 } as const;
 export type ErrorCode = keyof typeof ERROR_STATUS;

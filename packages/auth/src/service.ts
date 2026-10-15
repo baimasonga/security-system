@@ -655,6 +655,18 @@ export class AuthService {
     return m;
   }
 
+  /** Contact facts for an active user (internal; used by sharing receipts and recipient checks). */
+  async contact(userId: string): Promise<{ email: string; emailVerified: boolean } | undefined> {
+    const u = await this.#store.findUserById(userId);
+    return u && u.status === 'active'
+      ? { email: u.email, emailVerified: !!u.emailVerifiedAt }
+      : undefined;
+  }
+
+  async isMember(orgId: string, userId: string): Promise<boolean> {
+    return (await this.#store.findMembership(orgId, userId)) !== undefined;
+  }
+
   async orgExists(orgId: string): Promise<boolean> {
     return (await this.#store.findOrganization(orgId)) !== undefined;
   }

@@ -377,3 +377,11 @@ Billing behavioral suites additionally run under PostgreSQL owner and least-priv
 A local PostgreSQL 17.11 activation stampede compared archived commit `b455192` with the encrypted outbox source, using separate disposable databases, fsync on, pool 10 and 30 competing devices against a five-device limit. Both runs produced exactly five successes and 25 `device_limit_reached` outcomes, with zero deadlocks, retries or exhausted transactions. Baseline p99 was 190.79 ms; new-source p99 was 196.21 ms. This short run establishes the expected licensing outcomes, not a throughput improvement or a production capacity bound. Email delivery was not configured for that licensing comparison.
 
 The dedicated outbox tests separately drain 30 messages with four concurrent workers in bounded passes, require exactly one send per message without lease expiry, and test stale acknowledgements after lease reclamation. Provider replay after a crash remains at-least-once and relies on the same idempotency key. All mail adapters in these measurements are test adapters; no real email was sent. Longer production/provider-outage soaks remain unrun.
+
+## Re-check after migration 0011 (file sharing, ADR-021)
+
+`--scenario refresh-ramp --rps 100,200 --seconds 10 --assert-clean` on the same kind of shared VM: 100/s → 99.9/s
+(p99 28.6 ms), 200/s → 199.8/s (p99 30.2 ms), 0 errors, 0 dropped, 0 retries, 0 deadlocks; consistent with the
+baseline above (refresh clean to 300/s, p99 39 ms). Sharing tables are separate from the licensing hot path. The new
+upload/download paths and the per-organization sharing account lock are **not yet load tested** (open item in
+architecture/10 §7).
