@@ -1,6 +1,6 @@
 # ADR-029: Cross-application operations and security monitoring
 
-Status: **accepted design in OPS-001; runtime implementation pending OPS-002 onward**.
+Status: **accepted design in OPS-001; OPS-002 inventory implemented, disabled by default; OPS-003 onward pending**.
 Date: 19 October 2026. Trust-boundary change: **yes**.
 
 ## Context and baseline
@@ -8,14 +8,14 @@ Date: 19 October 2026. Trust-boundary change: **yes**.
 Warrior needs to monitor multiple applications and systems. Reconciled against `87256b7`
 and PR #15: Products are licensing catalog, client telemetry is privacy-filtered usage data,
 and the Security Center is account/device oriented. Buffered telemetry cannot acknowledge
-committed evidence. No monitoring inventory, integration credential or event collector exists.
+committed evidence. OPS-002 now adds inventory; integration credentials and the event collector remain pending.
 Business Admin provisioning and Rokela PDF's shared subscription/auth remain unchanged.
 
 ## Decisions
 
 The normative [operations contract](../api/operations-contract.md) resolves OPS-001's decisions.
-The [planned OpenAPI](../api/operations-planned.openapi.yaml) specifies OPS-002–004 requests and
-responses and is deliberately separate from the live API contract.
+The [planned OpenAPI](../api/operations-planned.openapi.yaml) retains OPS-003/004 requests and responses. Implemented OPS-002 inventory moved to the
+live API contract with an explicit rollout flag.
 
 1. **Inventory and authority.** Organization → application → environment → component. An active
    organization member owns the application, with criticality and optional active Product mapping.
@@ -79,3 +79,15 @@ OPS-001 adds documentation, machine-readable planned schemas and contract-exampl
 are executable schema checks, not implemented authorization, storage, credentials, event ingestion,
 alerting or a live Rokela PDF integration. Subsequent tasks must record runtime/PG/load/mutation evidence
 in [the status file](../programs/operations-security-status.md) before claiming those controls exist.
+
+## OPS-002 persistence refinement
+
+A per-organization `operations_accounts` lock anchor serializes inventory writes,
+including lifecycle, owner changes, caps and same-org dependency cycle checks.
+This deliberately coarse lock subsumes descendant inventory locks until credential
+and event tasks add their finer locks after the same anchor. All authority checks
+inside a PostgreSQL transaction use its own connection. A contention test exposed
+pool exhaustion when callbacks checked permissions through the outer pool; the
+transaction-bound authority port removes that dependency. Audit append stays in
+the same transaction; grants permit archival but no physical deletion. Rollout is
+opt-in through `OPERATIONS_INVENTORY_ENABLED`, with no production changes here.

@@ -1,3 +1,4 @@
+import { registerOperationsRoutes } from './routes/operations.ts';
 import Fastify, { type FastifyInstance } from 'fastify';
 import rateLimit, { type FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
 import { fastifyRateStore } from './rate-limit.ts';
@@ -83,6 +84,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   registerAuthRoutes(app, c);
   registerBillingRoutes(app, c);
   registerOrgRoutes(app, c);
+  registerOperationsRoutes(app, c);
   registerLicenseRoutes(app, c);
   registerDeviceRoutes(app, c);
   registerAdminRoutes(app, c);

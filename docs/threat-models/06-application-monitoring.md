@@ -1,6 +1,6 @@
 # Application monitoring threat model
 
-Status: **accepted design for OPS-001; required runtime controls remain unimplemented**.
+Status: **accepted design for OPS-001; OPS-002 inventory controls implemented; credential/event/health controls remain pending**.
 19 October 2026. Normative limits/protocol: [operations contract](../api/operations-contract.md).
 Scope: inventory, integrations, ingestion, health history, alerts and incidents; read-only first milestone.
 
@@ -44,3 +44,15 @@ restore drill, external probe, live credential, delivery provider or production 
 by OPS-001. Tests currently prove schema acceptance/rejection only. Later tasks must mutation-check each
 runtime control, run memory/least-privilege PG contracts and applicable load/outage scenarios, and attach
 actual evidence in the status file. No production changes or real alert recipients are authorized by this design.
+
+## OPS-002 control evidence
+
+`services/platform-api/test/operations.test.ts` exercises session/role/tenant and
+ancestor refusal, active owner/Product validation, unknown-field safe diagnostics,
+version conflicts, lifecycle/tombstone behavior, scoped cursors, dependency cycles,
+freeze and concurrent caps. `operations-store.db.test.ts` plus the shared store
+contract exercise ancestor FKs, immutable identity, adapter isolation, rollback and
+least-privilege deletion refusal. The contention driver tests requests beyond pool
+capacity and exact successful-write/audit counts. Mutation checks are recorded in
+the program handoff. These controls do not establish credentials, ingestion,
+notification delivery, independent probes or any live application integration.

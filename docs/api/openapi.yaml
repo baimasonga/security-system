@@ -2441,10 +2441,709 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/AdminHold' }
       responses:
         '200': { description: Hold state }
+  /v1/organizations/{orgId}/operations/applications:
+    get:
+      operationId: listApplications
+      summary: listApplications
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/Opslimit'
+        - $ref: '#/components/parameters/Opscursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsApplicationList'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    post:
+      operationId: createApplication
+      summary: createApplication
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsApplication'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsCreateApplication'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}:
+    get:
+      operationId: getApplication
+      summary: getApplication
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsApplication'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    patch:
+      operationId: updateApplication
+      summary: updateApplication
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsApplication'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsUpdateApplication'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    delete:
+      operationId: archiveApplication
+      summary: archiveApplication
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsApplication'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsArchive'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments:
+    get:
+      operationId: listEnvironments
+      summary: listEnvironments
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/Opslimit'
+        - $ref: '#/components/parameters/Opscursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsEnvironmentList'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    post:
+      operationId: createEnvironment
+      summary: createEnvironment
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsEnvironment'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsCreateEnvironment'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}:
+    get:
+      operationId: getEnvironment
+      summary: getEnvironment
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsEnvironment'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    patch:
+      operationId: updateEnvironment
+      summary: updateEnvironment
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsEnvironment'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsUpdateEnvironment'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    delete:
+      operationId: archiveEnvironment
+      summary: archiveEnvironment
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsEnvironment'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsArchive'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/components:
+    get:
+      operationId: listComponents
+      summary: listComponents
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/Opslimit'
+        - $ref: '#/components/parameters/Opscursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsComponentList'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    post:
+      operationId: createComponent
+      summary: createComponent
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsComponent'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsCreateComponent'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/components/{componentId}:
+    get:
+      operationId: getComponent
+      summary: getComponent
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/OpscomponentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsComponent'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    patch:
+      operationId: updateComponent
+      summary: updateComponent
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/OpscomponentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsComponent'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsUpdateComponent'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+    delete:
+      operationId: archiveComponent
+      summary: archiveComponent
+      x-implementation-status: implemented
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/OpscomponentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsComponent'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsArchive'
+      x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }
   parameters:
+    OpsorgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OpsOrgId'
+    Opslimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    Opscursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+        pattern: ^[A-Za-z0-9_-]+$
+    OpsapplicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OpsApplicationId'
+    OpsenvironmentId:
+      name: environmentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OpsEnvironmentId'
+    OpscomponentId:
+      name: componentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OpsComponentId'
     OrgId:
       {
         name: orgId,
@@ -2938,6 +3637,73 @@ components:
                   description: 'base64url Ed25519 over the proof message (see DeviceProof message)',
                 }
   responses:
+    OpsError400:
+      description: Malformed request or invalid cursor
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError401:
+      description: Generic authentication failure
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError403:
+      description: Insufficient permission or management freeze
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError404:
+      description: Not found or inaccessible scope
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError409:
+      description: Version, lifecycle, identity or inventory-cap conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError413:
+      description: Body exceeds 256 KiB
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError415:
+      description: Unsupported content encoding or media type
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError422:
+      description: Schema/privacy/new-event clock rejection
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+    OpsError429:
+      description: Request or scoped event/storage quota exceeded
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+          description: Seconds before retry; source bounds delay to 300 seconds
+    OpsError503:
+      description: Unavailable; no durable acknowledgement
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OpsProblem'
     SessionResponse:
       description: '{ token, expires_at, user_id }'
     PrivilegedRequest:
@@ -2946,6 +3712,476 @@ components:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
   schemas:
+    OpsOrgId:
+      type: string
+      pattern: ^org_[a-f0-9]{24}$
+    OpsApplicationList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsApplication'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    OpsApplication:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/OpsApplicationId'
+        org_id:
+          $ref: '#/components/schemas/OpsOrgId'
+        code:
+          $ref: '#/components/schemas/OpsCode'
+        state:
+          $ref: '#/components/schemas/OpsState'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          $ref: '#/components/schemas/OpsTime'
+        updated_at:
+          $ref: '#/components/schemas/OpsTime'
+        owner_user_id:
+          $ref: '#/components/schemas/OpsUserId'
+        criticality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        product_id:
+          anyOf:
+            - $ref: '#/components/schemas/OpsProductId'
+            - type: 'null'
+      required:
+        - id
+        - org_id
+        - code
+        - state
+        - version
+        - created_at
+        - updated_at
+        - owner_user_id
+        - criticality
+        - product_id
+    OpsApplicationId:
+      type: string
+      pattern: ^opa_[a-f0-9]{24}$
+    OpsCode:
+      type: string
+      pattern: ^[a-z][a-z0-9-]{1,47}$
+    OpsState:
+      type: string
+      enum:
+        - active
+        - disabled
+        - archived
+    OpsTime:
+      type: string
+      format: date-time
+      pattern: Z$
+    OpsUserId:
+      type: string
+      pattern: ^usr_[a-f0-9]{24}$
+    OpsProductId:
+      type: string
+      pattern: ^prd_[a-f0-9]{24}$
+    OpsProblem:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthenticated
+            - forbidden
+            - not_found
+            - conflict
+            - too_large
+            - unsupported_media_type
+            - unprocessable
+            - rate_limited
+            - unavailable
+        message:
+          type: string
+          enum:
+            - request rejected
+            - authentication required
+            - not found
+            - service unavailable
+        request_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            event_index:
+              type: integer
+              minimum: 0
+              maximum: 99
+            field:
+              type: string
+              enum:
+                - body
+                - events
+                - id
+                - component_id
+                - occurred_at
+                - type
+                - attributes
+            rule:
+              type: string
+              enum:
+                - schema
+                - unknown_attribute
+                - scope
+                - clock
+                - privacy
+                - conflict
+                - budget
+          required: []
+      required:
+        - code
+        - message
+        - request_id
+    OpsCreateApplication:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/OpsCode'
+        owner_user_id:
+          $ref: '#/components/schemas/OpsUserId'
+        criticality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        product_id:
+          anyOf:
+            - $ref: '#/components/schemas/OpsProductId'
+            - type: 'null'
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - code
+        - owner_user_id
+        - criticality
+        - product_id
+        - reason
+    OpsReason:
+      type: string
+      enum:
+        - initial_setup
+        - owner_transfer
+        - maintenance
+        - retirement
+        - restore
+        - security_response
+        - routine_rotation
+        - config_change
+        - incident_ack
+        - incident_resolution
+        - assignment
+    OpsUpdateApplication:
+      type: object
+      additionalProperties: false
+      properties:
+        owner_user_id:
+          $ref: '#/components/schemas/OpsUserId'
+        criticality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        product_id:
+          anyOf:
+            - $ref: '#/components/schemas/OpsProductId'
+            - type: 'null'
+        state:
+          type: string
+          enum:
+            - active
+            - disabled
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - expected_version
+        - reason
+      minProperties: 3
+    OpsArchive:
+      type: object
+      additionalProperties: false
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - expected_version
+        - reason
+    OpsEnvironmentList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsEnvironment'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    OpsEnvironment:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/OpsEnvironmentId'
+        org_id:
+          $ref: '#/components/schemas/OpsOrgId'
+        code:
+          $ref: '#/components/schemas/OpsCode'
+        state:
+          $ref: '#/components/schemas/OpsState'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          $ref: '#/components/schemas/OpsTime'
+        updated_at:
+          $ref: '#/components/schemas/OpsTime'
+        application_id:
+          $ref: '#/components/schemas/OpsApplicationId'
+        kind:
+          type: string
+          enum:
+            - development
+            - staging
+            - production
+      required:
+        - id
+        - org_id
+        - code
+        - state
+        - version
+        - created_at
+        - updated_at
+        - application_id
+        - kind
+    OpsEnvironmentId:
+      type: string
+      pattern: ^ope_[a-f0-9]{24}$
+    OpsCreateEnvironment:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/OpsCode'
+        kind:
+          type: string
+          enum:
+            - development
+            - staging
+            - production
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - code
+        - kind
+        - reason
+    OpsUpdateEnvironment:
+      type: object
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+          enum:
+            - active
+            - disabled
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - expected_version
+        - reason
+      minProperties: 3
+    OpsComponentList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsComponent'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    OpsComponent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/OpsComponentId'
+        org_id:
+          $ref: '#/components/schemas/OpsOrgId'
+        code:
+          $ref: '#/components/schemas/OpsCode'
+        state:
+          $ref: '#/components/schemas/OpsState'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          $ref: '#/components/schemas/OpsTime'
+        updated_at:
+          $ref: '#/components/schemas/OpsTime'
+        application_id:
+          $ref: '#/components/schemas/OpsApplicationId'
+        environment_id:
+          $ref: '#/components/schemas/OpsEnvironmentId'
+        kind:
+          type: string
+          enum:
+            - service
+            - database
+            - storage
+            - worker
+            - scanner
+            - desktop
+            - provider
+        dependency_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsComponentId'
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+      required:
+        - id
+        - org_id
+        - code
+        - state
+        - version
+        - created_at
+        - updated_at
+        - application_id
+        - environment_id
+        - kind
+        - dependency_ids
+    OpsComponentId:
+      type: string
+      pattern: ^opm_[a-f0-9]{24}$
+    OpsCreateComponent:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/OpsCode'
+        kind:
+          type: string
+          enum:
+            - service
+            - database
+            - storage
+            - worker
+            - scanner
+            - desktop
+            - provider
+        dependency_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsComponentId'
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - code
+        - kind
+        - dependency_ids
+        - reason
+    OpsUpdateComponent:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum:
+            - service
+            - database
+            - storage
+            - worker
+            - scanner
+            - desktop
+            - provider
+        dependency_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsComponentId'
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+        state:
+          type: string
+          enum:
+            - active
+            - disabled
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - expected_version
+        - reason
+      minProperties: 3
     Problem:
       type: object
       required: [code, message, request_id]

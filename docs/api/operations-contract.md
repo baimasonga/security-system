@@ -1,8 +1,9 @@
 # Operations monitoring contract
 
-Accepted design for OPS-001, 19 October 2026. **Not a live API.** The separately published
-[planned OpenAPI](operations-planned.openapi.yaml) is the implementation target for OPS-002–004.
-The live `openapi.yaml` stays limited to implemented routes. Health, incident and probe
+Accepted design for OPS-001, 19 October 2026. OPS-002 inventory is implemented in
+[live OpenAPI](openapi.yaml), disabled by default behind `OPERATIONS_INVENTORY_ENABLED`.
+The separately published [planned OpenAPI](operations-planned.openapi.yaml) remains the
+implementation target for OPS-003/004; those routes do not exist yet. Health, incident and probe
 contracts below are design requirements for OPS-005/006; their routes will be specified
 before implementation. No production configuration is applied by accepting this contract.
 
@@ -35,7 +36,7 @@ of the same organization, a `low|medium|high|critical` criticality and optional 
 A Product mapping conveys no entitlement, membership or monitoring credential. Dependencies reference
 components within the same organization; reject cycles and cross-tenant references.
 
-Add distinct permissions when OPS-002 ships:
+Inventory grants shipped in OPS-002; the remaining grants ship with their tasks:
 
 | Permission               | Ordinary member | Organization admin/owner | Authority                                                           |
 | ------------------------ | --------------- | ------------------------ | ------------------------------------------------------------------- |
@@ -216,7 +217,7 @@ infrastructure authority is included in any integration credential or first-mile
 
 ## Implementation and rollout gates
 
-OPS-002 adds inventory tables, strict ancestor foreign keys/uniqueness/version checks, memory and PG store
+OPS-002 implements inventory tables, strict ancestor foreign keys/uniqueness/version checks, memory and PG store
 contracts, app-role grants, API/RBAC and audit/freeze tests. OPS-003 adds credential tables/digest handling and
 rotation/revocation concurrency tests. OPS-004 adds event/counter tables, durable commit tests and retention load
 scenarios. Apply owner migrations then app grants; least-privilege app roles never get DDL or audit-update rights.
@@ -232,3 +233,14 @@ OPS-001 tests validate planned schema examples and rejection cases only. They do
 transaction commit behavior, DB grants, actual credential secrecy, delivery, probes or isolation at runtime. The
 live OpenAPI drift test remains authoritative for implemented endpoints. Subsequent tasks must add their full
 negative/mutation/PG/load evidence before claiming those controls exist.
+
+## OPS-002 implementation notes
+
+Inventory is a backend API behind an explicit rollout flag; see the
+[rollout guide](../deploy/operations-inventory.md). `operations_accounts` is a
+per-organization lock anchor, serializing all descendant inventory mutations and
+same-org graph/cap checks. This is a coarser implementation of organization-first
+locking. Transaction-bound authority checks use the same connection, avoiding
+pool exhaustion under lock contention. Future tasks must share this anchor before
+locking descendant credentials/counters/events. Inventory is not routed through
+best-effort telemetry and grants no collection, licensing or remediation authority.

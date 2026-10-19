@@ -12,6 +12,8 @@ export const PERMISSIONS = [
   'share:read',
   'share:create',
   'share:manage',
+  'ops:read',
+  'ops:manage_inventory',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -38,6 +40,8 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
     'share:read',
     'share:create',
     'share:manage',
+    'ops:read',
+    'ops:manage_inventory',
   ],
   owner: [
     'org:read',
@@ -51,11 +55,15 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
     'share:read',
     'share:create',
     'share:manage',
+    'ops:read',
+    'ops:manage_inventory',
   ],
 };
 
 /** Plain-language meaning of each permission, shown in the security center (ADR-027). */
 export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
+  'ops:read': 'See application monitoring inventory and evidence',
+  'ops:manage_inventory': 'Manage application, environment and component inventory',
   'org:read': 'See the organization, its members and their roles',
   'org:manage_members': 'Add members and set their roles',
   'license:read': 'See licenses, entitlements, usage and seats',

@@ -1,3 +1,5 @@
+import { InventoryService, InMemoryInventoryStore } from '@trust/operations';
+import { PgInventoryStore } from './db/pg-operations-store.ts';
 import { BillingService } from './billing.ts';
 import {
   PaddleCheckoutProvider,
@@ -84,6 +86,7 @@ export interface Container {
   clock: Clock;
   audit: AuditLog;
   auth: AuthService;
+  operations: InventoryService;
   licensing: LicensingService;
   billing: BillingService | undefined;
   /** File sharing and short links (ADR-021); undefined when not configured. */
@@ -470,6 +473,22 @@ export async function createContainer(
     },
   });
 
+  const operations = new InventoryService({
+    store: pool
+      ? new PgInventoryStore(pool, clock, { auditShards: shards })
+      : new InMemoryInventoryStore({ audit }),
+    clock,
+    authorize: async (p, orgId, permission) => {
+      await auth.requireOrgPermission(p, orgId, permission);
+    },
+    assertWritable: (orgId) => privileged.assertWritable(orgId),
+    activeMember: async (orgId, userId) =>
+      !!(await authStore.findMembership(orgId, userId)) &&
+      (await authStore.findUserById(userId))?.status === 'active',
+    activeProduct: async (productId) =>
+      (await licensingStore.findProductById(productId))?.status === 'active',
+  });
+
   const rateBackend: RateBackend | undefined =
     pool && config.rateLimitStore === 'postgres'
       ? new ResilientRateBackend(new PgRateBackend(pool), new MemoryRateBackend(), {
@@ -484,6 +503,7 @@ export async function createContainer(
     clock,
     audit,
     auth,
+    operations,
     licensing,
     billing,
     sharing,
