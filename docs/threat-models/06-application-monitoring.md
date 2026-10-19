@@ -71,3 +71,14 @@ refusing further use. Security mutation results belong in the status file.
 These checks establish a guarded transaction primitive. They do not prove event
 schema privacy, durable receipts, rate/event quotas, actual ingestion/revocation
 races through a collector route, alerts or live integrations; those are later tasks.
+
+## Dashboard control boundary
+
+The application management portal reuses the session-authenticated inventory and
+credential APIs; hiding or showing controls grants no authority. The server remains
+responsible for organization membership, roles, expected versions, lifecycle, freeze,
+fresh MFA and atomic audit. Browser contexts capture their organization and visit;
+late responses cannot render credentials in a different context. Submitted factors
+are cleared before awaiting requests. One-time secrets are not stored in browser
+storage and are removed on dialog close/cancel, navigation and page exit. Browser
+regression and deliberate-mutation evidence are recorded in the program handoff.

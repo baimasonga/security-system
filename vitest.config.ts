@@ -10,6 +10,17 @@ export default defineConfig({
         extends: true,
         test: {
           ...common,
+          name: 'portal',
+          include: ['tests/browser/**/*.test.ts'],
+          testTimeout: 90_000,
+          hookTimeout: 30_000,
+          fileParallelism: false,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          ...common,
           name: 'unit',
           include: [
             'packages/*/test/**/*.test.ts',
@@ -17,7 +28,7 @@ export default defineConfig({
             'services/*/test/**/*.test.mjs',
             'tests/**/*.test.ts',
           ],
-          exclude: ['**/node_modules/**', '**/*.db.test.ts'],
+          exclude: ['**/node_modules/**', '**/*.db.test.ts', 'tests/browser/**'],
         },
       },
       {

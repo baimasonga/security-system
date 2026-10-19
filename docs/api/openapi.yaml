@@ -2106,6 +2106,16 @@ paths:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
         '302': { description: Redirect }
+  /operations.mjs:
+    get:
+      summary: Application inventory and credential management browser module
+      security: []
+      responses:
+        '200':
+          description: Same-origin JavaScript; management APIs require an authorized session
+          content:
+            text/javascript:
+              schema: { type: string }
   /files.mjs:
     get:
       tags: [sharing]

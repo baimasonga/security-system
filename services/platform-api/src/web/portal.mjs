@@ -1,5 +1,6 @@
 import { BrowserDevice } from './device.mjs';
 import { filesView } from './files.mjs';
+import { operationsView } from './operations.mjs';
 const $ = (id) => document.getElementById(id);
 const state = {
   token: '',
@@ -33,17 +34,18 @@ function errorMessage(e) {
   notice(e.message || 'The request could not be completed.', true);
 }
 async function api(path, method = 'GET', body) {
+  const token = state.token;
   const response = await fetch(path, {
     method,
     headers: {
       ...(body ? { 'content-type': 'application/json' } : {}),
-      ...(state.token ? { authorization: `Bearer ${state.token}` } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const json = response.status === 204 ? null : await response.json();
   if (!response.ok) {
-    if (response.status === 401 && state.token) {
+    if (response.status === 401 && token && state.token === token) {
       state.token = '';
       state.principal = null;
       renderAuth();
@@ -86,9 +88,13 @@ function fieldsForm(specs, submitText, action) {
     let input;
     if (spec.options) {
       input = node('select');
+      input.multiple = spec.type === 'multiselect';
       for (const [value, text] of spec.options) {
         const option = node('option', text);
         option.value = value;
+        option.selected = Array.isArray(spec.value)
+          ? spec.value.includes(value)
+          : value === spec.value;
         input.append(option);
       }
     } else if (spec.type === 'json') {
@@ -104,7 +110,13 @@ function fieldsForm(specs, submitText, action) {
     }
     input.name = spec.name;
     input.setAttribute('aria-label', spec.label);
-    input.required = !spec.optional;
+    input.required = !spec.optional && spec.type !== 'multiselect';
+    if (spec.pattern) input.pattern = spec.pattern;
+    if (spec.inputMode) input.inputMode = spec.inputMode;
+    if (spec.max !== undefined) {
+      if (spec.type === 'number') input.max = spec.max;
+      else input.maxLength = spec.max;
+    }
     if (spec.min && spec.type !== 'number') input.minLength = spec.min;
     if (spec.type === 'number') input.min = spec.min ?? 0;
     label.append(input);
@@ -123,11 +135,13 @@ function fieldsForm(specs, submitText, action) {
       for (const [name, { input, spec }] of Object.entries(controls)) {
         if (!input.value && spec.optional) continue;
         data[name] =
-          spec.type === 'number'
-            ? Number(input.value)
-            : spec.type === 'json'
-              ? JSON.parse(input.value)
-              : input.value;
+          spec.type === 'multiselect'
+            ? [...input.selectedOptions].map((o) => o.value)
+            : spec.type === 'number'
+              ? Number(input.value)
+              : spec.type === 'json'
+                ? JSON.parse(input.value)
+                : input.value;
       }
       await action(data, form);
     } catch (err) {
@@ -160,9 +174,18 @@ $('close-modal').addEventListener('click', () => {
   $('modal').close();
   $('modal-content').replaceChildren();
 });
-$('modal').addEventListener('close', () => $('modal-content').replaceChildren());
+$('modal').addEventListener('close', () => {
+  if (!$('modal').open) $('modal-content').replaceChildren();
+});
+$('modal').addEventListener('cancel', () => $('modal-content').replaceChildren());
+function clearModal() {
+  $('modal').close();
+  $('modal-content').replaceChildren();
+}
+window.addEventListener('pagehide', clearModal);
 function renderAuth(register = false) {
   state.version++;
+  clearModal();
   $('navigation').replaceChildren();
   $('organization').replaceChildren();
   $('identity').textContent = '';
@@ -345,6 +368,7 @@ function renderShell() {
   $('signout').hidden = false;
   const views = [
     'Licenses',
+    'Applications',
     'Files & links',
     'Devices',
     'Organization',
@@ -416,6 +440,7 @@ function details(object) {
 }
 const productName = (id) => state.products.find((p) => p.id === id)?.name || id;
 async function navigate(view) {
+  clearModal();
   state.view = view;
   const version = ++state.version;
   notice();
@@ -442,6 +467,36 @@ async function navigate(view) {
   }
 }
 async function renderView(view) {
+  if (view === 'Applications') {
+    const version = state.version;
+    const orgId = state.orgId;
+    const path = orgPath();
+    return operationsView({
+      api,
+      node,
+      panel,
+      button,
+      title,
+      table,
+      empty,
+      fieldsForm,
+      notice,
+      errorMessage,
+      content,
+      products: state.products,
+      userId: state.principal.user_id,
+      role: state.orgs.find((o) => o.id === orgId)?.role,
+      orgPath: () => path,
+      isCurrent: () => version === state.version && orgId === state.orgId && !!state.token,
+      clearModal,
+      showSecret,
+      modal: (...children) => {
+        if (version !== state.version) return;
+        $('modal-content').replaceChildren(...children);
+        $('modal').showModal();
+      },
+    });
+  }
   if (view === 'Licenses') {
     const rows = (await api(`${orgPath()}/licenses`)).items;
     const section = panel(

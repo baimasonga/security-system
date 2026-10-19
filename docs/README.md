@@ -68,3 +68,5 @@ Operations design and implementation: [contract](api/operations-contract.md),
 OPS-002 inventory is implemented behind an opt-in flag: [rollout and rollback](deploy/operations-inventory.md).
 
 OPS-003 credential management and guarded verification: [rollout, rotation and rollback](deploy/operations-credentials.md).
+
+- [Application management dashboard](deploy/operations-dashboard.md): inventory and MFA credential controls, verification and rollout.

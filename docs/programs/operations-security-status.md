@@ -8,8 +8,10 @@ OPS-001 design, OPS-002 inventory and OPS-003 credential management are implemen
 Inventory and credentials have separate opt-in flags, both default false. Credential
 verification supplies a guarded transaction primitive, not an event collector.
 No events/health/incidents runtime or live Rokela PDF connection is implemented.
-OPS-003 is based on OPS-002 commit `a5cbd97` / PR #23 and is published as a stacked change
-until that prerequisite is merged. No production configuration was applied.
+OPS-002 and OPS-003 were merged together in PR #24 (`919dff77`); PR #23 was
+closed as superseded. Both operations flags are enabled on the existing Warrior
+Railway production service. This enabled backend management APIs; dashboard wiring is now implemented on the
+working branch described below. Application event ingestion remains unimplemented. See the production rollout evidence below.
 
 | Task    | State                                 | Verification/evidence                                                                                                                        |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -21,6 +23,79 @@ until that prerequisite is merged. No production configuration was applied.
 | OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                           |
 | OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                   |
 | OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                           |
+
+## Production enablement — 19 October 2026
+
+- User explicitly authorized enabling implemented features. Combined PR #24's exact
+  head `e2844f3` passed format/lint/types/unit, PostgreSQL owner/app-role plus load
+  smoke, Windows SDK, dependency/secret scanning and CodeQL checks. The older PR
+  #23 had a passkey asynchronous-signal assertion failure; the combined release's
+  complete PostgreSQL suite passed. This is not evidence that the test race is fixed.
+- Existing Railway project `victorious-commitment`, service `@trust/platform-api`,
+  production environment; repository/default branch retained. No duplicate service
+  was created and no Business Admin licensing or existing secret was replaced.
+- Set `OPERATIONS_INVENTORY_ENABLED=true` and
+  `OPERATIONS_CREDENTIALS_ENABLED=true`, reusing the existing MFA encryption key.
+  Widened watch patterns from only `/services/platform-api/**` to `/**` so shared
+  packages and migrations trigger deployment. Moved migrations/grants/profile
+  checks into pre-deploy; the start command now only starts the API.
+- Source merge `919dff77bf8fc67b73c166833b1f0a28e4a86a37` deployed successfully
+  as `439ed945-7db6-4a33-972c-cccc9b8fb32b`. Logs confirm migrations 0017/0018
+  applied and 90 application-role grant statements applied.
+- Enabled-settings deployment `6d8966b9-d8c7-421a-999e-43622c351767` reached
+  SUCCESS. Logs confirm schema through 0018, verified database TLS and application
+  role startup; Railway's `/healthz` health check succeeded. Staged changes are clear.
+- Verification limit: direct public HTTP checks from this managed session hit its
+  outbound proxy's CONNECT 403, not an application response. No authenticated live
+  inventory/credential flow was performed, and no production credential was issued.
+  An organization admin/owner must enroll MFA and use the documented APIs; a fleet
+  management UI remains unimplemented. Events, health, incidents and live Rokela PDF
+  integration remain unimplemented. Existing external audit anchoring remains disabled.
+- Rollback: disable credentials first, then inventory if required; keep migrations,
+  stored digests and audit history. Do not replace the MFA key or licensing secrets.
+
+## Dashboard wiring — implementation and continuation checkpoint
+
+User requested usable dashboard controls for the implemented APIs, followed by the
+remaining monitoring program, with a durable handoff for the next agent. Work branch: `feat/operations-dashboard`, based on
+production merge `919dff77` plus the production evidence commit `8b44184` (PR #25).
+Do not mistake this working branch for a production deployment.
+Implementation commit `e522703`, published as [PR #28](https://github.com/baimasonga/security-system/pull/28).
+CI/merge/rollout remain pending; the last confirmed live deployment is still the
+backend-only `6d8966b9-d8c7-421a-999e-43622c351767`.
+Default-branch compatibility update PR #26 (`5f89809`) was subsequently integrated
+without conflicts (`7663423`). Its exact-source local replay passed `npm run check`
+with 802 tests and 3 skips, plus all four browser workflows. CI/merge/rollout of
+this combined head remain pending; the extra unit test comes from PR #26.
+
+- Added `web/operations.mjs` and Applications navigation: applications, environments,
+  components/dependencies, ownership/Product/criticality editing, versioned lifecycle
+  changes, retained-record lookup and credential issue/rotate/revoke with fresh MFA.
+- Scope is captured per visit. Navigation/workspace/session changes invalidate async
+  results; credential factors are cleared before requests, secrets use one-time modal
+  presentation and are cleared on close/navigation/pagehide. Backend authorization and
+  APIs are unchanged. Disabled/archived parent credential revocation stays available.
+- Added Playwright Core as a development dependency, a separate `portal` Vitest project,
+  `npm run test:portal`, and a CI browser job. Local browser uses
+  `CHROMIUM_PATH=/usr/bin/chromium npm run test:portal`; CI installs Chromium using
+  `npx playwright-core install --with-deps chromium`. No provider credentials needed.
+- Four real browser/API flows pass locally: inventory/dependencies, MFA credentials,
+  disabled/archived emergency revoke, pagination/retained lookup, delayed secret scope,
+  member refusal, replay refusal, unavailable rollout and mobile overflow. Three
+  deliberate mutations were caught by assertions: retained MFA input, a late secret
+  displayed across workspace switch, and secret persistence in localStorage.
+- PostgreSQL owner/app-role operations regression: 30 tests passed. Final exact-source
+  `npm run check` passed with 801 tests and 3 skips; the four browser workflows
+  also passed after all modal/loading refinements. `npm audit --audit-level=high`
+  reported zero vulnerabilities. Local runtime:
+  Node 24.19.0/npm 11.9.0, Chromium; CI uses Node 22 and managed Chromium.
+- Rollout/user guide: [operations-dashboard.md](../deploy/operations-dashboard.md).
+  GitHub continuation checkpoint is also recorded in PR #25
+  (comment 6277627115). Do not treat that provisional comment as deployment evidence.
+- Before resuming: inspect git status and this entry, confirm final browser/check results, run `npm run check` and applicable regression checks, publish a PR containing
+  this checkpoint, then observe CI and deployment. Record exact evidence, not intent.
+- Next backend task remains OPS-004 below. No ingestion, health, incidents, live app
+  credentials, provider onboarding or external witness was implemented by this UI work.
 
 ## Next action: OPS-004
 
@@ -35,8 +110,9 @@ callback must be retry-safe and have no external side effects. Add real HTTP col
 race/DB failure/conflict/PII tests, memory/PG contracts, app-role grants, mutation and
 contention/retention evidence. Do not infer ingestion readiness from credential tests.
 
-Reconcile/merge prerequisite PRs through normal review/CI first. Local work needs no
-production token, external account, provider or real alert destination.
+OPS-002/003 prerequisites are already merged and enabled. Finish publishing the
+dashboard slice above through normal CI first, then start OPS-004 from that baseline.
+Local ingestion work needs no production token, external account or real alert destination.
 
 ## OPS-003 implementation entry
 

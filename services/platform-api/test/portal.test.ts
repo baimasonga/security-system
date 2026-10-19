@@ -17,7 +17,7 @@ it('serves an account-free portal with strict same-origin assets and preserves A
   expect(page.body).not.toMatch(/<script[^>]*>[^<]+<\/script>/);
   expect(page.headers['content-security-policy']).toContain("script-src 'self'");
   expect(page.headers['content-security-policy']).not.toContain('unsafe-inline');
-  for (const url of ['/portal.mjs', '/portal.css', '/device.mjs'])
+  for (const url of ['/portal.mjs', '/portal.css', '/device.mjs', '/operations.mjs'])
     expect((await env.app.inject({ url })).statusCode).toBe(200);
   expect((await env.app.inject({ url: '/v1/auth/me' })).statusCode).toBe(401);
   expect((await env.app.inject({ url: '/healthz' })).headers['content-security-policy']).toBe(
