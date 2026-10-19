@@ -42,7 +42,8 @@ production token, external account, provider or real alert destination.
 
 - **Task/state:** credential management and transaction-bound verification implemented;
   no production enablement and no collector route.
-- **Commit/PR:** branch `feat/ops-003-credentials`, stacked on PR #23; publication link follows checks.
+- **Commit/PR:** [PR #24](https://github.com/baimasonga/security-system/pull/24), initial implementation
+  commit `9f71e7d`, stacked on PR #23. GitHub CI is separate from the local evidence below.
 - **Behavior:** four management operations, separate admin/owner-only permission, real
   AuthService step-up, live-session recheck, reviewed reasons, one-time no-store secret
   response, explicit metadata projection and silent raw request logs. Secrets are 256-bit
