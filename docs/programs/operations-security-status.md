@@ -63,6 +63,10 @@ Do not mistake this working branch for a production deployment.
 Implementation commit `e522703`, published as [PR #28](https://github.com/baimasonga/security-system/pull/28).
 CI/merge/rollout remain pending; the last confirmed live deployment is still the
 backend-only `6d8966b9-d8c7-421a-999e-43622c351767`.
+Default-branch compatibility update PR #26 (`5f89809`) was subsequently integrated
+without conflicts (`7663423`). Its exact-source local replay passed `npm run check`
+with 802 tests and 3 skips, plus all four browser workflows. CI/merge/rollout of
+this combined head remain pending; the extra unit test comes from PR #26.
 
 - Added `web/operations.mjs` and Applications navigation: applications, environments,
   components/dependencies, ownership/Product/criticality editing, versioned lifecycle
