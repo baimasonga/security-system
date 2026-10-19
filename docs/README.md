@@ -66,3 +66,5 @@ Operations design and implementation: [contract](api/operations-contract.md),
 [planned OpenAPI](api/operations-planned.openapi.yaml), [safe examples](api/operations-safe-examples.json).
 
 OPS-002 inventory is implemented behind an opt-in flag: [rollout and rollback](deploy/operations-inventory.md).
+
+OPS-003 credential management and guarded verification: [rollout, rotation and rollback](deploy/operations-credentials.md).

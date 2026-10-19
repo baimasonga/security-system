@@ -4,34 +4,86 @@ Updated: 19 October 2026.
 
 ## Current state
 
-OPS-001's design contract is finalized. OPS-002 now implements application/environment/component
-inventory behind `OPERATIONS_INVENTORY_ENABLED` (default false). No integration credential,
-event collector, probe, incident engine or live Rokela PDF connection is implemented.
-Source baseline reconciled against `b7c0c79`, including OPS-001 and the compatible ESLint toolchain.
+OPS-001 design, OPS-002 inventory and OPS-003 credential management are implemented.
+Inventory and credentials have separate opt-in flags, both default false. Credential
+verification supplies a guarded transaction primitive, not an event collector.
+No events/health/incidents runtime or live Rokela PDF connection is implemented.
+OPS-003 is based on OPS-002 commit `a5cbd97` / PR #23 and is published as a stacked change
+until that prerequisite is merged. No production configuration was applied.
 
 | Task    | State                                 | Verification/evidence                                                                                                                        |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | OPS-001 | Contract complete; local verification | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below. |
 | OPS-002 | Implemented; local validation         | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                   |
-| OPS-003 | Ready; not implemented                | Scoped credential protocol specified; no credential runtime exists.                                                                          |
-| OPS-004 | Not started; depends on OPS-003       | Nine strict backend event types specified; no durable ingestion runtime exists.                                                              |
+| OPS-003 | Implemented; local verification       | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                        |
+| OPS-004 | Ready; not implemented                | Nine strict backend event types specified; durable ingestion is next.                                                                        |
 | OPS-005 | Not started; depends on OPS-002/004   | Health semantics specified; network probes remain disabled.                                                                                  |
 | OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                           |
 | OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                   |
 | OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                           |
 
-## Next action: OPS-003
+## Next action: OPS-004
 
-Reconcile the credential contract against current inventory code and any preserved local work
-before implementation. Add per-environment, purpose-bound integration credentials with one-time
-secret responses, digest-only persistence, fresh MFA, rotation overlap, revocation and strict
-metadata-only reads. Keep integration authority separate from sessions and license keys. Acquire
-`operations_accounts` before descendant locks and bind in-transaction checks to the same connection;
-never acquire an outer-pool connection while holding an inventory lock. Add negative, mutation,
-PostgreSQL/app-role and contention evidence. Keep event ingestion planned until OPS-004.
+Implement durable event ingestion using the accepted strict version-1 schemas and
+`CredentialService.withCredential` to authorize and write in one committed transaction.
+Derive scope/provenance from the credential, reject all body scope overrides, validate
+component ancestry, canonicalize validated events and deduplicate across rotation.
+Implement atomic batch receipts, clock windows, request/event/storage quotas, bounded
+retention and counters. Do not use the lossy telemetry buffer or change browser events.
+Preserve the organization-first anchor and use the same transaction connection; the
+callback must be retry-safe and have no external side effects. Add real HTTP collector
+race/DB failure/conflict/PII tests, memory/PG contracts, app-role grants, mutation and
+contention/retention evidence. Do not infer ingestion readiness from credential tests.
 
-No production credentials are needed for local acceptance. Production enablement, real recipients,
-independent monitoring and recovery drills remain later gates.
+Reconcile/merge prerequisite PRs through normal review/CI first. Local work needs no
+production token, external account, provider or real alert destination.
+
+## OPS-003 implementation entry
+
+- **Task/state:** credential management and transaction-bound verification implemented;
+  no production enablement and no collector route.
+- **Commit/PR:** branch `feat/ops-003-credentials`, stacked on PR #23; publication link follows checks.
+- **Behavior:** four management operations, separate admin/owner-only permission, real
+  AuthService step-up, live-session recheck, reviewed reasons, one-time no-store secret
+  response, explicit metadata projection and silent raw request logs. Secrets are 256-bit
+  CSPRNG values; storage holds SHA-256 digests and 128-bit public IDs. Unknown IDs use a
+  dummy fixed-size digest and secret comparisons use timingSafeEqual.
+- **Lifecycle:** TTL 1–90 days, two active keys/environment/purpose, expiry may only shorten,
+  overlap 0–3600 seconds, no repeated predecessor rotation or new rotation while an
+  overlap predecessor is active. Zero-overlap replacement of one of two independent
+  credentials preserves the cap. Revocation is irreversible, idempotent and audited once;
+  it requires fresh MFA but remains possible during freeze/disabled/archived ancestry.
+- **Persistence/boundary:** migration `0018_operations_credentials`, composite ancestor FK,
+  immutable lifecycle trigger, no delete grants, shared memory/PG contract and organization
+  lock. Role/session checks inside mutations use that connection. MFA consumption precedes
+  the operations transaction and is not restored on later conflict/audit/commit failure.
+  `withCredential` rechecks current scope, purpose, source, ancestors, enablement and expiry
+  around a retry-safe callback/commit; OPS-004 must use it without caching detached authority.
+- **Verification:** `npm run check` passed: 801 tests passed, 3 skipped. Full `npm run test:db`
+  passed: 644 tests across 59 files (435.77 s), including the least-privilege app role.
+  A final current-source credential-only PG/app-role replay passed all 18 checks. Twelve
+  deliberate mutations caught MFA, secret comparison, environment scope, revocation, expiry,
+  freeze, TTL, overlap, ancestor, audit, active cap and live-session bypasses. Tests cover
+  secret-free metadata/logs/raw DB rows, OTP/recovery-code misuse, tenant/role/refusal and
+  failed issue/rotate/revoke rollback. Node 24.19.0, npm 11.9.0, PostgreSQL 17; managed Linux.
+- **Contention:** real HTTP/PostgreSQL, fsync on, three distinct MFA admins: first issuance
+  exactly 2 creates + 1 conflict; competing rotation exactly 1 create + 2 conflicts;
+  another rotation during overlap conflicts; a guarded callback commits before waiting
+  revoke, then the revoked token fails. Four credential rows, eight credential audit events,
+  no DB plaintext and a verified audit chain. The final replay passed with three contenders and two connections,
+  confirming locked checks do not depend on an outer-pool connection.
+  Inventory regression: 264 requests, 220 creates + 1 update + 43 expected conflicts,
+  exactly 221 audit rows, verified chain, 2274 ms (previous OPS-002 run 1975 ms).
+  `npm audit --audit-level=high`: zero vulnerabilities. Full database suite used the
+  throwaway harness default (fsync off); both contention scenarios required fsync on.
+  These short contention samples establish correctness, not sustained capacity or a measured
+  latency regression; the historical V1 licensing benchmark is a different workload.
+- **Configuration:** flags/MFA keys and tokens only in local fixtures; no production migration,
+  secret issuance, application connection, notification or provider configuration.
+- **Rollback:** disable credential flag, keep digests/history/audit; verifier refuses while
+  disabled. Unrevoked/unexpired keys can work again after re-enable. See the
+  [credential rollout/rollback guide](../deploy/operations-credentials.md).
+- **Next:** OPS-004 as above. Credentials cannot grant commercial access or infrastructure authority.
 
 ## OPS-002 implementation entry
 

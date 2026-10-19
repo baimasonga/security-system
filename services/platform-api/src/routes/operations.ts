@@ -17,6 +17,7 @@ const ID_PATTERNS = {
   opa: /^opa_[a-f0-9]{24}$/,
   ope: /^ope_[a-f0-9]{24}$/,
   opm: /^opm_[a-f0-9]{24}$/,
+  opc: /^opc_[a-f0-9]{32}$/,
 } as const;
 const id = (prefix: keyof typeof ID_PATTERNS) => z.string().regex(ID_PATTERNS[prefix]);
 const code = z.string().regex(/^[a-z][a-z0-9-]{1,47}$/);
@@ -120,6 +121,7 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
         });
     });
     registerInventoryRoutes(scoped, c);
+    registerCredentialRoutes(scoped, c);
   });
 }
 function registerInventoryRoutes(app: FastifyInstance, c: Container) {
@@ -258,4 +260,84 @@ function registerInventoryRoutes(app: FastifyInstance, c: Container) {
       });
     }
   }
+}
+
+function registerCredentialRoutes(app: FastifyInstance, c: Container) {
+  const path = base + '/:applicationId/environments/:environmentId/credentials';
+  const pre = {
+    logLevel: 'silent' as const,
+    preHandler: [
+      authenticated(c),
+      async () => {
+        if (!c.config.operationsCredentialsEnabled || !c.config.operationsInventoryEnabled)
+          throw new DomainError('not_found', 'not found');
+      },
+    ],
+  };
+  const scopeParams = z
+    .object({ orgId: id('org'), applicationId: id('opa'), environmentId: id('ope') })
+    .strict();
+  const itemParams = scopeParams.extend({ credentialId: id('opc') });
+  const common = { reason, mfa_code: z.string().regex(/^[0-9]{6}$/) };
+  const ttl = z.number().int().min(86400).max(7776000);
+  app.get(path, pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const scope = safeParse(scopeParams, req.params);
+    const query = safeParse(
+      z
+        .object({
+          limit: z.coerce.number().int().min(1).max(100).optional(),
+          cursor: z.string().min(1).max(512).optional(),
+        })
+        .strict(),
+      req.query,
+    );
+    return toWire(await c.operationsCredentials.list(principalOf(req), scope, query));
+  });
+  app.post(path, pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const scope = safeParse(scopeParams, req.params);
+    const input = safeParse(
+      z.object({ ...common, purpose: z.literal('events:write'), ttl_seconds: ttl }).strict(),
+      req.body,
+    );
+    const issued = await c.operationsCredentials.issue(principalOf(req), scope, {
+      purpose: input.purpose,
+      ttlSeconds: input.ttl_seconds,
+      mfaCode: input.mfa_code,
+      reason: input.reason,
+    });
+    return reply.status(201).send(toWire(issued));
+  });
+  app.post(path + '/:credentialId/rotate', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const { credentialId, ...scope } = safeParse(itemParams, req.params);
+    const input = safeParse(
+      z
+        .object({ ...common, ttl_seconds: ttl, overlap_seconds: z.number().int().min(0).max(3600) })
+        .strict(),
+      req.body,
+    );
+    return reply.status(201).send(
+      toWire(
+        await c.operationsCredentials.rotate(principalOf(req), scope, credentialId, {
+          ttlSeconds: input.ttl_seconds,
+          overlapSeconds: input.overlap_seconds,
+          mfaCode: input.mfa_code,
+          reason: input.reason,
+        }),
+      ),
+    );
+  });
+  app.post(path + '/:credentialId/revoke', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const { credentialId, ...scope } = safeParse(itemParams, req.params);
+    const input = safeParse(z.object(common).strict(), req.body);
+    return toWire(
+      await c.operationsCredentials.revoke(principalOf(req), scope, credentialId, {
+        mfaCode: input.mfa_code,
+        reason: input.reason,
+      }),
+    );
+  });
 }

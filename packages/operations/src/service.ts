@@ -37,7 +37,7 @@ export interface InventoryDependencies {
   authorize(
     p: UserPrincipal,
     orgId: string,
-    permission: 'ops:read' | 'ops:manage_inventory',
+    permission: 'ops:read' | 'ops:manage_inventory' | 'ops:manage_credentials',
   ): Promise<void>;
   assertWritable(orgId: string): Promise<void>;
   activeMember(orgId: string, userId: string): Promise<boolean>;

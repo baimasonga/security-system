@@ -16,6 +16,7 @@ import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 export interface PlatformConfig {
   /** Staged OPS-002 rollout; disabled unless explicitly enabled. */
   operationsInventoryEnabled: boolean;
+  operationsCredentialsEnabled: boolean;
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
   identityMailEncryptionKey?: string;
@@ -264,6 +265,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const opsInventory = env['OPERATIONS_INVENTORY_ENABLED'];
   if (opsInventory !== undefined && opsInventory !== 'true' && opsInventory !== 'false')
     throw new Error('OPERATIONS_INVENTORY_ENABLED must be true or false');
+  const opsCredentials = env['OPERATIONS_CREDENTIALS_ENABLED'];
+  if (opsCredentials !== undefined && opsCredentials !== 'true' && opsCredentials !== 'false')
+    throw new Error('OPERATIONS_CREDENTIALS_ENABLED must be true or false');
+  if (opsCredentials === 'true' && (opsInventory !== 'true' || !mfaEncryptionKey))
+    throw new Error('OPERATIONS_CREDENTIALS_ENABLED requires inventory and MFA_ENCRYPTION_KEY');
   const dualControlEnv = env['PRIVILEGED_DUAL_CONTROL'];
   if (dualControlEnv && !['true', 'false'].includes(dualControlEnv))
     throw new Error('PRIVILEGED_DUAL_CONTROL must be true or false');
@@ -513,6 +519,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     requireOperatorMfa,
     privilegedDualControl,
     operationsInventoryEnabled: opsInventory === 'true',
+    operationsCredentialsEnabled: opsCredentials === 'true',
     ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',
     port,

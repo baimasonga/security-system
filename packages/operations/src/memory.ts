@@ -1,5 +1,8 @@
 import { AuditBuffer, type AuditLog, type AuditEventInput } from '@trust/audit';
 import type {
+  CredentialRecord,
+  CredentialScope,
+  CredentialListOptions,
   InventoryEntities,
   InventoryRepo,
   InventoryScope,
@@ -9,6 +12,49 @@ import type {
 } from './model.ts';
 
 class Repo implements InventoryRepo {
+  credentials = new Map<string, CredentialRecord>();
+  async findCredential(id: string) {
+    const row = this.credentials.get(id);
+    return row ? structuredClone(row) : undefined;
+  }
+  async listCredentials(scope: CredentialScope, options: CredentialListOptions) {
+    return [...this.credentials.values()]
+      .filter(
+        (r) =>
+          r.orgId === scope.orgId &&
+          r.applicationId === scope.applicationId &&
+          r.environmentId === scope.environmentId &&
+          (!options.after || r.id > options.after) &&
+          (!options.activeAt || (!r.revokedAt && r.expiresAt > options.activeAt)),
+      )
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .slice(0, options.limit)
+      .map((r) => structuredClone(r));
+  }
+  async insertCredential(row: CredentialRecord) {
+    const env = await this.find('environment', row.orgId, row.environmentId);
+    if (!env || env.applicationId !== row.applicationId) throw new Error('credential_parent');
+    if (this.credentials.has(row.id)) throw new Error('duplicate_credential');
+    this.credentials.set(row.id, structuredClone(row));
+  }
+  async updateCredential(row: CredentialRecord) {
+    const old = await this.findCredential(row.id);
+    if (
+      !old ||
+      old.orgId !== row.orgId ||
+      old.applicationId !== row.applicationId ||
+      old.environmentId !== row.environmentId ||
+      old.secretHash !== row.secretHash ||
+      old.purpose !== row.purpose ||
+      old.source !== row.source ||
+      +old.createdAt !== +row.createdAt ||
+      row.expiresAt > old.expiresAt ||
+      (old.revokedAt && (!row.revokedAt || +old.revokedAt !== +row.revokedAt)) ||
+      (old.rotatedAt && (!row.rotatedAt || +old.rotatedAt !== +row.rotatedAt))
+    )
+      throw new Error('credential_immutable');
+    this.credentials.set(row.id, structuredClone(row));
+  }
   rows: { [K in InventoryType]: Map<string, InventoryEntities[K]> } = {
     application: new Map(),
     environment: new Map(),
@@ -89,12 +135,14 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       // Work against an isolated snapshot: readers cannot see uncommitted rows.
       const repo = new Repo();
       repo.rows = structuredClone(this.rows);
+      repo.credentials = structuredClone(this.credentials);
       const buffer = new AuditBuffer();
       const out = await fn(Object.assign(repo, { audit: buffer }));
       const events = buffer.drain();
       if (this.#audit) await this.#audit.appendMany(events);
       else this.committedAudit.push(...events);
       this.rows = repo.rows;
+      this.credentials = repo.credentials;
       return out;
     };
     const result = this.#tail.then(run, run);

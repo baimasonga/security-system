@@ -1,6 +1,6 @@
 # Application monitoring threat model
 
-Status: **accepted design for OPS-001; OPS-002 inventory controls implemented; credential/event/health controls remain pending**.
+Status: **accepted design for OPS-001; OPS-002 inventory and OPS-003 credential controls implemented; event/health controls remain pending**.
 19 October 2026. Normative limits/protocol: [operations contract](../api/operations-contract.md).
 Scope: inventory, integrations, ingestion, health history, alerts and incidents; read-only first milestone.
 
@@ -41,7 +41,7 @@ operational rows; only separately anchored audit history has its existing tamper
 
 An unavailable Warrior cannot report its own outage reliably; independent observation is required. No
 restore drill, external probe, live credential, delivery provider or production integration is established
-by OPS-001. Tests currently prove schema acceptance/rejection only. Later tasks must mutation-check each
+by OPS-001. OPS-001's tests prove schema acceptance/rejection only; OPS-002/003 runtime evidence is recorded below. Later tasks must mutation-check each
 runtime control, run memory/least-privilege PG contracts and applicable load/outage scenarios, and attach
 actual evidence in the status file. No production changes or real alert recipients are authorized by this design.
 
@@ -56,3 +56,18 @@ least-privilege deletion refusal. The contention driver tests requests beyond po
 capacity and exact successful-write/audit counts. Mutation checks are recorded in
 the program handoff. These controls do not establish credentials, ingestion,
 notification delivery, independent probes or any live application integration.
+
+## OPS-003 control evidence
+
+Credential service/store contracts and HTTP tests cover fresh MFA consumption and
+replay, recovery-code/reflected-MFA refusal, revoked session, tenant/ancestor and
+purpose/source mismatches, digest-only persistence, one-time response/metadata/log
+separation, bounded TTL/active count, overlap, irreversible state, freeze emergency
+revoke, failed audit rollback and disabled rollout. The real PostgreSQL contention
+scenario uses separate MFA identities and more contenders than pool connections;
+it also observes revocation waiting on a guarded verification callback before
+refusing further use. Security mutation results belong in the status file.
+
+These checks establish a guarded transaction primitive. They do not prove event
+schema privacy, durable receipts, rate/event quotas, actual ingestion/revocation
+races through a collector route, alerts or live integrations; those are later tasks.

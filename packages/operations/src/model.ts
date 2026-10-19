@@ -41,8 +41,36 @@ export interface InventoryScope {
   applicationId?: string;
   environmentId?: string;
 }
+export interface CredentialScope {
+  orgId: string;
+  applicationId: string;
+  environmentId: string;
+}
+export interface CredentialRecord extends CredentialScope {
+  id: string;
+  purpose: 'events:write';
+  source: 'backend_report';
+  secretHash: string;
+  createdAt: Date;
+  expiresAt: Date;
+  revokedAt: Date | null;
+  rotatedAt: Date | null;
+}
+export interface CredentialListOptions {
+  limit: number;
+  after?: string;
+  activeAt?: Date;
+}
 /** All mutation work, including audit, must run inside a serialized organization transaction. */
 export interface InventoryRepo {
+  findCredential(id: string): Promise<CredentialRecord | undefined>;
+  listCredentials(
+    scope: CredentialScope,
+    options: CredentialListOptions,
+  ): Promise<CredentialRecord[]>;
+  insertCredential(row: CredentialRecord): Promise<void>;
+  /** Identity/digest never change, expiry only shortens, revoke and rotation are irreversible. */
+  updateCredential(row: CredentialRecord): Promise<void>;
   find<K extends InventoryType>(
     type: K,
     orgId: string,
@@ -60,9 +88,10 @@ export interface InventoryAuthority {
   authorize(
     p: UserPrincipal,
     orgId: string,
-    permission: 'ops:read' | 'ops:manage_inventory',
+    permission: 'ops:read' | 'ops:manage_inventory' | 'ops:manage_credentials',
   ): Promise<void>;
   assertWritable(orgId: string): Promise<void>;
+  sessionActive?(p: UserPrincipal, now: Date): Promise<boolean>;
   activeMember(orgId: string, userId: string): Promise<boolean>;
   activeProduct(productId: string): Promise<boolean>;
 }

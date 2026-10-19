@@ -3101,10 +3101,214 @@ paths:
             schema:
               $ref: '#/components/schemas/OpsArchive'
       x-rollout-flag: OPERATIONS_INVENTORY_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/credentials:
+    get:
+      operationId: listCredentials
+      summary: listCredentials
+      x-implementation-status: implemented
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/Opslimit'
+        - $ref: '#/components/parameters/Opscursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsCredentialList'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      x-rollout-flag: OPERATIONS_CREDENTIALS_ENABLED
+    post:
+      operationId: issueCredential
+      summary: issueCredential
+      x-implementation-status: implemented
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsIssuedCredential'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsIssueCredential'
+      x-fresh-mfa-required: true
+      x-rollout-flag: OPERATIONS_CREDENTIALS_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/credentials/{credentialId}/rotate:
+    post:
+      operationId: rotateCredential
+      summary: rotateCredential
+      x-implementation-status: implemented
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/OpscredentialId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsIssuedCredential'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsRotateCredential'
+      x-fresh-mfa-required: true
+      x-rollout-flag: OPERATIONS_CREDENTIALS_ENABLED
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/credentials/{credentialId}/revoke:
+    post:
+      operationId: revokeCredential
+      summary: revokeCredential
+      x-implementation-status: implemented
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - bearer: []
+      parameters:
+        - $ref: '#/components/parameters/OpsorgId'
+        - $ref: '#/components/parameters/OpsapplicationId'
+        - $ref: '#/components/parameters/OpsenvironmentId'
+        - $ref: '#/components/parameters/OpscredentialId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsRevokedCredential'
+        '400':
+          $ref: '#/components/responses/OpsError400'
+        '401':
+          $ref: '#/components/responses/OpsError401'
+        '403':
+          $ref: '#/components/responses/OpsError403'
+        '404':
+          $ref: '#/components/responses/OpsError404'
+        '409':
+          $ref: '#/components/responses/OpsError409'
+        '413':
+          $ref: '#/components/responses/OpsError413'
+        '415':
+          $ref: '#/components/responses/OpsError415'
+        '422':
+          $ref: '#/components/responses/OpsError422'
+        '429':
+          $ref: '#/components/responses/OpsError429'
+        '503':
+          $ref: '#/components/responses/OpsError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpsRevokeCredential'
+      x-fresh-mfa-required: true
+      x-rollout-flag: OPERATIONS_CREDENTIALS_ENABLED
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }
   parameters:
+    OpscredentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OpsCredentialId'
     OpsorgId:
       name: orgId
       in: path
@@ -3712,6 +3916,141 @@ components:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
   schemas:
+    OpsCredentialList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpsCredential'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    OpsCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/OpsCredentialId'
+        org_id:
+          $ref: '#/components/schemas/OpsOrgId'
+        application_id:
+          $ref: '#/components/schemas/OpsApplicationId'
+        environment_id:
+          $ref: '#/components/schemas/OpsEnvironmentId'
+        purpose:
+          type: string
+          enum:
+            - events:write
+        source:
+          type: string
+          enum:
+            - backend_report
+        expires_at:
+          $ref: '#/components/schemas/OpsTime'
+        revoked_at:
+          anyOf:
+            - $ref: '#/components/schemas/OpsTime'
+            - type: 'null'
+        created_at:
+          $ref: '#/components/schemas/OpsTime'
+      required:
+        - id
+        - org_id
+        - application_id
+        - environment_id
+        - purpose
+        - source
+        - expires_at
+        - revoked_at
+        - created_at
+    OpsCredentialId:
+      type: string
+      pattern: ^opc_[a-f0-9]{32}$
+    OpsIssuedCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        credential:
+          $ref: '#/components/schemas/OpsCredential'
+        token:
+          type: string
+          pattern: ^ops_v1\.opc_[a-f0-9]{32}\.[a-f0-9]{64}$
+      required:
+        - credential
+        - token
+    OpsIssueCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        purpose:
+          type: string
+          enum:
+            - events:write
+        ttl_seconds:
+          type: integer
+          minimum: 86400
+          maximum: 7776000
+        mfa_code:
+          $ref: '#/components/schemas/OpsMfaCode'
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - purpose
+        - ttl_seconds
+        - mfa_code
+        - reason
+    OpsMfaCode:
+      type: string
+      pattern: ^[0-9]{6}$
+    OpsRotateCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        ttl_seconds:
+          type: integer
+          minimum: 86400
+          maximum: 7776000
+        overlap_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+        mfa_code:
+          $ref: '#/components/schemas/OpsMfaCode'
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+      required:
+        - ttl_seconds
+        - overlap_seconds
+        - mfa_code
+        - reason
+    OpsRevokedCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        credential:
+          $ref: '#/components/schemas/OpsCredential'
+      required:
+        - credential
+    OpsRevokeCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          $ref: '#/components/schemas/OpsReason'
+        mfa_code:
+          $ref: '#/components/schemas/OpsMfaCode'
+      required:
+        - reason
+        - mfa_code
     OpsOrgId:
       type: string
       pattern: ^org_[a-f0-9]{24}$

@@ -15,6 +15,7 @@ const RIU: Priv[] = ['SELECT', 'INSERT', 'UPDATE'];
 const ALL: Priv[] = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 
 export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
+  operations_credentials: RIU, // immutable digests and revocable evidence; no DELETE
   operations_accounts: RIU, // organization lock anchor for inventory graph and caps
   operations_applications: RIU, // archive only; immutable identity tombstones
   operations_environments: RIU,

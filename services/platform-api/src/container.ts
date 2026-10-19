@@ -1,4 +1,4 @@
-import { InventoryService, InMemoryInventoryStore } from '@trust/operations';
+import { InventoryService, InMemoryInventoryStore, CredentialService } from '@trust/operations';
 import { PgInventoryStore } from './db/pg-operations-store.ts';
 import { BillingService } from './billing.ts';
 import {
@@ -87,6 +87,7 @@ export interface Container {
   audit: AuditLog;
   auth: AuthService;
   operations: InventoryService;
+  operationsCredentials: CredentialService;
   licensing: LicensingService;
   billing: BillingService | undefined;
   /** File sharing and short links (ADR-021); undefined when not configured. */
@@ -473,10 +474,11 @@ export async function createContainer(
     },
   });
 
+  const operationsStore = pool
+    ? new PgInventoryStore(pool, clock, { auditShards: shards })
+    : new InMemoryInventoryStore({ audit });
   const operations = new InventoryService({
-    store: pool
-      ? new PgInventoryStore(pool, clock, { auditShards: shards })
-      : new InMemoryInventoryStore({ audit }),
+    store: operationsStore,
     clock,
     authorize: async (p, orgId, permission) => {
       await auth.requireOrgPermission(p, orgId, permission);
@@ -487,6 +489,27 @@ export async function createContainer(
       (await authStore.findUserById(userId))?.status === 'active',
     activeProduct: async (productId) =>
       (await licensingStore.findProductById(productId))?.status === 'active',
+  });
+
+  const operationsCredentials = new CredentialService({
+    store: operationsStore,
+    clock,
+    enabled: () => config.operationsCredentialsEnabled && config.operationsInventoryEnabled,
+    authorize: async (p, orgId, permission) => {
+      await auth.requireOrgPermission(p, orgId, permission);
+    },
+    assertWritable: (orgId) => privileged.assertWritable(orgId),
+    stepUp: (p, code) => auth.stepUp(p, code),
+    sessionActive: async (p, now) => {
+      const s = await authStore.findSessionById(p.sessionId);
+      return (
+        !!s &&
+        s.userId === p.userId &&
+        !s.revokedAt &&
+        s.expiresAt > now &&
+        (await authStore.findUserById(p.userId))?.status === 'active'
+      );
+    },
   });
 
   const rateBackend: RateBackend | undefined =
@@ -504,6 +527,7 @@ export async function createContainer(
     audit,
     auth,
     operations,
+    operationsCredentials,
     licensing,
     billing,
     sharing,

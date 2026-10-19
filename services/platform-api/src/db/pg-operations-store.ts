@@ -2,6 +2,9 @@ import { roleAllows } from '@trust/auth';
 import { DomainError, type OrgRole } from '@trust/shared-types';
 import { AuditBuffer } from '@trust/audit';
 import type {
+  CredentialRecord,
+  CredentialScope,
+  CredentialListOptions,
   InventoryAuthority,
   InventoryEntities,
   InventoryRepo,
@@ -60,6 +63,16 @@ function authorityFor(q: Queryable): InventoryAuthority {
       if (!row) throw new DomainError('not_found', 'not found');
       if (!roleAllows(row.role, permission)) throw new DomainError('forbidden', 'request rejected');
     },
+    async sessionActive(p, now) {
+      return (
+        (
+          await q.query(
+            'SELECT 1 FROM sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>$3',
+            [p.sessionId, p.userId, now],
+          )
+        ).rows.length > 0
+      );
+    },
     async assertWritable(orgId) {
       const result = await q.query(
         "SELECT 1 FROM privileged_freezes WHERE scope IN ('platform',$1)",
@@ -85,10 +98,78 @@ function authorityFor(q: Queryable): InventoryAuthority {
     },
   };
 }
+const credentialFrom = (r: Record<string, unknown>): CredentialRecord => ({
+  id: r.id as string,
+  orgId: r.org_id as string,
+  applicationId: r.application_id as string,
+  environmentId: r.environment_id as string,
+  purpose: r.purpose as 'events:write',
+  source: r.source as 'backend_report',
+  secretHash: r.secret_hash as string,
+  createdAt: new Date(r.created_at as Date),
+  expiresAt: new Date(r.expires_at as Date),
+  revokedAt: r.revoked_at ? new Date(r.revoked_at as Date) : null,
+  rotatedAt: r.rotated_at ? new Date(r.rotated_at as Date) : null,
+});
 class Repo implements InventoryRepo {
   readonly #q: Queryable;
   constructor(q: Queryable) {
     this.#q = q;
+  }
+  async findCredential(id: string) {
+    const result = await this.#q.query('SELECT * FROM operations_credentials WHERE id=$1', [id]);
+    return result.rows[0] ? credentialFrom(result.rows[0] as Record<string, unknown>) : undefined;
+  }
+  async listCredentials(scope: CredentialScope, options: CredentialListOptions) {
+    const result = await this.#q.query(
+      'SELECT * FROM operations_credentials WHERE org_id=$1 AND application_id=$2 AND environment_id=$3 AND ($4::text IS NULL OR id>$4) AND ($5::timestamptz IS NULL OR (revoked_at IS NULL AND expires_at>$5)) ORDER BY id COLLATE "C" LIMIT $6',
+      [
+        scope.orgId,
+        scope.applicationId,
+        scope.environmentId,
+        options.after ?? null,
+        options.activeAt ?? null,
+        options.limit,
+      ],
+    );
+    return result.rows.map((r) => credentialFrom(r as Record<string, unknown>));
+  }
+  async insertCredential(row: CredentialRecord) {
+    await this.#q.query(
+      'INSERT INTO operations_credentials (id,org_id,application_id,environment_id,purpose,source,secret_hash,created_at,expires_at,revoked_at,rotated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      [
+        row.id,
+        row.orgId,
+        row.applicationId,
+        row.environmentId,
+        row.purpose,
+        row.source,
+        row.secretHash,
+        row.createdAt,
+        row.expiresAt,
+        row.revokedAt,
+        row.rotatedAt,
+      ],
+    );
+  }
+  async updateCredential(row: CredentialRecord) {
+    const result = await this.#q.query(
+      'UPDATE operations_credentials SET org_id=$2,application_id=$3,environment_id=$4,purpose=$5,source=$6,secret_hash=$7,created_at=$8,expires_at=$9,revoked_at=$10,rotated_at=$11 WHERE id=$1',
+      [
+        row.id,
+        row.orgId,
+        row.applicationId,
+        row.environmentId,
+        row.purpose,
+        row.source,
+        row.secretHash,
+        row.createdAt,
+        row.expiresAt,
+        row.revokedAt,
+        row.rotatedAt,
+      ],
+    );
+    if (result.rowCount !== 1) throw new Error('credential_missing');
   }
   async find<K extends InventoryType>(type: K, orgId: string, id: string) {
     const result = await this.#q.query(`SELECT * FROM ${TABLES[type]} WHERE org_id=$1 AND id=$2`, [

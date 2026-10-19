@@ -1,7 +1,8 @@
 # Operations inventory rollout (OPS-002)
 
-This implements inventory only. Credentials, event ingestion, probes, alerts and a
-fleet dashboard are later tasks. No infrastructure or commercial access changes
+This guide covers inventory. Credential management has a
+[separate rollout guide](operations-credentials.md); ingestion, probes, alerts and a
+fleet dashboard remain later tasks. No infrastructure or commercial access changes
 are performed by registering an application.
 
 ## Local and staging enablement
@@ -22,8 +23,8 @@ are performed by registering an application.
    Codes are immutable, content-free slugs. DELETE archives; codes cannot be reused.
 5. Verify reads, ordinary-member refusal, wrong-organization 404, stale-version
    409, freeze refusal, atomic audit and tombstone behavior. Check existing license
-   activation remains unchanged. Do not issue production integration credentials:
-   no credential endpoint is implemented by this release.
+   activation remains unchanged. Credential management additionally requires its separate flag and fresh MFA;
+   follow its rollout guide. Event ingestion is not implemented yet.
 
 Example create body (replace the user ID with an active member of the same org):
 
@@ -77,6 +78,7 @@ an active same-organization user.
   integrity/contention test, not a production throughput claim.
 - Before production, review staging evidence and deploy the migration before the
   application release. No production rollout has been performed by local tests.
-- Roll back by setting `OPERATIONS_INVENTORY_ENABLED=false` and deploying the
+- If credential management was enabled later, disable its flag before disabling inventory.
+  Roll back inventory by setting `OPERATIONS_INVENTORY_ENABLED=false` and deploying the
   preceding app version. Keep inventory tables and audit evidence for inspection;
   do not drop data or roll back licensing to disable monitoring.

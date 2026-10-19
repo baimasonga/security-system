@@ -1,9 +1,9 @@
 # Operations monitoring contract
 
-Accepted design for OPS-001, 19 October 2026. OPS-002 inventory is implemented in
-[live OpenAPI](openapi.yaml), disabled by default behind `OPERATIONS_INVENTORY_ENABLED`.
+Accepted design for OPS-001, 19 October 2026. OPS-002 inventory and OPS-003 credential management are implemented in
+[live OpenAPI](openapi.yaml), disabled by default behind separate rollout flags.
 The separately published [planned OpenAPI](operations-planned.openapi.yaml) remains the
-implementation target for OPS-003/004; those routes do not exist yet. Health, incident and probe
+implementation target for OPS-004; event ingestion does not exist yet. Health, incident and probe
 contracts below are design requirements for OPS-005/006; their routes will be specified
 before implementation. No production configuration is applied by accepting this contract.
 
@@ -244,3 +244,24 @@ locking. Transaction-bound authority checks use the same connection, avoiding
 pool exhaustion under lock contention. Future tasks must share this anchor before
 locking descendant credentials/counters/events. Inventory is not routed through
 best-effort telemetry and grants no collection, licensing or remediation authority.
+
+## OPS-003 implementation notes
+
+Credential management uses `OPERATIONS_CREDENTIALS_ENABLED`, default false, with
+inventory/MFA configuration prerequisites. Four management operations are live
+contracts; the event ingestion route remains planned. See the
+[credential rollout guide](../deploy/operations-credentials.md).
+
+Metadata excludes the verification digest and internal rotation marker. Digests
+and identity are immutable; expiry only shortens and revoke/rotation markers
+cannot be cleared. An active rotated predecessor prevents another rotation until
+expired/revoked. Two independent active credentials can use zero-overlap
+replacement without exceeding the cap; a positive overlap requires a free slot.
+
+Fresh MFA consumption precedes the organization lock; management rechecks role,
+active session, scope and lifecycle within its own transaction/connection.
+`withCredential` supplies the guarded transaction for future ingestion, not a
+cacheable authentication result. Verification checks current state, expected
+purpose/source/scope, and expiry/enablement before callback and commit. It never
+consults commercial subscription state. No HTTP verification/ingestion endpoint
+has been added by OPS-003.
