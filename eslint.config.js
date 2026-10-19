@@ -40,6 +40,10 @@ export default tseslint.config(
   security.configs.recommended,
   {
     rules: {
+      // Keep the ESLint 9 rule baseline during the toolchain migration. Audit
+      // these new recommended rules separately from dependency compatibility.
+      'preserve-caught-error': 'off',
+      'no-useless-assignment': 'off',
       eqeqeq: ['error', 'always'],
       'no-eval': 'error',
       'no-implied-eval': 'error',

@@ -71,3 +71,29 @@ alert destinations, independent monitoring and restore exercises remain later ro
   channel is configured. Schema acceptance tests are not runtime authorization/persistence tests.
 - Record commit/PR, tests/failures, configuration names, verification environment and remaining limits for each
   task. Never include credentials, private links, file contents or production exports.
+
+### ESLint dependency integration — 2026-10-19
+
+Merged the Dependabot ESLint 10.12.0 and `@eslint/js` 10.0.1 branches together
+with `eslint-plugin-security` 4.2.0. The latter replaces the removed ESLint
+context API that caused the lint crash. Resolved the package/lockfile conflicts
+by retaining both ESLint 10 declarations and regenerating the lockfile with the
+security plugin upgrade; frozen installation succeeds.
+
+Preserved the ESLint 9 rule baseline by explicitly deferring the two newly
+recommended rules, `preserve-caught-error` and `no-useless-assignment`. Existing
+security rules remain enabled. Grouped the ESLint dependencies in Dependabot to
+prevent future incompatible individual updates.
+
+Verification: `npm ci`, `npm run check` (770 passed, 3 skipped), and
+`npm audit --audit-level=high` (0 vulnerabilities) passed. An stdin unsafe-regex
+probe in the platform source scope produced the expected security-rule warning,
+confirming that the upgraded plugin executes. Evidence is in
+`/tmp/eslint-integration-check.log`. These are local checks; remote CI and native
+Windows execution have not been observed. This integration changes development
+tooling only; no application/database security boundaries were changed.
+
+The unrelated local OPS-003 implementation remains preserved in the original
+workspace and is not included in this dependency integration. Next: observe the
+new CI run, then reconcile the local OPS implementation with the accepted
+upstream contracts before continuing feature work.
