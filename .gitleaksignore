@@ -13,3 +13,5 @@
 331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:145
 331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:157
 331434ed00c9a18e6adc7a1b5f4179d2eff4936d:docs/api/lease-test-vectors.json:jwt:169
+# OPS-005 negative-path fixture: malformed "ops_v1.invalid" cannot authenticate.
+29a2cabe46aef0a52c133d2ebabf6477c7cef82b:services/platform-api/test/operations-health.test.ts:generic-api-key:46

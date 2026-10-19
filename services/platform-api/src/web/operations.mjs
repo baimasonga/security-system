@@ -308,6 +308,75 @@ export async function operationsView(ui) {
         ),
     };
   }
+  async function healthPanel(path) {
+    try {
+      const result = await ui.api(`${path}/health`);
+      return panel(
+        node('h2', 'Reported health'),
+        node(
+          'p',
+          'Backend assertions, not independent probes. Missing and stale reports do not establish availability. Refresh to update.',
+        ),
+        result.components.length
+          ? table(
+              ['Component', 'Health with dependencies', 'Own report', 'Last received'],
+              result.components.map((c) => [
+                c.code,
+                c.status,
+                c.reported_status,
+                when(c.received_at),
+              ]),
+            )
+          : empty('No components to monitor.'),
+      );
+    } catch (e) {
+      if (e.status === 401) throw e;
+      return panel(
+        node('h2', 'Reported health'),
+        empty(
+          e.status === 404
+            ? 'Health reporting is not enabled for this workspace.'
+            : 'Health evidence is currently unavailable.',
+        ),
+      );
+    }
+  }
+  async function historyPanel(path) {
+    try {
+      const result = await ui.api(`${path}/history`);
+      return panel(
+        node('h2', 'Recent event history'),
+        node(
+          'p',
+          'Hourly backend observations over the last 24 hours. Empty hours are gaps, not successful checks. Boundary hours include the whole stored bucket.',
+        ),
+        ...(result.truncated
+          ? [
+              node(
+                'p',
+                'This interval contains more than 1,000 rows. Only the first 1,000 are shown.',
+              ),
+            ]
+          : []),
+        result.items.length
+          ? table(
+              ['Hour', 'Event type', 'Reported outcome', 'Count'],
+              result.items.map((r) => [when(r.hour), r.type, r.outcome, String(r.count)]),
+            )
+          : empty('No retained observations in this interval.'),
+      );
+    } catch (e) {
+      if (e.status === 401) throw e;
+      return panel(
+        node('h2', 'Recent event history'),
+        empty(
+          e.status === 404
+            ? 'Health history is not enabled for this workspace.'
+            : 'History evidence is currently unavailable.',
+        ),
+      );
+    }
+  }
   async function environment(appId, id) {
     const appPath = `${base}/${enc(appId)}`;
     const path = `${appPath}/environments/${enc(id)}`;
@@ -335,6 +404,7 @@ export async function operationsView(ui) {
         parent,
       ),
       button('Refresh', refresh(reload)),
+      await healthPanel(path),
       panel(
         node('h2', 'Components'),
         rows.length ? table(['Component', 'Kind', 'State', ''], rows) : empty('No components yet.'),
@@ -385,6 +455,7 @@ export async function operationsView(ui) {
       ...header(c.code, `${c.kind} · ${c.state} · version ${c.version}`, parent),
       button('Refresh', refresh(reload)),
       node('p', `Component ID: ${c.id}`),
+      await historyPanel(`${path}/${enc(id)}`),
       ...(writable && c.state !== 'archived'
         ? [
             panel(
@@ -438,7 +509,7 @@ export async function operationsView(ui) {
       node('h2', 'Integration credentials'),
       node(
         'p',
-        'Credentials authorize future backend event reporting only. Event collection is not implemented yet. Enroll an authenticator under Account before issuing, rotating or revoking. A failed request consumes its code; use a new code for every attempt. If a response is lost, refresh the credential list before issuing again; an old secret cannot be recovered.',
+        'Credentials authorize backend event reporting when the collector rollout is enabled; they do not prove that a sender is connected. Enroll an authenticator under Account before issuing, rotating or revoking. A failed request consumes its code; use a new code for every attempt. If a response is lost, refresh the credential list before issuing again; an old secret cannot be recovered.',
       ),
     );
     function mutation(action, row) {

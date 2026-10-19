@@ -32,6 +32,7 @@ try {
       operationsInventoryEnabled: true,
       operationsCredentialsEnabled: true,
       operationsIngestionEnabled: true,
+      operationsHealthEnabled: true,
       mfaEncryptionKey: randomBytes(32).toString('hex'),
       scrypt: { N: 1024, r: 8, p: 1 },
     },
@@ -127,6 +128,27 @@ try {
     assert.equal(response.status, 200);
     assert.equal(response.body.accepted?.filter((r) => r.disposition === 'stored').length, 100);
   }
+  const healthPath = base + '/' + a.body.id + '/environments/' + e.body.id + '/health';
+  const healthResponses = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      fetch(address + healthPath, { headers: { authorization: 'Bearer ' + session } }),
+    ),
+  );
+  assert(healthResponses.every((r) => r.status === 200));
+  for (const r of healthResponses)
+    assert.equal(
+      ((await r.json()) as { components: Array<{ status: string }> }).components[0]?.status,
+      'healthy',
+    );
+  time = new Date(+time + 180000);
+  const stale = await fetch(address + healthPath, {
+    headers: { authorization: 'Bearer ' + session },
+  });
+  assert.equal(stale.status, 200);
+  assert.equal(
+    ((await stale.json()) as { components: Array<{ status: string }> }).components[0]?.status,
+    'stale',
+  );
   const before = (
     await pool.query(
       'SELECT count(*)::int AS count,sum(size_bytes)::bigint AS bytes FROM operations_events',
@@ -204,6 +226,8 @@ try {
       expired_retry_refused: true,
       audit_verified: true,
       fsync: 'on',
+      health_read_contenders: 20,
+      stale_after_180_seconds: true,
       duration_ms: Math.round(performance.now() - started),
     }),
   );

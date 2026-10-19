@@ -56,6 +56,7 @@ describe('OpenAPI ↔ implementation drift', () => {
         'get /v1/billing/checkout-options',
         'get /device.mjs',
         'get /healthz',
+        'get /readyz',
         'get /rokela-icon.png',
         'get /portal.css',
         'get /portal.mjs',

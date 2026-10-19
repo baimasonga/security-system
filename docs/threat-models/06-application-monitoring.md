@@ -82,3 +82,15 @@ late responses cannot render credentials in a different context. Submitted facto
 are cleared before awaiting requests. One-time secrets are not stored in browser
 storage and are removed on dialog close/cancel, navigation and page exit. Browser
 regression and deliberate-mutation evidence are recorded in the program handoff.
+
+## OPS-005 health read boundary
+
+Latest eligible heartbeat selection is transactional with committed evidence. Reports older
+than 120 seconds at receipt or future-dated cannot refresh health; older occurrences and
+equal-occurrence healthier ties cannot overwrite a failure. Duplicate receipt TTL cannot
+resurrect health. Inactive ancestry and missing/expired state remain unknown; TTL expiry is
+stale. Dependency states cannot promote health. All read paths verify live ops:read authority
+before scope lookup and again on the transaction connection. Counts are historical assertions
+with gaps and truncation, not availability measurements. Public readiness returns only a
+bounded fixed-connection persistence result; raw diagnostics and arbitrary destinations never
+enter it. Independent Warrior monitoring and optional-provider checks remain deployment work.

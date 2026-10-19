@@ -18,6 +18,7 @@ export interface PlatformConfig {
   operationsInventoryEnabled: boolean;
   operationsCredentialsEnabled: boolean;
   operationsIngestionEnabled: boolean;
+  operationsHealthEnabled: boolean;
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
   identityMailEncryptionKey?: string;
@@ -264,6 +265,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   if (requireOperatorMfa && !mfaEncryptionKey)
     throw new Error('MFA_ENCRYPTION_KEY is required for operator MFA');
   const opsInventory = env['OPERATIONS_INVENTORY_ENABLED'];
+  const opsHealth = env['OPERATIONS_HEALTH_ENABLED'];
+  if (opsHealth !== undefined && opsHealth !== 'true' && opsHealth !== 'false')
+    throw new Error('OPERATIONS_HEALTH_ENABLED must be true or false');
+  if (opsHealth === 'true' && opsInventory !== 'true')
+    throw new Error('OPERATIONS_HEALTH_ENABLED requires inventory');
   if (opsInventory !== undefined && opsInventory !== 'true' && opsInventory !== 'false')
     throw new Error('OPERATIONS_INVENTORY_ENABLED must be true or false');
   const opsIngestion = env['OPERATIONS_INGESTION_ENABLED'];
@@ -525,6 +531,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     operationsInventoryEnabled: opsInventory === 'true',
     operationsCredentialsEnabled: opsCredentials === 'true',
     operationsIngestionEnabled: opsIngestion === 'true',
+    operationsHealthEnabled: opsHealth === 'true',
     ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',
     port,

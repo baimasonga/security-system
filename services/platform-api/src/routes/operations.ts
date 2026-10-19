@@ -136,6 +136,7 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
     registerInventoryRoutes(scoped, c);
     registerCredentialRoutes(scoped, c);
     registerEventRoutes(scoped, c);
+    registerHealthRoutes(scoped, c);
   });
 }
 function registerInventoryRoutes(app: FastifyInstance, c: Container) {
@@ -386,4 +387,44 @@ function registerEventRoutes(app: FastifyInstance, c: Container) {
       return receipt;
     },
   );
+}
+
+function registerHealthRoutes(app: FastifyInstance, c: Container) {
+  const path = base + '/:applicationId/environments/:environmentId';
+  const params = z
+    .object({ orgId: id('org'), applicationId: id('opa'), environmentId: id('ope') })
+    .strict();
+  const pre = {
+    logLevel: 'silent' as const,
+    preHandler: [
+      authenticated(c),
+      async () => {
+        if (!c.config.operationsHealthEnabled) throw new DomainError('not_found', 'not found');
+      },
+    ],
+  };
+  app.get(path + '/health', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    return toWire(
+      await c.operationsHealth.snapshot(principalOf(req), safeParse(params, req.params)),
+    );
+  });
+  app.get(path + '/components/:componentId/history', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const { componentId, ...scope } = safeParse(
+      params.extend({ componentId: id('opm') }),
+      req.params,
+    );
+    const q = safeParse(
+      z
+        .object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() })
+        .strict()
+        .refine((q) => !!q.from === !!q.to),
+      req.query,
+    );
+    const to = q.to ? new Date(q.to) : c.clock.now();
+    const from = q.from ? new Date(q.from) : new Date(+to - 86400000);
+    return toWire(await c.operationsHealth.history(principalOf(req), scope, componentId, from, to));
+  });
 }

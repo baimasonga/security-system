@@ -68,6 +68,18 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
 
   app.get('/healthz', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
 
+  app.get(
+    '/readyz',
+    { logLevel: 'silent', config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (_req, reply) => {
+      const ready = await c.readiness();
+      return reply
+        .header('Cache-Control', 'no-store')
+        .status(ready ? 200 : 503)
+        .send({ status: ready ? 'ready' : 'unavailable' });
+    },
+  );
+
   app.addHook('onClose', async () => c.close());
 
   // Request metrics: route TEMPLATE (never the raw URL), so labels cannot carry ids or secrets.

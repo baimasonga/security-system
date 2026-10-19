@@ -1,3 +1,5 @@
+import { HealthService } from '@trust/operations';
+import { persistenceReadiness } from './readiness.ts';
 import {
   InventoryService,
   InMemoryInventoryStore,
@@ -94,6 +96,8 @@ export interface Container {
   operations: InventoryService;
   operationsCredentials: CredentialService;
   operationsEvents: EventService;
+  operationsHealth: HealthService;
+  readiness(): Promise<boolean>;
   licensing: LicensingService;
   billing: BillingService | undefined;
   /** File sharing and short links (ADR-021); undefined when not configured. */
@@ -518,6 +522,32 @@ export async function createContainer(
     },
   });
 
+  const operationsHealth = new HealthService({
+    store: operationsStore,
+    clock,
+    enabled: () => config.operationsHealthEnabled && config.operationsInventoryEnabled,
+    authorize: async (p, orgId, tx) => {
+      if (tx?.authority) {
+        await tx.authority.authorize(p, orgId, 'ops:read');
+        if (!(await tx.authority.sessionActive?.(p, clock.now())))
+          throw new DomainError('unauthenticated', 'authentication required');
+      } else {
+        await auth.requireOrgPermission(p, orgId, 'ops:read');
+        const session = await authStore.findSessionById(p.sessionId);
+        if (
+          !session ||
+          session.userId !== p.userId ||
+          session.revokedAt ||
+          session.expiresAt <= clock.now()
+        )
+          throw new DomainError('unauthenticated', 'authentication required');
+      }
+    },
+  });
+  const readiness = persistenceReadiness(async () => {
+    if (pool) await pool.query('SELECT 1');
+  });
+
   const operationsEvents = new EventService({
     store: operationsStore,
     credentials: operationsCredentials,
@@ -542,6 +572,8 @@ export async function createContainer(
     operations,
     operationsCredentials,
     operationsEvents,
+    operationsHealth,
+    readiness,
     licensing,
     billing,
     sharing,

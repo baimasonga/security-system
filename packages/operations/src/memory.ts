@@ -1,3 +1,4 @@
+import type { Heartbeat } from './health.ts';
 import type { OperationEvent } from './events-model.ts';
 import { MemoryEventRepo } from './events-memory.ts';
 import { AuditBuffer, type AuditLog, type AuditEventInput } from '@trust/audit';
@@ -14,6 +15,12 @@ import type {
 } from './model.ts';
 
 class Repo extends MemoryEventRepo implements InventoryRepo {
+  override async recordHeartbeat(row: Heartbeat) {
+    const c = await this.find('component', row.orgId, row.componentId);
+    if (!c || c.applicationId !== row.applicationId || c.environmentId !== row.environmentId)
+      throw new Error('heartbeat_parent');
+    await super.recordHeartbeat(row);
+  }
   override async insertEvent(row: OperationEvent) {
     const component = await this.find('component', row.orgId, row.componentId);
     const credential = await this.findCredential(row.credentialId);
@@ -156,6 +163,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       repo.events = structuredClone(this.events);
       repo.eventCounters = structuredClone(this.eventCounters);
       repo.eventAggregates = structuredClone(this.eventAggregates);
+      repo.heartbeats = structuredClone(this.heartbeats);
       const buffer = new AuditBuffer();
       const out = await fn(Object.assign(repo, { audit: buffer }));
       const events = buffer.drain();
@@ -166,6 +174,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       this.events = repo.events;
       this.eventCounters = repo.eventCounters;
       this.eventAggregates = repo.eventAggregates;
+      this.heartbeats = repo.heartbeats;
       return out;
     };
     const result = this.#tail.then(run, run);
