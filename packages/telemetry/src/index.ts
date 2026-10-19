@@ -1,5 +1,13 @@
 import { hmacSha256Hex, newId } from '@trust/crypto';
 import { redact, type Clock, type Json } from '@trust/shared-types';
+import {
+  checkClientEvent,
+  contentViolation,
+  type ClientTelemetryName,
+  type Violation,
+} from './firewall.ts';
+
+export * from './firewall.ts';
 
 // ---------------------------------------------------------------------------------------------
 // Privacy-preserving telemetry. Every event name has an explicit attribute allow-list; anything not
@@ -47,7 +55,8 @@ export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 export interface TelemetryRecord {
   id: string;
   occurredAt: string;
-  name: TelemetryName;
+  /** Server events by name; client events (privacy firewall, ADR-027) are stored as `client.<name>`. */
+  name: TelemetryName | `client.${ClientTelemetryName}`;
   attributes: Record<string, string | number>;
 }
 
@@ -89,8 +98,11 @@ export function sanitizeAttributes(
     if (v === undefined || v === null) continue;
     if (def.type === 'number' && typeof v === 'number' && Number.isFinite(v)) out[key] = v;
     else if (def.type === 'enum' && typeof v === 'string' && def.values.includes(v)) out[key] = v;
-    else if (def.type === 'string' && typeof v === 'string') out[key] = v.slice(0, def.max);
-    else if (def.type === 'enum' && typeof v === 'boolean') out[key] = String(v);
+    else if (def.type === 'string' && typeof v === 'string') {
+      // Server-side events go through the same content detectors (ADR-027): suspicious values are dropped.
+      const bounded = v.slice(0, def.max);
+      if (!contentViolation(bounded)) out[key] = bounded;
+    } else if (def.type === 'enum' && typeof v === 'boolean') out[key] = String(v);
   }
   return out;
 }
@@ -119,6 +131,32 @@ export class Telemetry {
       name,
       attributes: sanitizeAttributes(name, attrs),
     });
+  }
+
+  /**
+   * Client-submitted events (ADR-027). Each passes the privacy firewall or is refused with field + rule only; no
+   * user reference is stored with accepted events (data minimization).
+   */
+  async ingestClient(
+    events: ReadonlyArray<{ name: string; attributes: Record<string, unknown> }>,
+  ): Promise<{ accepted: number; rejected: Array<{ index: number; violations: Violation[] }> }> {
+    const rejected: Array<{ index: number; violations: Violation[] }> = [];
+    let accepted = 0;
+    for (const [index, e] of events.entries()) {
+      const r = checkClientEvent(e.name, e.attributes);
+      if (!r.ok) {
+        rejected.push({ index, violations: r.violations });
+        continue;
+      }
+      await this.#sink.recordTelemetry({
+        id: newId('tel'),
+        occurredAt: this.#clock.now().toISOString(),
+        name: `client.${r.name}`,
+        attributes: r.attributes,
+      });
+      accepted++;
+    }
+    return { accepted, rejected };
   }
 
   async signal(

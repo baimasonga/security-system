@@ -54,6 +54,25 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
   ],
 };
 
+/** Plain-language meaning of each permission, shown in the security center (ADR-027). */
+export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
+  'org:read': 'See the organization, its members and their roles',
+  'org:manage_members': 'Add members and set their roles',
+  'license:read': 'See licenses, entitlements, usage and seats',
+  'license:activate': 'Activate licenses on your devices',
+  'license:manage_seats': 'Give and remove seats on seat-based licenses',
+  'trial:start': 'Start a product trial for the organization',
+  'device:read': 'See activated devices, their passports and trust posture',
+  'device:deactivate': "Sign out anyone's device to free a slot",
+  'share:read': 'See shared files, documents and links',
+  'share:create': 'Upload files and create share links',
+  'share:manage': 'Manage, hold or delete any shared item in the organization',
+};
+
+export function permissionsFor(role: OrgRole): readonly Permission[] {
+  return GRANTS[role];
+}
+
 export function roleAllows(role: OrgRole, permission: Permission): boolean {
   return GRANTS[role].includes(permission);
 }

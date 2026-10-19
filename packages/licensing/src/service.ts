@@ -799,6 +799,32 @@ export class LicensingService {
   }
 
   /** Owners/admins may deactivate any device; members only devices they activated themselves. */
+  /** The caller's own active devices in the given organizations, with their trust posture (security center). */
+  async myDevices(p: UserPrincipal, orgIds: readonly string[]) {
+    const out = [];
+    for (const orgId of orgIds) {
+      for (const lic of await this.#d.store.listLicenses(orgId)) {
+        for (const a of await this.#d.store.listActivationsForLicense(orgId, lic.id)) {
+          if (a.activatedBy !== p.userId || a.status !== 'active') continue;
+          const posture = await this.#d.store.findDevicePosture(orgId, a.deviceId);
+          out.push({
+            orgId,
+            licenseId: lic.id,
+            activationId: a.id,
+            deviceId: a.deviceId,
+            activatedAt: a.activatedAt,
+            lastValidatedAt: a.lastValidatedAt,
+            offlineLeaseValidUntil: a.lastLeaseExp,
+            posture: posture?.decision ?? Decision.ALLOW,
+            postureReasons: posture?.reasons ?? ['attestation_unknown'],
+            attestation: 'unknown' as const,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
   // ---- seats (ADR-025) --------------------------------------------------------------------------------------
 
   async listSeats(p: UserPrincipal, orgId: string, licenseId: string) {

@@ -41,6 +41,7 @@ Current browser and identity work:
 
 - [ADR-015 — Browser portal](adr/ADR-015-browser-portal.md)
 - [ADR-016 — Email verification and password recovery](adr/ADR-016-identity-recovery.md)
+- [ADR-027 — Privacy firewall and security center](adr/ADR-027-privacy-firewall-and-security-center.md)
 - [ADR-026 — Device trust: passport, signals, deterministic posture](adr/ADR-026-device-trust.md) · [threat model](threat-models/05-device-trust.md)
 - [ADR-025 — Named-user seats and offline transfer](adr/ADR-025-seats-and-offline-transfer.md)
 - [ADR-024 — Capability tokens for processing services](adr/ADR-024-capability-tokens.md)

@@ -768,6 +768,46 @@ paths:
         '200': { description: Deactivated }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /v1/security-center:
+    get:
+      summary: 'Security center (ADR-027): account protection, roles with plain-language permissions, your own devices with trust posture, collected data categories and retention, recommendations'
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '200':
+            {
+              description: '{ account, organizations, devices, data_categories, recommendations }',
+            },
+        }
+  /v1/telemetry/events:
+    post:
+      summary: 'Client telemetry through the privacy firewall (ADR-027): only allow-listed events and fields; values that look like personal data, paths, URLs, secrets, card numbers or key material are refused. Refusals name the field and rule, never the value. No user reference is stored.'
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              additionalProperties: false
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [name]
+                    additionalProperties: false
+                    properties:
+                      name: { type: string, enum: [app.started, feature.used, app.error] }
+                      attributes: { type: object }
+      responses:
+        {
+          '200':
+            { description: '{ accepted, rejected: [{ index, violations: [{ field, rule }] }] }' },
+        }
   /v1/organizations/{orgId}/devices/{deviceId}/passport:
     parameters:
       - { $ref: '#/components/parameters/OrgId' }

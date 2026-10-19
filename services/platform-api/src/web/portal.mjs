@@ -351,6 +351,7 @@ function renderShell() {
     'Catalog',
     'Device demo',
     'Account',
+    'Security center',
   ];
   if (state.principal.platform_role === 'platform_admin') views.push('Operator console');
   $('navigation').replaceChildren(...views.map((view) => button(view, () => navigate(view))));
@@ -639,6 +640,7 @@ async function renderView(view) {
       },
     });
   if (view === 'Device demo') return deviceView();
+  if (view === 'Security center') return securityCenterView();
   if (view === 'Account')
     return [
       title(
@@ -672,6 +674,62 @@ async function renderView(view) {
   if (view === 'Operator console') return operatorView();
   return [];
 }
+async function securityCenterView() {
+  const sc = await api('/v1/security-center');
+  const yes = (v) => (v ? 'Yes' : 'No');
+  return [
+    title(
+      'Security center',
+      'How your account is protected, what your roles allow, your devices, and what we collect.',
+    ),
+    ...(sc.recommendations.length
+      ? [panel(node('h2', 'Recommended'), ...sc.recommendations.map((r) => node('p', r)))]
+      : []),
+    panel(
+      node('h2', 'Your account'),
+      details({
+        email: sc.account.email,
+        email_verified: yes(sc.account.email_verified),
+        authenticator_app: yes(sc.account.authenticator_enabled),
+        passkeys: sc.account.passkeys,
+        platform_operator: yes(sc.account.operator),
+      }),
+    ),
+    ...sc.organizations.map((o) =>
+      panel(
+        node('h2', `${o.name} — ${o.role}`),
+        table(
+          ['You may', 'Permission'],
+          o.permissions.map((x) => [x.description, node('span', x.permission, 'mono')]),
+        ),
+      ),
+    ),
+    panel(
+      node('h2', 'Your devices'),
+      sc.devices.length
+        ? table(
+            ['Device', 'Trust', 'Hardware evidence', 'Works offline until'],
+            sc.devices.map((d) => [
+              node('span', d.device_id, 'mono'),
+              badge(d.posture),
+              d.attestation === 'unknown' ? 'None verified' : d.attestation,
+              d.offline_lease_valid_until
+                ? new Date(d.offline_lease_valid_until).toLocaleString()
+                : '—',
+            ]),
+          )
+        : empty('You have not activated any devices.'),
+    ),
+    panel(
+      node('h2', 'What we collect'),
+      table(
+        ['Category', 'Contents', 'Why', 'Kept'],
+        sc.data_categories.map((d) => [d.category, d.contents, d.purpose, d.retention]),
+      ),
+    ),
+  ];
+}
+
 // WebAuthn binary fields travel as base64url; nothing about a passkey is kept in browser storage.
 const toB64u = (buffer) =>
   btoa(String.fromCharCode(...new Uint8Array(buffer)))

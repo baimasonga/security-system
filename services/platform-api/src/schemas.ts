@@ -270,3 +270,20 @@ export const seatBody = z.object({ user_id: id }).strict();
 export const seatParams = z.object({ orgId: id, licenseId: id, userId: id }).strict();
 
 export const deviceParams = z.object({ orgId: id, deviceId: id }).strict();
+
+// ---- privacy firewall (ADR-027) ----
+export const clientTelemetryBody = z
+  .object({
+    events: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(64),
+            attributes: z.record(z.unknown()).default({}),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(50),
+  })
+  .strict();
