@@ -3,7 +3,7 @@ export function persistenceReadiness(query: () => Promise<unknown>, timeoutMs = 
   let active: Promise<boolean> | undefined;
   let last = { at: -Infinity, ready: false };
   return async () => {
-    if (Date.now() - last.at < 1000) return last.ready;
+    if (performance.now() - last.at < 1000) return last.ready;
     if (active) return active;
     let deliver!: (ready: boolean) => void;
     // Keep this same settled result while a timed-out query is still pending. Later callers
@@ -13,7 +13,7 @@ export function persistenceReadiness(query: () => Promise<unknown>, timeoutMs = 
     });
     const result = active;
     const timer = setTimeout(() => {
-      last = { at: Date.now(), ready: false };
+      last = { at: performance.now(), ready: false };
       deliver(false);
     }, timeoutMs);
     void Promise.resolve()
@@ -24,7 +24,7 @@ export function persistenceReadiness(query: () => Promise<unknown>, timeoutMs = 
       );
     function finish(ready: boolean) {
       clearTimeout(timer);
-      last = { at: Date.now(), ready };
+      last = { at: performance.now(), ready };
       active = undefined;
       deliver(ready);
     }

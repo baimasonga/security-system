@@ -113,7 +113,7 @@ it('bounds slow persistence checks and coalesces pending queries', async () => {
 });
 
 it('reuses a timed-out readiness result while persistence remains wedged', async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'performance'] });
   try {
     let calls = 0;
     const check = persistenceReadiness(() => {
@@ -134,6 +134,23 @@ it('reuses a timed-out readiness result while persistence remains wedged', async
     expect(await later).toBe(false);
     expect(calls).toBe(1);
     expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('expires readiness cache by monotonic time when the wall clock rolls backward', async () => {
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'performance'] });
+  try {
+    let calls = 0;
+    const check = persistenceReadiness(async () => {
+      if (++calls > 1) throw new Error('unavailable');
+    });
+    expect(await check()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1001);
+    vi.setSystemTime(new Date(Date.now() - 3600000));
+    expect(await check()).toBe(false);
+    expect(calls).toBe(2);
   } finally {
     vi.useRealTimers();
   }

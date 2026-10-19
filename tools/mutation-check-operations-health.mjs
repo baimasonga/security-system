@@ -63,14 +63,22 @@ try {
   assert.equal(baseline.status, 0, baseline.stdout + baseline.stderr);
   for (const [file, before, after] of cases)
     mutate('packages/operations/src/' + file, before, after, 'unit', test);
+  const readinessTest = 'services/platform-api/test/operations-health.test.ts';
+  const readinessBaseline = run('unit', readinessTest);
+  assert.equal(readinessBaseline.status, 0, readinessBaseline.stdout + readinessBaseline.stderr);
+  for (const [before, after] of [
+    ['performance.now()', 'Date.now()'],
+    ['if (active) return active;', 'if (false) return active;'],
+  ])
+    mutate('services/platform-api/src/readiness.ts', before, after, 'unit', readinessTest);
   if (process.env.DATABASE_URL) {
     const dbTest = 'services/platform-api/test/operations-events-store.db.test.ts';
     const dbBaseline = run('db', dbTest);
     assert.equal(dbBaseline.status, 0, dbBaseline.stdout + dbBaseline.stderr);
     for (const [before, after] of pgCases)
       mutate('services/platform-api/src/db/pg-operations-events.ts', before, after, 'db', dbTest);
-    console.log('13 mutations killed, including PostgreSQL ordering and scope');
-  } else console.log('11 mutations killed; set DATABASE_URL to include two PostgreSQL mutations');
+    console.log('15 mutations killed, including PostgreSQL ordering and scope');
+  } else console.log('13 mutations killed; set DATABASE_URL to include two PostgreSQL mutations');
 } finally {
   rmSync(copy, { recursive: true, force: true });
 }

@@ -386,11 +386,11 @@ upstream contracts before continuing feature work.
   configured. Optional-provider readiness, independent external Warrior monitoring,
   incident maintenance suppression and the live source integration remain explicit
   rollout/next-task requirements. See [health guide](../deploy/operations-health.md).
-- Verification: `npm run check` passed **844 tests, 3 skipped**. Full PostgreSQL
+- Verification: `npm run check` passed **845 tests, 3 skipped**. Full PostgreSQL
   owner/app-role regression passed **678 tests in 65 files** (345.13 s); final
-  health/event PG replay passed **24 tests**, and migration replay passed **14**.
+  health/event PG replay passed **26 tests**, and migration replay passed **14**.
   Existing occupied-port child errors are intentional negative-path probes.
-- All **four browser workflows** passed under Chromium/CSP. Thirteen deliberate
+- All **four browser workflows** passed under Chromium/CSP. Fifteen deliberate
   mutations were caught, including PostgreSQL ordering/scope; reproducible tool:
   `tools/mutation-check-operations-health.mjs` (disposable source copy).
 - Real HTTP/fsync-on, pool=2 load retained all expected collector totals and
@@ -415,3 +415,6 @@ upstream contracts before continuing feature work.
 - Follow-up readiness review removed repeated timeout handlers on a wedged query:
   callers now share the same settled timeout result until persistence completes.
   A fake-clock regression proves no new timers or queries appear after cache expiry.
+
+- Readiness cache expiry uses monotonic time. A regression rolls wall time backward
+  after cache expiry and confirms a new failed persistence check cannot reuse ready.
