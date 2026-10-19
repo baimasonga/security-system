@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { makeEnv, type Env } from './harness.ts';
 import { loadConfig } from '../src/config.ts';
 import { persistenceReadiness } from '../src/readiness.ts';
@@ -110,4 +110,31 @@ it('bounds slow persistence checks and coalesces pending queries', async () => {
       throw new Error('private database password');
     }, 5)(),
   ).toBe(false);
+});
+
+it('reuses a timed-out readiness result while persistence remains wedged', async () => {
+  vi.useFakeTimers();
+  try {
+    let calls = 0;
+    const check = persistenceReadiness(() => {
+      calls++;
+      return new Promise(() => {});
+    }, 5);
+    const first = check();
+    await vi.advanceTimersByTimeAsync(5);
+    expect(await first).toBe(false);
+    await vi.advanceTimersByTimeAsync(1001);
+    let resolved = false;
+    const later = check().then((value) => {
+      resolved = true;
+      return value;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resolved).toBe(true);
+    expect(await later).toBe(false);
+    expect(calls).toBe(1);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });

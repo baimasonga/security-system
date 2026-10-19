@@ -386,9 +386,9 @@ upstream contracts before continuing feature work.
   configured. Optional-provider readiness, independent external Warrior monitoring,
   incident maintenance suppression and the live source integration remain explicit
   rollout/next-task requirements. See [health guide](../deploy/operations-health.md).
-- Verification: `npm run check` passed **843 tests, 3 skipped**. Full PostgreSQL
+- Verification: `npm run check` passed **844 tests, 3 skipped**. Full PostgreSQL
   owner/app-role regression passed **678 tests in 65 files** (345.13 s); final
-  health/event PG replay passed **22 tests**, and migration replay passed **14**.
+  health/event PG replay passed **24 tests**, and migration replay passed **14**.
   Existing occupied-port child errors are intentional negative-path probes.
 - All **four browser workflows** passed under Chromium/CSP. Thirteen deliberate
   mutations were caught, including PostgreSQL ordering/scope; reproducible tool:
@@ -401,7 +401,17 @@ upstream contracts before continuing feature work.
 - Validation caught an ambiguous browser selector after adding the second component
   table; scoped it to inventory. Mutation checks exposed overlapping history
   rejection predicates, so range and retention tests now exercise each independently.
-- Publication: branch `codex/ops005-health`; implementation/PR reference follows
-  publication. Remote CI and production health rollout remain unverified here.
+- Publication: implementation [`29a2cab`](https://github.com/baimasonga/security-system/commit/29a2cabe46aef0a52c133d2ebabf6477c7cef82b),
+  [PR #29](https://github.com/baimasonga/security-system/pull/29), branch
+  `codex/ops005-health`. Remote CI is recorded on the PR; production health
+  rollout remains unverified here.
 - Next: OPS-006 typed incidents, maintenance suppression and fenced notification
   delivery, using fake/local recipients; preserve the explicit external-monitor gate.
+
+- Initial PR CI secret scan flagged the malformed `ops_v1.invalid` negative-path
+  fixture. Added only its exact historical commit/file/rule/line fingerprint to
+  `.gitleaksignore`; no real credential or broad rule/path suppression is involved.
+
+- Follow-up readiness review removed repeated timeout handlers on a wedged query:
+  callers now share the same settled timeout result until persistence completes.
+  A fake-clock regression proves no new timers or queries appear after cache expiry.

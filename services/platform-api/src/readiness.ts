@@ -1,30 +1,33 @@
 /** Fixed internal persistence check; no request-controlled destinations or raw diagnostics. */
 export function persistenceReadiness(query: () => Promise<unknown>, timeoutMs = 1000) {
-  let pending: Promise<boolean> | undefined;
+  let active: Promise<boolean> | undefined;
   let last = { at: -Infinity, ready: false };
   return async () => {
     if (Date.now() - last.at < 1000) return last.ready;
-    // One query at a time even if the pool is wedged. Timed-out callers cannot fan out.
-    pending ??= query()
+    if (active) return active;
+    let deliver!: (ready: boolean) => void;
+    // Keep this same settled result while a timed-out query is still pending. Later callers
+    // must not add more queries, timers or handlers to a wedged persistence connection.
+    active = new Promise<boolean>((resolve) => {
+      deliver = resolve;
+    });
+    const result = active;
+    const timer = setTimeout(() => {
+      last = { at: Date.now(), ready: false };
+      deliver(false);
+    }, timeoutMs);
+    void Promise.resolve()
+      .then(query)
       .then(
-        () => true,
-        () => false,
-      )
-      .finally(() => {
-        pending = undefined;
-      });
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const ready = await Promise.race([
-        pending,
-        new Promise<false>((resolve) => {
-          timer = setTimeout(() => resolve(false), timeoutMs);
-        }),
-      ]);
+        () => finish(true),
+        () => finish(false),
+      );
+    function finish(ready: boolean) {
+      clearTimeout(timer);
       last = { at: Date.now(), ready };
-      return ready;
-    } finally {
-      if (timer) clearTimeout(timer);
+      active = undefined;
+      deliver(ready);
     }
+    return result;
   };
 }
