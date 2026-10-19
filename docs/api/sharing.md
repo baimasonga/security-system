@@ -14,7 +14,7 @@ part_size, part_count, expires_at}`. Quotas and the file-type allowlist apply he
 4. `POST …/uploads/{id}/complete` → `processing`. The file becomes `available` after checks; poll the transfer or
    document. Abandoned sessions expire after 24 h.
 
-## Editor integration (Rokela PDF Pro)
+## Editor integration (external PDF editors)
 
 Save: upload with `target: "draft"` (PDF only). Export: `POST …/documents/{id}/export`. Publish:
 `POST …/documents/{id}/publish {version_id, replacement_note?}`. Share: `POST …/links` with

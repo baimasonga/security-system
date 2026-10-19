@@ -1593,8 +1593,8 @@ export class SharingService {
     if (email && this.#d.mailer)
       await this.#enqueue(tx, orgId, 'notify_email', subject.id, now, {
         userId,
-        subject: 'Rokela PDF Pro sharing notification',
-        text: `${message}\n\nOpen your Rokela workspace to see details. You receive this because notifications are on for this item.`,
+        subject: 'Rokela Bai Bureh Warrior sharing notification',
+        text: `${message}\n\nOpen your Rokela Bai Bureh Warrior workspace to see details. You receive this because notifications are on for this item.`,
       });
   }
 

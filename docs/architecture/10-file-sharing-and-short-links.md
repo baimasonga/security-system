@@ -1,4 +1,4 @@
-# 10 — File sharing and link shortening (Rokela PDF Pro Web)
+# 10 — File sharing and link shortening (Rokela Bai Bureh Warrior)
 
 Decision record: [ADR-021](../adr/ADR-021-file-sharing-and-short-links.md) · Threats:
 [threat-models/02](../threat-models/02-file-sharing-and-short-links.md) · Retention:

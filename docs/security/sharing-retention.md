@@ -1,6 +1,6 @@
 # Sharing retention and deletion policy (disclosed to customers)
 
-This policy describes what Rokela PDF Pro sharing keeps and for how long. It is implemented by the maintenance pass
+This policy describes what Rokela Bai Bureh Warrior sharing keeps and for how long. It is implemented by the maintenance pass
 (`SharingService.runRetention`) and the deletion job worker; every step is retryable and idempotent.
 
 | Data                                                               | Kept until                                                                                                                                   | Then                                                                                          |

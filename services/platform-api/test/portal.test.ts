@@ -25,3 +25,19 @@ it('serves an account-free portal with strict same-origin assets and preserves A
   );
   expect((await env.app.inject({ url: '/web/../../config.ts' })).statusCode).toBe(404);
 });
+
+it('brands every public page and notification as Rokela Bai Bureh Warrior', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const web = new URL('../src/web/', import.meta.url);
+  const pages = readdirSync(web).filter((f) => f.endsWith('.html'));
+  expect(pages.length).toBeGreaterThanOrEqual(5);
+  for (const f of pages)
+    expect(readFileSync(new URL(f, web), 'utf8'), f).toMatch(
+      /<title>[^<]*Rokela Bai Bureh Warrior<\/title>/,
+    );
+  const sources = [
+    ...readdirSync(web).map((f) => new URL(f, web)),
+    new URL('../../../packages/sharing/src/service.ts', import.meta.url),
+  ].filter((u) => /\.(html|mjs|ts)$/.test(u.pathname));
+  for (const u of sources) expect(readFileSync(u, 'utf8'), u.pathname).not.toMatch(/PDF Pro/);
+});

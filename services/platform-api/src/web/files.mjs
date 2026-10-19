@@ -245,7 +245,7 @@ async function documents(openId) {
 async function documentDetail(id) {
   const d = await ui.api(`${P()}/documents/${enc(id)}`);
   const docLinks = (await ui.api(`${P()}/links?target_id=${enc(id)}`)).items;
-  // Composer: a minimal editor that produces a PDF. Drafts it made can be reopened; other PDFs are edited in Rokela PDF Pro.
+  // Composer: a minimal editor that produces a PDF. Drafts it made can be reopened; other PDFs are edited in an external PDF editor.
   const titleInput = ui.node('input');
   titleInput.value = d.title;
   titleInput.setAttribute('aria-label', 'Document heading');
@@ -309,7 +309,7 @@ async function documentDetail(id) {
             const src = composerSource(bytes);
             if (!src)
               return ui.notice(
-                'This draft was not made with the composer. Edit it in Rokela PDF Pro and upload the result.',
+                'This draft was not made with the composer. Edit it in your PDF editor and upload the result.',
                 true,
               );
             titleInput.value = src.title;
@@ -320,7 +320,7 @@ async function documentDetail(id) {
         ]
       : []),
   );
-  const uploadPdf = ui.node('label', 'Or upload a PDF edited in Rokela PDF Pro');
+  const uploadPdf = ui.node('label', 'Or upload a PDF edited in your PDF editor');
   uploadPdf.append(pick);
   editor.append(uploadPdf);
 

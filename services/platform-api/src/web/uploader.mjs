@@ -97,7 +97,7 @@ export async function uploadFile(o) {
 
 // ---- tiny PDF writer for the document composer -----------------------------------------------------------
 // Produces a standards-conforming text PDF (Helvetica, A4). The editable source is embedded as a PDF comment so a
-// draft made here can be reopened and edited again; other PDFs are edited in the Rokela PDF Pro editor.
+// draft made here can be reopened and edited again; other PDFs are edited in an external PDF editor.
 
 const b64 = (str) => {
   let s = '';

@@ -40,7 +40,12 @@ export function createSchemaPool(): PgPool {
     max: 6,
     idleTimeoutMillis: 300,
     options: `-c search_path=${schema}`,
+    // Tags this pool's server sessions so teardown can terminate any a test left checked out.
+    application_name: schema,
   });
+  // Teardown terminates leaked sessions; their clients then report 57P01, which is expected here.
+  pool.on('error', () => undefined);
+  pool.on('connect', (c) => c.on('error', () => undefined));
   created.push({ schema, pool });
   const ready = (async () => {
     admin ??= await (async () => {
@@ -83,9 +88,18 @@ export function createSchemaPool(): PgPool {
 
 afterAll(async () => {
   for (const { schema, pool } of created.splice(0)) {
-    await pool.end().catch(() => undefined);
+    // pool.end() waits for every checked-out client, so one a test leaked (for example mid-transaction) would hang
+    // teardown and its locks would block the DROP. Wait briefly, then terminate whatever is still connected.
+    const ended = pool.end().catch(() => undefined);
+    await Promise.race([ended, new Promise((r) => setTimeout(r, 2000))]);
+    await admin
+      ?.query(
+        'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = $1 AND pid <> pg_backend_pid()',
+        [schema],
+      )
+      .catch(() => undefined);
     await admin?.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`).catch(() => undefined);
   }
   await admin?.end().catch(() => undefined);
   admin = undefined;
-});
+}, 60_000);

@@ -1,6 +1,6 @@
-# Software Trust Platform
+# Rokela Bai Bureh Warrior
 
-Centralized identity, licensing, entitlement, device-trust and (later) secure-update
+Secure software licensing platform. Centralized identity, licensing, entitlement, device-trust and (later) secure-update
 platform for all desktop and web products. Not a license-key server: the server is
 the only authority; clients receive **signed, device-bound, expiring evidence** they
 can verify offline with public keys.
