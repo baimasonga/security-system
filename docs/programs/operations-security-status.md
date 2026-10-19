@@ -8,8 +8,10 @@ OPS-001 design, OPS-002 inventory and OPS-003 credential management are implemen
 Inventory and credentials have separate opt-in flags, both default false. Credential
 verification supplies a guarded transaction primitive, not an event collector.
 No events/health/incidents runtime or live Rokela PDF connection is implemented.
-OPS-003 is based on OPS-002 commit `a5cbd97` / PR #23 and is published as a stacked change
-until that prerequisite is merged. No production configuration was applied.
+OPS-002 and OPS-003 were merged together in PR #24 (`919dff77`); PR #23 was
+closed as superseded. Both operations flags are enabled on the existing Warrior
+Railway production service. This enables backend management APIs, not a fleet UI
+or application event ingestion. See the production rollout evidence below.
 
 | Task    | State                                 | Verification/evidence                                                                                                                        |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -21,6 +23,36 @@ until that prerequisite is merged. No production configuration was applied.
 | OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                           |
 | OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                   |
 | OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                           |
+
+## Production enablement — 19 October 2026
+
+- User explicitly authorized enabling implemented features. Combined PR #24's exact
+  head `e2844f3` passed format/lint/types/unit, PostgreSQL owner/app-role plus load
+  smoke, Windows SDK, dependency/secret scanning and CodeQL checks. The older PR
+  #23 had a passkey asynchronous-signal assertion failure; the combined release's
+  complete PostgreSQL suite passed. This is not evidence that the test race is fixed.
+- Existing Railway project `victorious-commitment`, service `@trust/platform-api`,
+  production environment; repository/default branch retained. No duplicate service
+  was created and no Business Admin licensing or existing secret was replaced.
+- Set `OPERATIONS_INVENTORY_ENABLED=true` and
+  `OPERATIONS_CREDENTIALS_ENABLED=true`, reusing the existing MFA encryption key.
+  Widened watch patterns from only `/services/platform-api/**` to `/**` so shared
+  packages and migrations trigger deployment. Moved migrations/grants/profile
+  checks into pre-deploy; the start command now only starts the API.
+- Source merge `919dff77bf8fc67b73c166833b1f0a28e4a86a37` deployed successfully
+  as `439ed945-7db6-4a33-972c-cccc9b8fb32b`. Logs confirm migrations 0017/0018
+  applied and 90 application-role grant statements applied.
+- Enabled-settings deployment `6d8966b9-d8c7-421a-999e-43622c351767` reached
+  SUCCESS. Logs confirm schema through 0018, verified database TLS and application
+  role startup; Railway's `/healthz` health check succeeded. Staged changes are clear.
+- Verification limit: direct public HTTP checks from this managed session hit its
+  outbound proxy's CONNECT 403, not an application response. No authenticated live
+  inventory/credential flow was performed, and no production credential was issued.
+  An organization admin/owner must enroll MFA and use the documented APIs; a fleet
+  management UI remains unimplemented. Events, health, incidents and live Rokela PDF
+  integration remain unimplemented. Existing external audit anchoring remains disabled.
+- Rollback: disable credentials first, then inventory if required; keep migrations,
+  stored digests and audit history. Do not replace the MFA key or licensing secrets.
 
 ## Next action: OPS-004
 
