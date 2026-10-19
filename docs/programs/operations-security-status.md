@@ -36,8 +36,8 @@ independent monitoring and recovery drills remain later gates.
 ## OPS-002 implementation entry
 
 - **Task/state:** inventory implemented and locally verified; no production enablement.
-- **Commit/PR:** [implementation branch](https://github.com/baimasonga/security-system/tree/feat/ops-002-inventory);
-  PR evidence follows publication.
+- **Commit/PR:** [PR #23](https://github.com/baimasonga/security-system/pull/23), initial implementation
+  commit `beaec96`; GitHub checks are started by this PR and remain separate from local evidence.
 - **Behavior:** 15 session-authenticated inventory operations; admin/owner-only distinct permissions,
   active member ownership and optional active Product linkage, strict safe slugs/reason codes,
   immutable ancestry/codes, optimistic versions, terminal tombstones, parent lifecycle checks,
