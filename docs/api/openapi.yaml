@@ -947,6 +947,222 @@ paths:
             },
         }
 
+  # ---- privileged operations (ADR-022) ----
+  /v1/admin/privileged/requests:
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Request a privileged operation (dual control / JIT grant). The target is validated and stored; execution uses the stored target only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - {
+                    type: object,
+                    required: [operation, org_id, license_id, reason],
+                    additionalProperties: false,
+                    properties:
+                      {
+                        operation: { type: string, enum: [license.revoke] },
+                        org_id: { type: string },
+                        license_id: { type: string },
+                        reason: { type: string, minLength: 3, maxLength: 500 },
+                      },
+                  }
+                - {
+                    type: object,
+                    required: [operation, user_id, reason],
+                    additionalProperties: false,
+                    properties:
+                      {
+                        operation: { type: string, enum: [operator.grant, operator.revoke] },
+                        user_id: { type: string },
+                        reason: { type: string, minLength: 3, maxLength: 500 },
+                      },
+                  }
+                - {
+                    type: object,
+                    required: [operation, org_id, reason],
+                    additionalProperties: false,
+                    properties:
+                      {
+                        operation: { type: string, enum: [org.unfreeze] },
+                        org_id: { type: string },
+                        reason: { type: string, minLength: 3, maxLength: 500 },
+                      },
+                  }
+                - {
+                    type: object,
+                    required: [operation, reason],
+                    additionalProperties: false,
+                    properties:
+                      {
+                        operation: { type: string, enum: [platform.unfreeze] },
+                        reason: { type: string, minLength: 3, maxLength: 500 },
+                      },
+                  }
+      responses:
+        {
+          '201': { $ref: '#/components/responses/PrivilegedRequest' },
+          '404': { $ref: '#/components/responses/Problem' },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Privileged requests, newest first
+      parameters:
+        - {
+            name: status,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum:
+                  [pending, approved, executing, executed, rejected, cancelled, failed, expired],
+              },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+      responses: { '200': { description: '{ items: [PrivilegedRequest] }' } }
+  /v1/admin/privileged/requests/{requestId}:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '200': { $ref: '#/components/responses/PrivilegedRequest' },
+          '404': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/privileged/requests/{requestId}/approve:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Approve as a distinct operator with a fresh authenticator code (step-up; recovery codes not accepted). Opens a one-hour grant for the requester.
+      requestBody: { $ref: '#/components/requestBodies/PrivilegedDecision' }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/PrivilegedRequest' },
+          '401': { description: Invalid or replayed code },
+          '403': { description: Own request, or MFA not enabled },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/privileged/requests/{requestId}/reject:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/PrivilegedRequest' },
+          '403': { description: Own request },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/privileged/requests/{requestId}/cancel:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Requester only, before execution
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/PrivilegedRequest' },
+          '403': { description: Not the requester },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/privileged/requests/{requestId}/execute:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Requester only, within the grant window; runs the stored operation at most once
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/PrivilegedRequest' },
+          '403': { description: Not the requester },
+          '409':
+            {
+              description: 'Not approved, expired, already executed, break-glass not yet witnessed, or the operation itself refused (request becomes failed)',
+            },
+          '423': { description: Platform frozen (operator.grant) },
+        }
+  /v1/admin/privileged/requests/{requestId}/break-glass:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Requester self-approves with a fresh code when no second operator is available. Needs external audit anchoring; once per operator per 24 h; 15-minute grant; usable only after the witness acknowledges an anchor covering the approval.
+      requestBody: { $ref: '#/components/requestBodies/PrivilegedDecision' }
+      responses:
+        {
+          '200':
+            {
+              description: 'The request; when the witness did not acknowledge, it carries witness.status and stays unusable until /witness succeeds',
+            },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/privileged/requests/{requestId}/witness:
+    parameters: [{ $ref: '#/components/parameters/RequestId' }]
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Retry publishing the external anchor for a break-glass approval
+      requestBody: { $ref: '#/components/requestBodies/Reason' }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/PrivilegedRequest' },
+          '409': { $ref: '#/components/responses/Problem' },
+        }
+  /v1/admin/freezes:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      responses: { '200': { description: '{ items: [{ scope, reason, frozen_by, frozen_at }] }' } }
+    post:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: 'Freeze now (restricts only): stops writes that grant or extend access for one organization or the whole platform; reads, device flows, suspension and revocation keep working. Lifting needs a privileged request (org.unfreeze / platform.unfreeze). Refused writes return 423 frozen.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - {
+                    type: object,
+                    required: [scope, reason],
+                    additionalProperties: false,
+                    properties:
+                      { scope: { type: string, enum: [platform] }, reason: { type: string } },
+                  }
+                - {
+                    type: object,
+                    required: [scope, org_id, reason],
+                    additionalProperties: false,
+                    properties:
+                      {
+                        scope: { type: string, enum: [organization] },
+                        org_id: { type: string },
+                        reason: { type: string },
+                      },
+                  }
+      responses:
+        {
+          '201': { description: The freeze },
+          '404': { $ref: '#/components/responses/Problem' },
+          '409': { description: Already frozen },
+        }
+
   /v1/organizations/{orgId}/sharing/overview:
     get:
       tags: [sharing]
@@ -1976,7 +2192,35 @@ components:
         required: true,
         schema: { type: string, pattern: '^lic_[0-9a-f]{24}$' },
       }
+    RequestId:
+      {
+        name: requestId,
+        in: path,
+        required: true,
+        schema: { type: string, pattern: '^prq_[0-9a-f]{24}$' },
+      }
   requestBodies:
+    Reason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            additionalProperties: false
+            properties:
+              reason: { type: string, minLength: 3, maxLength: 500 }
+    PrivilegedDecision:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason, code]
+            additionalProperties: false
+            properties:
+              reason: { type: string, minLength: 3, maxLength: 500 }
+              code: { type: string, pattern: '^[0-9]{6}$', description: Current authenticator code }
     Empty:
       required: true
       content:
@@ -2427,6 +2671,8 @@ components:
                   description: 'base64url Ed25519 over the proof message (see DeviceProof message)',
                 }
   responses:
+    PrivilegedRequest:
+      description: 'A privileged request: id, operation, org_id, target_id, reason, requested_by, created_at, expires_at, status (pending|approved|executing|executed|rejected|cancelled|failed|expired), decided_by, decided_at, decision_reason, break_glass, witnessed_at, witness_anchor, execute_before, executed_at, failure'
     Problem:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
@@ -2456,6 +2702,10 @@ components:
               device_key_conflict,
               activation_not_found,
               trial_not_available,
+              quota_exceeded,
+              link_unavailable,
+              password_required,
+              frozen,
               internal,
             ]
         message: { type: string }

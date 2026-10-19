@@ -26,7 +26,8 @@ import {
 /**
  * Platform-operator surface. Every route: authenticated, re-checks the operator role on each call,
  * requires a reason on mutations, and is tenant-explicit (org id in the path) — no cross-tenant
- * wildcard queries. JIT elevation / dual control arrive in Milestone 6.
+ * wildcard queries. Writes that grant or extend access are refused while the platform or the organization is
+ * frozen; dual-control requests, JIT grants and break-glass live in routes/privileged.ts (ADR-022).
  */
 export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   const pre = { preHandler: operator(c) };
@@ -39,6 +40,7 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
 
   app.post('/v1/admin/products', pre, async (req, reply) => {
     const b = parse(productBody, req.body);
+    await c.privileged.assertWritable(null);
     return reply
       .status(201)
       .send(
@@ -51,6 +53,7 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   app.post('/v1/admin/products/:productId/plans', pre, async (req, reply) => {
     const { productId } = parse(productParams, req.params);
     const b = parse(planBody, req.body);
+    await c.privileged.assertWritable(null);
     const plan = await c.licensing.createPlan(
       {
         productId,
@@ -68,6 +71,7 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   app.patch('/v1/admin/plans/:planId', pre, async (req) => {
     const { planId } = parse(planParams, req.params);
     const b = parse(planPatchBody, req.body);
+    await c.privileged.assertWritable(null);
     return toWire(
       await c.licensing.updatePlan(
         planId,
@@ -84,6 +88,7 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   app.post('/v1/admin/organizations/:orgId/subscriptions', pre, async (req, reply) => {
     const { orgId } = parse(orgParams, req.params);
     const b = parse(subscriptionBody, req.body);
+    await c.privileged.assertWritable(orgId);
     const s = await c.licensing.createSubscription(
       {
         orgId,
@@ -100,6 +105,7 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   app.patch('/v1/admin/organizations/:orgId/subscriptions/:subscriptionId', pre, async (req) => {
     const { orgId, subscriptionId } = parse(subParams, req.params);
     const b = parse(subscriptionPatchBody, req.body);
+    await c.privileged.assertWritable(orgId);
     const cpe = date(b.current_period_end);
     return toWire(
       await c.licensing.updateSubscription(
@@ -118,6 +124,7 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   app.post('/v1/admin/organizations/:orgId/licenses', pre, async (req, reply) => {
     const { orgId } = parse(orgParams, req.params);
     const b = parse(issueLicenseBody, req.body);
+    await c.privileged.assertWritable(orgId);
     const overrides = mapOverrides(b.overrides);
     const r = await c.licensing.issueLicense(
       {
@@ -149,6 +156,14 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
     app.post(`/v1/admin/organizations/:orgId/licenses/:licenseId/${action}`, pre, async (req) => {
       const { orgId, licenseId } = parse(licenseParams, req.params);
       const { reason } = parse(reasonBody, req.body);
+      // Reinstating restores access; suspension and revocation are containment and stay available.
+      if (action === 'reinstate') await c.privileged.assertWritable(orgId);
+      if (action === 'revoke' && c.privileged.dualControlLicenseRevoke)
+        throw new DomainError(
+          'conflict',
+          'license revocation requires a second operator: create a privileged request (license.revoke)',
+          { approval_required: true },
+        );
       return toWire(
         await c.licensing.setLicenseState(orgId, licenseId, action, actor(req, reason)),
       );

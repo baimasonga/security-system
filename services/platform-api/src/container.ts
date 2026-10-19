@@ -38,7 +38,7 @@ import {
   type LicensingConfig,
   type LicensingStore,
 } from '@trust/licensing';
-import { systemClock, type Clock } from '@trust/shared-types';
+import { DomainError, systemClock, type Clock } from '@trust/shared-types';
 import { InMemoryTelemetrySink, Telemetry, type TelemetrySink } from '@trust/telemetry';
 import pg from 'pg';
 import type { PlatformConfig } from './config.ts';
@@ -72,6 +72,12 @@ import { PgAuthStore } from './db/pg-auth-store.ts';
 import { PgKeyStore } from './db/pg-key-store.ts';
 import { PgLicensingStore } from './db/pg-licensing-store.ts';
 import { PgTelemetrySink } from './db/pg-telemetry-sink.ts';
+import { PgPrivilegedStore } from './db/pg-privileged-store.ts';
+import {
+  InMemoryPrivilegedStore,
+  PrivilegedService,
+  type PrivilegedStore,
+} from '@trust/privileged';
 
 export interface Container {
   config: PlatformConfig;
@@ -84,6 +90,8 @@ export interface Container {
   sharing: SharingService | undefined;
   /** The local signed-URL store, when sharing uses it (served by the separate content origin). */
   sharingLocalStore: LocalObjectStore | undefined;
+  /** Dual control, JIT grants, freeze and break-glass (ADR-022). */
+  privileged: PrivilegedService;
   keyring: KeyRing;
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
@@ -406,6 +414,58 @@ export async function createContainer(
     : undefined;
   await anchors?.init();
 
+  const privilegedStore: PrivilegedStore = pool
+    ? new PgPrivilegedStore(pool, clock, { auditShards: shards })
+    : new InMemoryPrivilegedStore({ audit });
+  const privileged = new PrivilegedService({
+    store: privilegedStore,
+    clock,
+    config: {
+      dualControlLicenseRevoke: config.privilegedDualControl,
+      witnessConfigured: anchors !== undefined,
+    },
+    stepUp: (p, code) => auth.stepUp(p, code),
+    orgExists: (id) => auth.orgExists(id),
+    validateTarget: async (op, orgId, targetId) => {
+      if (op === 'license.revoke') {
+        const state = await licensing.adminLicenseState(orgId!, targetId!);
+        if (!state) throw new DomainError('not_found', 'license not found');
+        if (state === 'revoked') throw new DomainError('conflict', 'license is already revoked');
+      } else if (op === 'operator.grant' || op === 'operator.revoke') {
+        const u = await auth.operatorTarget(targetId!);
+        if (!u?.active) throw new DomainError('not_found', 'user not found');
+        const isOperator = u.platformRole === 'platform_admin';
+        if (isOperator === (op === 'operator.grant'))
+          throw new DomainError(
+            'conflict',
+            isOperator ? 'user is already an operator' : 'user is not an operator',
+          );
+      } else if (op === 'org.unfreeze' && !(await auth.orgExists(orgId!))) {
+        throw new DomainError('not_found', 'organization not found');
+      }
+    },
+    run: {
+      'license.revoke': async (r) => {
+        await licensing.setLicenseState(r.orgId!, r.targetId!, 'revoke', {
+          id: r.requestedBy,
+          reason: `${r.reason} (privileged request ${r.id})`,
+        });
+      },
+      'operator.grant': (r) =>
+        auth.setOperatorRole(r.targetId!, 'platform_admin', {
+          id: r.requestedBy,
+          reason: r.reason,
+          requestId: r.id,
+        }),
+      'operator.revoke': (r) =>
+        auth.setOperatorRole(r.targetId!, 'none', {
+          id: r.requestedBy,
+          reason: r.reason,
+          requestId: r.id,
+        }),
+    },
+  });
+
   const rateBackend: RateBackend | undefined =
     pool && config.rateLimitStore === 'postgres'
       ? new ResilientRateBackend(new PgRateBackend(pool), new MemoryRateBackend(), {
@@ -424,6 +484,7 @@ export async function createContainer(
     billing,
     sharing,
     sharingLocalStore,
+    privileged,
     keyring,
     telemetry,
     telemetrySink,

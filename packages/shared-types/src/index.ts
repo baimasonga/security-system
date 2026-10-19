@@ -64,6 +64,8 @@ export const ERROR_STATUS = {
   quota_exceeded: 409,
   link_unavailable: 410,
   password_required: 401,
+  // Privileged operations (ADR-022)
+  frozen: 423,
   internal: 500,
 } as const;
 export type ErrorCode = keyof typeof ERROR_STATUS;

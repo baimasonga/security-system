@@ -13,6 +13,8 @@ export interface PlatformConfig {
   mfaEncryptionKey?: string;
   identityMailEncryptionKey?: string;
   requireOperatorMfa: boolean;
+  /** PRIVILEGED_DUAL_CONTROL: license revocation needs a second operator's approval (ADR-022). */
+  privilegedDualControl: boolean;
   emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
   billing?: BillingConfig;
   host: string;
@@ -248,6 +250,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     throw new Error('REQUIRE_OPERATOR_MFA must be true or false');
   if (requireOperatorMfa && !mfaEncryptionKey)
     throw new Error('MFA_ENCRYPTION_KEY is required for operator MFA');
+  const dualControlEnv = env['PRIVILEGED_DUAL_CONTROL'];
+  if (dualControlEnv && !['true', 'false'].includes(dualControlEnv))
+    throw new Error('PRIVILEGED_DUAL_CONTROL must be true or false');
+  const privilegedDualControl = dualControlEnv === 'true';
+  // Approvals need a fresh authenticator code, which needs the MFA key.
+  if (privilegedDualControl && !mfaEncryptionKey)
+    throw new Error('MFA_ENCRYPTION_KEY is required for PRIVILEGED_DUAL_CONTROL');
   let billing: BillingConfig | undefined;
   if (
     [
@@ -472,6 +481,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     billing,
     mfaEncryptionKey,
     requireOperatorMfa,
+    privilegedDualControl,
     host: env['HOST'] ?? '127.0.0.1',
     port,
     trustProxy: env['TRUST_PROXY'] === '1',

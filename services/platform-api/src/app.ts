@@ -12,6 +12,7 @@ import { registerDeviceRoutes } from './routes/devices.ts';
 import { registerPortalRoutes } from './routes/portal.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
 import { registerSharingRoutes } from './routes/sharing.ts';
+import { registerPrivilegedRoutes } from './routes/privileged.ts';
 
 export interface AppOptions {
   logger?: boolean;
@@ -85,6 +86,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   registerLicenseRoutes(app, c);
   registerDeviceRoutes(app, c);
   registerAdminRoutes(app, c);
+  registerPrivilegedRoutes(app, c);
   registerSharingRoutes(app, c, pages);
   return app;
 }

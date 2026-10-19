@@ -522,6 +522,11 @@ export class LicensingService {
     return Promise.all(lics.map((l) => this.#licenseView(this.#d.store, l)));
   }
 
+  /** The license's state, or undefined when it does not exist in that organization (privileged requests). */
+  async adminLicenseState(orgId: string, licenseId: string): Promise<License['state'] | undefined> {
+    return (await this.#d.store.findLicense(orgId, licenseId))?.state;
+  }
+
   async adminListActivations(orgId: string, licenseId: string): Promise<ActivationView[]> {
     if (!(await this.#d.store.findLicense(orgId, licenseId)))
       throw new DomainError('not_found', 'license not found');

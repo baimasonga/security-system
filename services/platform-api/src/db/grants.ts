@@ -44,6 +44,10 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   rate_limits: ALL, // disposable counters
   // File sharing and short links (ADR-021). Immutable history (versions' blobs, destination history, comments)
   // cannot be rewritten or deleted by the application; only disposable state is deletable.
+  // Privileged operations (ADR-022): requests are an accountability record (no DELETE); a freeze is lifted by
+  // deleting its row (the audit log keeps the history).
+  privileged_requests: RIU,
+  privileged_freezes: ALL,
   share_accounts: RIU, // lock anchor for per-organization quota checks (row locks need UPDATE; no mutable data)
   share_blobs: RIU, // object metadata; deletion is a status change, the row stays as a tombstone
   share_documents: RIU,

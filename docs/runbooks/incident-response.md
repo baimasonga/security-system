@@ -58,6 +58,13 @@ The witness is unreachable or rejecting. Nothing is wrong with the log, but the 
 
 ## F. Operator account compromise
 
-1. `revokePlatformAdmin(email, reason)` — effective on the **next request** (role is re-checked per request).
-2. Review `admin.access_denied` and all `actor.type=operator` audit events for the account's window; reverse malicious changes with new audited operator actions.
-3. (Milestone 6) Emergency Trust Freeze blocks new keys/admins/mass changes while investigating.
+1. Contain first: `POST /v1/admin/freezes {scope: "platform", reason}` (ADR-022) — immediate, one operator. It stops
+   new operator grants, catalog changes, license issuing/reinstating, subscription changes, member additions and trials
+   everywhere; device flows, reads, suspension and revocation keep working. Use `scope: "organization"` when only one
+   tenant is affected.
+2. Remove the operator: `operator.revoke` privileged request + approval by a second operator, or out of band with
+   `revokePlatformAdmin(email, reason)` from the deployment — effective on the **next request** (role is re-checked
+   per request).
+3. Review `admin.access_denied`, `privileged.*` and all `actor.type=operator` audit events for the account's window;
+   reverse malicious changes with new audited operator actions.
+4. Lift the freeze with a `platform.unfreeze` (or `org.unfreeze`) request approved by a second operator.

@@ -59,6 +59,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0009_billing_checkout',
       '0010_identity_mail_outbox',
       '0011_file_sharing',
+      '0012_privileged_operations',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
@@ -75,6 +76,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         '0009_billing_checkout',
         '0010_identity_mail_outbox',
         '0011_file_sharing',
+        '0012_privileged_operations',
       ],
     });
   });

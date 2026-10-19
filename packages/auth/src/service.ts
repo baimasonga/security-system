@@ -3,7 +3,13 @@ import { randomBytes } from 'node:crypto';
 import { MfaCipher, base32, matchingCounter } from './mfa.ts';
 import { newId, newSecretToken, sha256Hex } from '@trust/crypto';
 import type { AuditLog } from '@trust/audit';
-import { DomainError, type Clock, type OrgRole, type UserPrincipal } from '@trust/shared-types';
+import {
+  DomainError,
+  type Clock,
+  type OrgRole,
+  type PlatformRole,
+  type UserPrincipal,
+} from '@trust/shared-types';
 import { hashPassword, verifyPassword, DEFAULT_SCRYPT, type ScryptParams } from './password.ts';
 import { canGrantRole, roleAllows, type Permission } from './rbac.ts';
 import type { AuthStore, AuthTx, MfaState, Membership, Organization, User } from './model.ts';
@@ -698,6 +704,73 @@ export class AuthService {
         action: 'operator.revoked',
         target: { type: 'user', id: u.id },
         reason,
+      });
+    });
+  }
+
+  /**
+   * Fresh second factor for a privileged decision (ADR-022). The live session's user must have authenticator MFA
+   * enabled and submit a current six-digit code; recovery codes are not accepted here. The code is consumed under
+   * the user lock with the same replay protection as login, and a failure counts toward the account lockout.
+   */
+  async stepUp(p: { userId: string; sessionId: string }, code: string): Promise<void> {
+    if (!this.#mfa || !/^\d{6}$/.test(code))
+      throw new DomainError('unauthenticated', 'invalid credentials or code');
+    const user = await this.#store.findUserById(p.userId);
+    if (!user) throw new DomainError('unauthenticated', 'authentication required');
+    const key = sha256Hex(user.email);
+    const ok = await this.#store.transaction(async (tx) => {
+      const now = this.#clock.now();
+      const current = await tx.findUserForUpdate(user.id);
+      const session = await tx.findSessionById(p.sessionId);
+      if (!session || session.userId !== user.id || session.revokedAt || session.expiresAt <= now)
+        throw new DomainError('unauthenticated', 'authentication required');
+      if (!current || current.status !== 'active' || !current.mfa?.enabled)
+        throw new DomainError('forbidden', 'authenticator MFA is required for this action');
+      const locked = await tx.findLoginFailure(key);
+      if (locked?.lockedUntil && locked.lockedUntil > now)
+        throw new DomainError('unauthenticated', 'invalid credentials or code');
+      const updated = this.#consumeFactor(current, code, now);
+      if (!updated) {
+        await this.#recordFactorFailure(tx, user.id, key);
+        return false;
+      }
+      await tx.setMfa(user.id, updated);
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'identity.step_up_succeeded',
+        metadata: { session_id: p.sessionId },
+      });
+      return true;
+    });
+    if (!ok) throw new DomainError('unauthenticated', 'invalid credentials or code');
+  }
+
+  /** For privileged requests: whether a user exists, is active, and their platform role. */
+  async operatorTarget(
+    userId: string,
+  ): Promise<{ active: boolean; platformRole: PlatformRole } | undefined> {
+    const u = await this.#store.findUserById(userId);
+    return u ? { active: u.status === 'active', platformRole: u.platformRole } : undefined;
+  }
+
+  /** Executes an approved `operator.grant` / `operator.revoke` request (ADR-022). Takes effect on the next request. */
+  async setOperatorRole(
+    userId: string,
+    role: PlatformRole,
+    actor: { id: string; reason: string; requestId: string },
+  ): Promise<void> {
+    await this.#store.transaction(async (tx) => {
+      const u = await tx.findUserForUpdate(userId);
+      if (!u || u.status !== 'active') throw new DomainError('not_found', 'user not found');
+      if (u.platformRole === role) throw new DomainError('conflict', 'role is already set');
+      await tx.setPlatformRole(userId, role);
+      await tx.audit.append({
+        actor: { type: 'operator', id: actor.id },
+        action: role === 'platform_admin' ? 'operator.granted' : 'operator.revoked',
+        target: { type: 'user', id: userId },
+        reason: actor.reason,
+        metadata: { request_id: actor.requestId },
       });
     });
   }

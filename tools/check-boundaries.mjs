@@ -20,6 +20,7 @@ const ALLOWED = {
   auth: ['audit', 'crypto', 'shared-types'],
   licensing: ['audit', 'crypto', 'entitlements', 'shared-types', 'telemetry'],
   sharing: ['audit', 'crypto', 'shared-types'],
+  privileged: ['audit', 'crypto', 'shared-types'],
   'sdk-core': ['crypto/verify', 'shared-types'],
   'platform-api': [
     'audit',
@@ -27,6 +28,7 @@ const ALLOWED = {
     'crypto',
     'entitlements',
     'licensing',
+    'privileged',
     'sdk-core',
     'sharing',
     'shared-types',

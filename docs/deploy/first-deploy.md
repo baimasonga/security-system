@@ -75,6 +75,11 @@ Set `MFA_ENCRYPTION_KEY` securely in Railway to a newly generated random 32-byte
 
 Enroll every operator from **Account → Set up authenticator**, confirm a code, save the ten recovery codes offline, then sign in with a new code. Confirmation revokes all sessions and consumes the current code, so wait for the next code or use a recovery code. Enable `REQUIRE_OPERATOR_MFA=true` after enrollment. This setting requires the encryption key and blocks administration for unenrolled operators while still allowing enrollment. Default false supports staged rollout. Disabling MFA requires password, unused factor and a reason, and revokes all sessions. Password reset does not disable MFA.
 
+Privileged operations (ADR-022): once at least **two** operators have enrolled MFA, set `PRIVILEGED_DUAL_CONTROL=true`
+(requires `MFA_ENCRYPTION_KEY`). License revocation then needs a second operator's approval; operator promotion and
+lifting a freeze always do. New operators can now be promoted with an `operator.grant` request instead of shell access.
+Break-glass (self-approval when nobody else is available) works only when external audit anchoring is configured.
+
 ## Monthly Quota Rollout (ADR-018)
 
 Apply migration `0008_monthly_quotas` with the schema owner, then run `npm run db:grants` with `APP_DB_ROLE`. The new `quota_charges` table requires SELECT/INSERT for the application role; migration alone does not grant these permissions. Verify `npm run db:check` with the application connection before deployment. A Railway pre-deploy job should run `npm run migrate && npm run db:grants` with the existing owner connection, schema and app-role settings; the API start command remains unchanged.

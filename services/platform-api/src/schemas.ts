@@ -187,3 +187,36 @@ export function mapOverrides(o: z.infer<typeof overrides> | undefined) {
 export const metricsQuery = z
   .object({ format: z.enum(['json', 'prometheus']).default('json') })
   .strict();
+
+// ---- privileged operations (ADR-022) ----
+const stepUpCode = z.string().regex(/^[0-9]{6}$/);
+export const privilegedCreateBody = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('license.revoke'), org_id: id, license_id: id, reason }).strict(),
+  z.object({ operation: z.literal('operator.grant'), user_id: id, reason }).strict(),
+  z.object({ operation: z.literal('operator.revoke'), user_id: id, reason }).strict(),
+  z.object({ operation: z.literal('org.unfreeze'), org_id: id, reason }).strict(),
+  z.object({ operation: z.literal('platform.unfreeze'), reason }).strict(),
+]);
+export const privilegedParams = z.object({ requestId: id }).strict();
+export const privilegedListQuery = z
+  .object({
+    status: z
+      .enum([
+        'pending',
+        'approved',
+        'executing',
+        'executed',
+        'rejected',
+        'cancelled',
+        'failed',
+        'expired',
+      ])
+      .optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .strict();
+export const privilegedDecisionBody = z.object({ reason, code: stepUpCode }).strict();
+export const freezeBody = z.discriminatedUnion('scope', [
+  z.object({ scope: z.literal('platform'), reason }).strict(),
+  z.object({ scope: z.literal('organization'), org_id: id, reason }).strict(),
+]);

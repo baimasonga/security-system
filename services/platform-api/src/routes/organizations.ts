@@ -35,6 +35,9 @@ export function registerOrgRoutes(app: FastifyInstance, c: Container): void {
   app.post('/v1/organizations/:orgId/members', pre, async (req, reply) => {
     const { orgId } = parse(orgParams, req.params);
     const { email, role } = parse(memberBody, req.body);
+    // Membership first (404 for non-members), so a freeze is never revealed to outsiders.
+    await c.auth.getOrganization(principalOf(req), orgId);
+    await c.privileged.assertWritable(orgId);
     const m = await c.auth.addMember(principalOf(req), orgId, email, role);
     return reply.status(201).send(toWire({ orgId: m.orgId, userId: m.userId, role: m.role }));
   });

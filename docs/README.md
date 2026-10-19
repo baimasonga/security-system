@@ -41,8 +41,9 @@ Current browser and identity work:
 
 - [ADR-015 — Browser portal](adr/ADR-015-browser-portal.md)
 - [ADR-016 — Email verification and password recovery](adr/ADR-016-identity-recovery.md)
+- [ADR-022 — Privileged operations: dual control, JIT grants, freeze, break-glass](adr/ADR-022-privileged-operations.md) · [threat model](threat-models/03-privileged-operations.md)
 - [ADR-021 — File sharing, document publication and short links](adr/ADR-021-file-sharing-and-short-links.md) · [architecture, data model, cost model and phased plan](architecture/10-file-sharing-and-short-links.md) · [threat model](threat-models/02-file-sharing-and-short-links.md) · [retention policy](security/sharing-retention.md) · [API guide](api/sharing.md)
 - [Feature implementation program](architecture/08-feature-program.md)
 - [Proposed advanced requirements](architecture/09-advanced-feature-requirements.md)
 
-Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Advanced billing, MFA/passkeys, device trust, update roots, workspace and dual-control capabilities are still tracked as remaining work, not completed features.
+Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Authenticator MFA and privileged operations (dual control, JIT grants, freeze, break-glass) are implemented. Advanced billing, passkeys, device trust, workspace and the remaining items in the feature program are still tracked as remaining work, not completed features.

@@ -11,6 +11,8 @@ import { authStoreContract } from '../../../../packages/auth/test/store-contract
 import { licensingStoreContract } from '../../../../packages/licensing/test/store-contract.ts';
 import { sharingStoreContract } from '../../../../packages/sharing/test/store-contract.ts';
 import { PgSharingStore } from '../../src/db/pg-sharing-store.ts';
+import { privilegedStoreContract } from '../../../../packages/privileged/test/store-contract.ts';
+import { PgPrivilegedStore } from '../../src/db/pg-privileged-store.ts';
 import { createSchemaPool } from '../../../../tests/support/pg.ts';
 import { loadConfig } from '../../src/config.ts';
 import { createContainer } from '../../src/container.ts';
@@ -35,6 +37,10 @@ describe.skipIf(!url)('PostgreSQL adapters', () => {
     return { store: new PgAuthStore(pool, clock), audited: auditedOf(pool) };
   });
   rateBackendContract('postgres', () => new PgRateBackend(createSchemaPool()));
+  privilegedStoreContract('postgres', () => {
+    const pool = createSchemaPool();
+    return { store: new PgPrivilegedStore(pool, clock), audited: auditedOf(pool) };
+  });
   anchorStoreContract('postgres', () => new PgAnchorStore(createSchemaPool()));
   auditLogContract('postgres', (clock, opts) => new PgAuditLog(createSchemaPool(), clock, opts));
   licensingStoreContract('postgres', () => {

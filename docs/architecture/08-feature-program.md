@@ -10,6 +10,8 @@ Portal, operator console and device demo are implemented locally against existin
 
 File sharing, document publication, short links and upload requests are implemented (ADR-021, [10-file-sharing-and-short-links](10-file-sharing-and-short-links.md)): resumable direct-to-storage uploads, quarantine, controlled share links (latest/fixed versions, password, expiry, limits, recipients, review), receipts, QR codes, retention jobs and separate usage meters. Watermarking, preview derivatives and submission bundles remain phase 3; the S3 adapter still needs a live-bucket check.
 
+Privileged operations are implemented (ADR-022): dual-control requests that act as just-in-time grants bound to the requester, operation, target and reason; approval by a distinct operator with a fresh authenticator code; at-most-once execution; organization and platform freeze (lifting needs dual control); bounded break-glass witnessed by the external audit anchor. `PRIVILEGED_DUAL_CONTROL=true` puts license revocation under dual control (staged rollout). Quorums larger than two remain out of scope.
+
 ## Capability map and delivery order
 
 | Module                  | Scope                                                                                     | Acceptance evidence                                                                   | Dependencies                            |

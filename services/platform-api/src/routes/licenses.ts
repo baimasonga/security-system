@@ -61,6 +61,8 @@ export function registerLicenseRoutes(app: FastifyInstance, c: Container): void 
   app.post('/v1/organizations/:orgId/trials', pre, async (req, reply) => {
     const { orgId } = parse(orgParams, req.params);
     const { product_id } = parse(trialBody, req.body);
+    await c.auth.getOrganization(principalOf(req), orgId); // 404 for non-members before revealing a freeze
+    await c.privileged.assertWritable(orgId);
     const r = await c.licensing.startTrial(principalOf(req), { orgId, productId: product_id });
     return reply.status(201).send({ license: toWire(r.license), license_key: r.licenseKey });
   });
