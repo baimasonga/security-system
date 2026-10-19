@@ -4,27 +4,30 @@ Updated: 19 October 2026.
 
 ## Current state
 
-OPS-001 design, OPS-002 inventory and OPS-003 credential management are implemented.
-Inventory and credentials have separate opt-in flags, both default false. Credential
-verification supplies a guarded transaction primitive, not an event collector.
-No events/health/incidents runtime or live Rokela PDF connection is implemented.
-OPS-002 and OPS-003 were merged together in PR #24 (`919dff77`); PR #23 was
-closed as superseded. Both operations flags are enabled on the existing Warrior
-Railway production service. This enabled backend management APIs; dashboard wiring is now implemented on the
-working branch described below. Application event ingestion remains unimplemented. See the production rollout evidence below.
+OPS-001 design, OPS-002 inventory, OPS-003 credential management and their dashboard
+controls are implemented. Inventory and credentials default off in source but are
+both enabled in the existing Warrior Railway production service. Open **Applications**
+in the signed-in portal; owners/admins can manage applications, environments,
+components/dependencies and fresh-MFA credentials without constructing API calls.
+
+OPS-002/003 merged in PR #24 (`919dff77`); dashboard PR #28 merged as `05e58fa8`.
+PRs #23 and #25 were closed as superseded; their implementation/evidence is retained.
+Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
+Credential verification remains a guarded transaction primitive, not a collector.
+No events/health/incidents runtime or live Rokela PDF monitoring integration exists.
 
 | Task    | State                                 | Verification/evidence                                                                                                                        |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | OPS-001 | Contract complete; local verification | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below. |
-| OPS-002 | Implemented; local validation         | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                   |
-| OPS-003 | Implemented; local verification       | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                        |
+| OPS-002 | Production API/dashboard enabled      | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                   |
+| OPS-003 | Production API/dashboard enabled      | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                        |
 | OPS-004 | Ready; not implemented                | Nine strict backend event types specified; durable ingestion is next.                                                                        |
 | OPS-005 | Not started; depends on OPS-002/004   | Health semantics specified; network probes remain disabled.                                                                                  |
 | OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                           |
 | OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                   |
 | OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                           |
 
-## Production enablement — 19 October 2026
+## Initial backend enablement — 19 October 2026 (historical)
 
 - User explicitly authorized enabling implemented features. Combined PR #24's exact
   head `e2844f3` passed format/lint/types/unit, PostgreSQL owner/app-role plus load
@@ -48,54 +51,94 @@ working branch described below. Application event ingestion remains unimplemente
 - Verification limit: direct public HTTP checks from this managed session hit its
   outbound proxy's CONNECT 403, not an application response. No authenticated live
   inventory/credential flow was performed, and no production credential was issued.
-  An organization admin/owner must enroll MFA and use the documented APIs; a fleet
-  management UI remains unimplemented. Events, health, incidents and live Rokela PDF
+  At this initial rollout, management required the documented APIs; the dashboard
+  release below subsequently closed that UI gap. Events, health, incidents and live Rokela PDF
   integration remain unimplemented. Existing external audit anchoring remains disabled.
 - Rollback: disable credentials first, then inventory if required; keep migrations,
   stored digests and audit history. Do not replace the MFA key or licensing secrets.
 
-## Dashboard wiring — implementation and continuation checkpoint
+## Dashboard release and next-agent handoff — 19 October 2026
 
-User requested usable dashboard controls for the implemented APIs, followed by the
-remaining monitoring program, with a durable handoff for the next agent. Work branch: `feat/operations-dashboard`, based on
-production merge `919dff77` plus the production evidence commit `8b44184` (PR #25).
-Do not mistake this working branch for a production deployment.
-Implementation commit `e522703`, published as [PR #28](https://github.com/baimasonga/security-system/pull/28).
-CI/merge/rollout remain pending; the last confirmed live deployment is still the
-backend-only `6d8966b9-d8c7-421a-999e-43622c351767`.
-Default-branch compatibility update PR #26 (`5f89809`) was subsequently integrated
-without conflicts (`7663423`). Its exact-source local replay passed `npm run check`
-with 802 tests and 3 skips, plus all four browser workflows. CI/merge/rollout of
-this combined head remain pending; the extra unit test comes from PR #26.
+User authorized making the implemented APIs usable from the dashboard and requested
+this durable handoff. Resume from the current default branch
+`claude/sleepy-carson-l0if1k`, not an older feature checkout. Read AGENTS.md/CLAUDE.md,
+this file and the accepted operations contract before changing the next task.
 
-- Added `web/operations.mjs` and Applications navigation: applications, environments,
-  components/dependencies, ownership/Product/criticality editing, versioned lifecycle
-  changes, retained-record lookup and credential issue/rotate/revoke with fresh MFA.
-- Scope is captured per visit. Navigation/workspace/session changes invalidate async
-  results; credential factors are cleared before requests, secrets use one-time modal
-  presentation and are cleared on close/navigation/pagehide. Backend authorization and
-  APIs are unchanged. Disabled/archived parent credential revocation stays available.
-- Added Playwright Core as a development dependency, a separate `portal` Vitest project,
-  `npm run test:portal`, and a CI browser job. Local browser uses
-  `CHROMIUM_PATH=/usr/bin/chromium npm run test:portal`; CI installs Chromium using
-  `npx playwright-core install --with-deps chromium`. No provider credentials needed.
-- Four real browser/API flows pass locally: inventory/dependencies, MFA credentials,
-  disabled/archived emergency revoke, pagination/retained lookup, delayed secret scope,
-  member refusal, replay refusal, unavailable rollout and mobile overflow. Three
-  deliberate mutations were caught by assertions: retained MFA input, a late secret
-  displayed across workspace switch, and secret persistence in localStorage.
-- PostgreSQL owner/app-role operations regression: 30 tests passed. Final exact-source
-  `npm run check` passed with 801 tests and 3 skips; the four browser workflows
-  also passed after all modal/loading refinements. `npm audit --audit-level=high`
-  reported zero vulnerabilities. Local runtime:
-  Node 24.19.0/npm 11.9.0, Chromium; CI uses Node 22 and managed Chromium.
-- Rollout/user guide: [operations-dashboard.md](../deploy/operations-dashboard.md).
-  GitHub continuation checkpoint is also recorded in PR #25
-  (comment 6277627115). Do not treat that provisional comment as deployment evidence.
-- Before resuming: inspect git status and this entry, confirm final browser/check results, run `npm run check` and applicable regression checks, publish a PR containing
-  this checkpoint, then observe CI and deployment. Record exact evidence, not intent.
-- Next backend task remains OPS-004 below. No ingestion, health, incidents, live app
-  credentials, provider onboarding or external witness was implemented by this UI work.
+### Shipped behavior and evidence
+
+- **Source:** [PR #28](https://github.com/baimasonga/security-system/pull/28),
+  implementation `e522703`; integrated default-branch compatibility PR #26 (`5f89809`)
+  without conflicts. Exact checked head `8140729`, merged source
+  `05e58fa8c67fa78b047aa5ba3a6fbb45eeb36860`.
+- **UI:** Applications navigation, nested inventory registration/read/edit, owner,
+  criticality and optional licensing Product mapping, same-environment dependencies,
+  expected-version lifecycle mutations, retained archive lookup, and fresh-MFA
+  credential issue/rotate/revoke. Disabled/archived parents preserve emergency revoke.
+  Product mapping still grants no commercial authority. Backend RBAC/schema unchanged.
+- **Browser boundary:** captured organization/visit scope, old-session 401 isolation,
+  factors cleared before requests, no persistent browser secret storage, one-time
+  modal cleared on close/cancel/navigation/pagehide, late secrets suppressed across
+  workspace changes, and existing select/dependency/Product values preserved.
+- **Local verification:** final integrated `npm run check`: **802 passed, 3 skipped**;
+  four real browser/API workflows pass under CSP. PostgreSQL owner/app-role inventory
+  and credential regression: **30 passed**. Three deliberate mutations were caught by
+  assertions: retained MFA input, cross-workspace late secret, and localStorage secret
+  persistence. `npm audit --audit-level=high`: **zero vulnerabilities**. Local Node
+  24.19.0/npm 11.9.0; CI uses Node 22 and downloaded Chromium.
+- **CI:** all eight exact-head checks passed, including the new browser job, full
+  owner/app-role PostgreSQL suite plus load smokes, Windows SDK, dependency/secret
+  scanning and CodeQL. CI run `39328226017`; CodeQL run `39328226005`.
+- **Production:** existing project `victorious-commitment` / service
+  `@trust/platform-api`; deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b`
+  reached SUCCESS on merged source `05e58fa8`. Logs confirm migrations through 0018,
+  verified database TLS and API startup. No MFA/signing/licensing secret was replaced,
+  no production integration credential was issued, and no real notification was sent.
+- **Deploy fix:** automatic and explicit deployments were SKIPPED with the build log
+  `no changes detected in watch paths`. Widening the filter (`/**`, then `**`) did not
+  solve it. Removed the service watch-path filter entirely (all-source default),
+  retained the same repository/default branch with no commit pin, and explicitly
+  deployed latest source. This triggered the successful Dockerfile build above.
+  Do not reinstate the old filter without proving that changed code deploys.
+- **Verification limits:** local public HTTP requests hit the managed outbound proxy's
+  CONNECT 403; the remote public-reader tool also could not access this hostname.
+  Browser workflows were verified locally and in CI, not using a production account.
+  Railway SUCCESS/startup/health evidence establishes deployment, not authenticated
+  production acceptance or a live monitoring integration.
+- **Guide:** [operations-dashboard.md](../deploy/operations-dashboard.md).
+  Final rollout/continuation evidence is also in PR #28's conversation
+  (comment `6278048962`); PR #25's checkpoint `6277627115` points there.
+
+### Continue here
+
+1. Confirm the current default-branch commit and live deployment; later documentation
+   releases may supersede the deployment ID above without changing feature code.
+   Existing passing evidence is not a reason to repeat all suites absent changes.
+2. Implement OPS-004 as the next bounded vertical slice, using the exact contract
+   below. Extend InventoryRepo/InventoryTx and both adapters with contract tests
+   first; the org anchor already serializes with revocation. The guarded verifier's
+   callback must write events on that same transaction/connection.
+3. Add strict runtime event validation, durable receipt/deduplication, request and
+   event/storage quotas, indexed bounded retention, migration/app-role grants,
+   safe route errors/metrics, negative and mutation tests, and actual collector
+   commit/revoke/failure/contention evidence before claiming ingestion implemented.
+4. Then proceed to OPS-005 health/history, OPS-006 incidents/notifications, OPS-007
+   Rokela PDF integration and OPS-008 security/recovery evidence in dependency order.
+   Keep the status file and live versus planned OpenAPI aligned in every change.
+
+### Other feature activation gates (not blockers for OPS-004 development)
+
+- Passkeys need the permanent Warrior RP domain and HTTPS origin. Changing the RP
+  domain later requires re-enrollment; choose it with the owner rather than guessing.
+- Warrior file sharing/short links need their own private object-store and scanner
+  configuration. Rokela PDF's working services/configuration are a separate deployment;
+  do not assume they are automatically connected to Warrior or copy their secrets.
+- External audit anchoring remains disabled. A real independent witness is required;
+  a placeholder URL or this same database is not equivalent evidence.
+- Privileged dual control needs two enrolled operators; do not turn it on blindly
+  and strand the only operator. Keep existing licensing/customer access intact.
+- Payment-provider onboarding/pricing and identity-provider SSO require owner/provider
+  setup. Preserve the existing operator-managed plan decision and configuration-only
+  SSO scope; do not silently switch paid-plan management or generate fake credentials.
 
 ## Next action: OPS-004
 
@@ -110,11 +153,11 @@ callback must be retry-safe and have no external side effects. Add real HTTP col
 race/DB failure/conflict/PII tests, memory/PG contracts, app-role grants, mutation and
 contention/retention evidence. Do not infer ingestion readiness from credential tests.
 
-OPS-002/003 prerequisites are already merged and enabled. Finish publishing the
-dashboard slice above through normal CI first, then start OPS-004 from that baseline.
+OPS-002/003 and the dashboard slice are already merged and enabled. Start OPS-004
+from the current default branch and reconcile any later changes first.
 Local ingestion work needs no production token, external account or real alert destination.
 
-## OPS-003 implementation entry
+## OPS-003 local implementation entry (historical)
 
 - **Task/state:** credential management and transaction-bound verification implemented;
   no production enablement and no collector route.

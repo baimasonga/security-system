@@ -42,8 +42,9 @@ application-role grants are prerequisites, already enabled in the production rol
 recorded in the program handoff. No new secret, provider account or migration is needed
 for this UI. A disabled rollout shows an unavailable message, not fake monitoring data.
 
-Use the normal checked PR/CI/default-branch deployment. Railway's existing service
-watches the whole repository. Observe terminal SUCCESS and health-check evidence;
+Use the normal checked PR/CI/default-branch deployment. Railway's existing service has no watch-path filter (all-source default).
+The earlier filters caused skipped builds and were removed; prove any future filter
+change against a real source update. Observe terminal SUCCESS and health-check evidence;
 local browser tests do not establish an authenticated production workflow.
 
 Rollback the portal source if necessary; retain the backend schema and audit evidence.
