@@ -90,7 +90,7 @@ export async function withTransaction<T>(
   const sleep = opts.sleep ?? defaultSleep;
   const started = performance.now();
   const client = await pool.connect();
-  let attempts = 0;
+  let attempts: number;
   try {
     for (let attempt = 1; ; attempt++) {
       attempts = attempt;
