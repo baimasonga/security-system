@@ -4,3 +4,4 @@ export * from './client.ts';
 export * from './updates.ts';
 export * from './windows-store.ts';
 export * from './capability-verifier.ts';
+export * from './release-evidence.ts';

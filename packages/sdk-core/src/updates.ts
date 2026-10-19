@@ -9,6 +9,13 @@ import {
   type PublicJwk,
 } from '@trust/crypto/verify';
 import type { SecureStore } from './device-key.ts';
+import {
+  MAX_EVIDENCE_BYTES,
+  evidenceUrls,
+  verifyReleaseEvidence,
+  type EvidencePolicy,
+  type VerifiedEvidence,
+} from './release-evidence.ts';
 
 export interface UpdateRole {
   threshold: number;
@@ -355,6 +362,40 @@ export class SecureUpdateClient {
       await this.#save(state, finished);
       return { envelope, manifest: m };
     });
+  }
+
+  /**
+   * Downloads the SBOM and provenance published next to the artifact (`<url>.cdx.json`, `<url>.intoto.json`) and
+   * verifies them against the signed manifest and the product's trusted builders (ADR-028). Call before
+   * installing; a release without valid evidence should not be installed.
+   */
+  async verifyEvidence(
+    envelope: SignedUpdateEnvelope,
+    policy: EvidencePolicy,
+  ): Promise<VerifiedEvidence & { manifest: UpdateManifest }> {
+    const m = await this.verifyManifest(envelope);
+    const urls = evidenceUrls(m.artifact.url);
+    const get = async (u: string): Promise<Uint8Array> => {
+      const url = httpsUrl(u);
+      const state = await this.#state(this.#now());
+      if (!state.root.artifact_origins.includes(url.origin)) reject('evidence origin');
+      const response = await (this.#o.fetch ?? fetch)(url.href, {
+        redirect: 'error',
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!response.ok || !response.body || (response.url && response.url !== url.href))
+        reject('evidence response');
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      for await (const chunk of response.body) {
+        size += chunk.byteLength;
+        if (size > MAX_EVIDENCE_BYTES) reject('evidence size');
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks);
+    };
+    const [sbom, provenance] = [await get(urls.sbom), await get(urls.provenance)];
+    return { ...verifyReleaseEvidence(m, { sbom, provenance }, policy), manifest: m };
   }
 
   /** Returns a private verified staging file. Caller removes its directory after installation. */

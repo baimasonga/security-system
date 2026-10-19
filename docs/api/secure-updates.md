@@ -30,7 +30,7 @@ Construct the client with `{ root, product, platform, channel, store }`. `checkF
 
 `stageArtifact(envelope, stagingDirectory)` re-verifies before download, streams bytes into a private random directory, and verifies signed size/SHA-256 before returning `{ path, manifest }`. The default artifact limit is 256 MiB and download timeout is 120 seconds. Configure a justified `maxArtifactBytes` for larger installers. Failed/interrupted downloads remove their staging directory; the host deletes successful staging directories after use.
 
-The host must supply a staging directory protected by OS permissions (including Windows ACLs), re-verify bytes when crossing an installation privilege boundary, and also verify Windows Authenticode publisher identity, independently validate provenance/SBOM evidence, apply its minimum-supported-version policy, and install through a platform-safe atomic/recoverable mechanism. Merely declaring an evidence digest does not verify that a build is approved. Ordinary update failures preserve the working installation and customer documents.
+The host must supply a staging directory protected by OS permissions (including Windows ACLs), re-verify bytes when crossing an installation privilege boundary, and also verify Windows Authenticode publisher identity, call `verifyEvidence(envelope, { trustedBuilders })` (ADR-028) so the pinned SBOM/provenance are downloaded, digest-checked and shown to describe this installer and a trusted builder, apply its minimum-supported-version policy, and install through a platform-safe atomic/recoverable mechanism. Merely declaring an evidence digest does not verify that a build is approved. Ordinary update failures preserve the working installation and customer documents.
 
 ## Signing and Hosting
 
@@ -43,3 +43,7 @@ node tools/sign-update.ts --development-software-key root.json manifest.json out
 ```
 
 Supply `UPDATE_SIGNING_KEY_PEM` securely in the process environment. The tool verifies its output against the public root and refuses production mode or overwriting an output file. Software signing is for development; production signing, root ceremony, storage immutability and installation/recovery drills remain deployment responsibilities.
+
+## Release evidence (ADR-028)
+
+Run `node tools/release-evidence.ts --artifact FILE --sbom FILE.cdx.json --builder-id URI --build-type URI --url ARTIFACT_URL [--source-uri URI --source-commit SHA]` in the release pipeline. It refuses an SBOM that does not name the installer's SHA-256, writes `<artifact>.cdx.json` and `<artifact>.intoto.json` (in-toto v1 / SLSA v1) without overwriting, and prints the manifest `artifact` fragment. Upload all three next to each other. Clients call `verifyEvidence(envelope, { trustedBuilders: ['<your CI builder id>'] })` before installing.
