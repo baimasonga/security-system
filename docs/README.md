@@ -1,5 +1,13 @@
 # Documentation Index
 
+For the cross-application monitoring expansion, start with the
+[operations/security implementation program](programs/operations-security.md) and
+[agent handoff/status](programs/operations-security-status.md). Proposed design:
+[ADR-029](adr/ADR-029-application-operations.md),
+[draft threat model](threat-models/06-application-monitoring.md), and
+[Rokela PDF integration brief](integrations/rokela-pdf.md). These documents specify
+future work; they do not establish a live integration.
+
 Required documentation set (brief §56) and its status. Every doc is versioned with the code; trust-boundary changes require an ADR.
 
 | Required document                                                   | Status                                                                    | Location                                                                                                     |

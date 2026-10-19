@@ -1,5 +1,14 @@
 # Feature implementation program
 
+## Cross-application operations expansion
+
+The owner also wants Warrior to monitor and help protect all applications/systems,
+with Rokela Business Admin first and Rokela PDF next. This is tracked separately in
+[the operations/security program](../programs/operations-security.md) and
+[status/handoff](../programs/operations-security-status.md). It extends, rather than
+replaces, the licensing/trust program below. Start at OPS-001; proposed design and
+roadmap entries are not implementation or live-deployment evidence.
+
 ## Source and limits
 
 The requested scope is every intended feature. Inventory source: architecture/01-system-context.md, architecture/02-domain-model.md, architecture/05-v1-status-and-handoff.md, existing API and SDK. These refer to an original numbered brief that is not present in the checkout. Several later contexts have names but no behavioral specification. This inventory preserves those requirements rather than claiming that a prototype implements them.
