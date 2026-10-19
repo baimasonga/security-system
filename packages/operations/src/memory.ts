@@ -1,3 +1,5 @@
+import type { OperationEvent } from './events-model.ts';
+import { MemoryEventRepo } from './events-memory.ts';
 import { AuditBuffer, type AuditLog, type AuditEventInput } from '@trust/audit';
 import type {
   CredentialRecord,
@@ -11,7 +13,22 @@ import type {
   InventoryType,
 } from './model.ts';
 
-class Repo implements InventoryRepo {
+class Repo extends MemoryEventRepo implements InventoryRepo {
+  override async insertEvent(row: OperationEvent) {
+    const component = await this.find('component', row.orgId, row.componentId);
+    const credential = await this.findCredential(row.credentialId);
+    if (
+      !component ||
+      component.applicationId !== row.applicationId ||
+      component.environmentId !== row.environmentId ||
+      !credential ||
+      credential.orgId !== row.orgId ||
+      credential.applicationId !== row.applicationId ||
+      credential.environmentId !== row.environmentId
+    )
+      throw new Error('event_parent');
+    await super.insertEvent(row);
+  }
   credentials = new Map<string, CredentialRecord>();
   async findCredential(id: string) {
     const row = this.credentials.get(id);
@@ -136,6 +153,9 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       const repo = new Repo();
       repo.rows = structuredClone(this.rows);
       repo.credentials = structuredClone(this.credentials);
+      repo.events = structuredClone(this.events);
+      repo.eventCounters = structuredClone(this.eventCounters);
+      repo.eventAggregates = structuredClone(this.eventAggregates);
       const buffer = new AuditBuffer();
       const out = await fn(Object.assign(repo, { audit: buffer }));
       const events = buffer.drain();
@@ -143,6 +163,9 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       else this.committedAudit.push(...events);
       this.rows = repo.rows;
       this.credentials = repo.credentials;
+      this.events = repo.events;
+      this.eventCounters = repo.eventCounters;
+      this.eventAggregates = repo.eventAggregates;
       return out;
     };
     const result = this.#tail.then(run, run);

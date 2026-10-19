@@ -26,9 +26,7 @@ tags:
   - { name: keys }
   - {
       name: sharing,
-      description: File sharing,
-      documents,
-      short links and upload requests (ADR-021; docs/api/sharing.md),
+      description: 'File sharing, documents, short links and upload requests (ADR-021; docs/api/sharing.md)',
     }
 paths:
   /checkout:
@@ -121,9 +119,9 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        '200': { description: Applied, duplicate, older or irrelevant event acknowledged }
+        '200': { description: 'Applied, duplicate, older or irrelevant event acknowledged' }
         '403': { description: Invalid signature or mapped price mismatch }
-        '409': { description: Unmapped, ambiguous or conflicting event requires reconciliation }
+        '409': { description: 'Unmapped, ambiguous or conflicting event requires reconciliation' }
         '503': { description: Billing is not configured }
   /v1/organizations/{orgId}/licenses/{licenseId}/usage:
     get:
@@ -821,7 +819,7 @@ paths:
             {
               description: '{ device_id, key, attestation, posture: { decision, reasons, review_at, mode }, signals }',
             },
-          '404': { description: Not a member, or unknown device },
+          '404': { description: 'Not a member, or unknown device' },
         }
   /v1/organizations/{orgId}/licenses/{licenseId}/seats:
     parameters:
@@ -852,7 +850,7 @@ paths:
         {
           '201': { description: '{ user_id, assigned_by, assigned_at, limit, used }' },
           '403': { description: Not an admin },
-          '404': { description: Not a member, or the person is not a member },
+          '404': { description: 'Not a member, or the person is not a member' },
           '409': { description: 'Not seat-based, already assigned, or seat_limit_reached' },
           '423': { description: Organization frozen },
         }
@@ -1318,7 +1316,7 @@ paths:
         {
           '200': { $ref: '#/components/responses/PrivilegedRequest' },
           '401': { description: Invalid or replayed code },
-          '403': { description: Own request, or MFA not enabled },
+          '403': { description: 'Own request, or MFA not enabled' },
           '409': { $ref: '#/components/responses/Problem' },
         }
   /v1/admin/privileged/requests/{requestId}/reject:
@@ -1490,7 +1488,7 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/SharingExport' }
       responses:
         '201': { description: Version }
-        '409': { description: No ready draft, no changes, or storage over allowance }
+        '409': { description: 'No ready draft, no changes, or storage over allowance' }
   /v1/organizations/{orgId}/sharing/documents/{id}/publish:
     post:
       tags: [sharing]
@@ -2096,7 +2094,7 @@ paths:
       responses:
         '302': { description: Redirect }
         '404': { description: Unknown }
-        '410': { description: Expired, suspended or revoked }
+        '410': { description: 'Expired, suspended or revoked' }
   /d/{code}:
     get:
       tags: [sharing]
@@ -2186,7 +2184,7 @@ paths:
         '200': { description: Manifest and grant }
         '401': { description: Sign-in or password required }
         '403': { description: Not a permitted recipient }
-        '410': { description: Revoked, suspended, expired or not published }
+        '410': { description: 'Revoked, suspended, expired or not published' }
         '429': { description: Too many attempts }
   /v1/public/shares/{token}/files/url:
     post:
@@ -3309,8 +3307,65 @@ paths:
               $ref: '#/components/schemas/OpsRevokeCredential'
       x-fresh-mfa-required: true
       x-rollout-flag: OPERATIONS_CREDENTIALS_ENABLED
+  /v1/operations/events:
+    post:
+      operationId: ingestOperationsEvents
+      summary: ingestOperationsEvents
+      x-task: OPS-004
+      x-required-permission: events:write
+      security:
+        - IntegrationBearer: []
+      parameters: []
+      responses:
+        '200':
+          description: Committed durable event receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorEventAcknowledgement'
+        '400':
+          $ref: '#/components/responses/CollectorError400'
+        '401':
+          $ref: '#/components/responses/CollectorError401'
+        '403':
+          $ref: '#/components/responses/CollectorError403'
+        '404':
+          $ref: '#/components/responses/CollectorError404'
+        '409':
+          $ref: '#/components/responses/CollectorError409'
+        '413':
+          $ref: '#/components/responses/CollectorError413'
+        '415':
+          $ref: '#/components/responses/CollectorError415'
+        '422':
+          $ref: '#/components/responses/CollectorError422'
+        '429':
+          $ref: '#/components/responses/CollectorError429'
+        '503':
+          $ref: '#/components/responses/CollectorError503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CollectorEventBatch'
+            example:
+              schema: 1
+              events:
+                - id: 00000000-0000-4000-8000-000000000001
+                  component_id: opm_cccccccccccccccccccccccc
+                  occurred_at: 2026-10-19T12:00:00Z
+                  type: component.heartbeat
+                  attributes:
+                    status: healthy
 components:
   securitySchemes:
+    IntegrationBearer:
+      type: http
+      scheme: bearer
+      description:
+        Scoped ops_v1 credential; purpose events:write, source backend_report. No inventory or
+        account authority.
     bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }
   parameters:
     OpscredentialId:
@@ -3851,6 +3906,73 @@ components:
                   description: 'base64url Ed25519 over the proof message (see DeviceProof message)',
                 }
   responses:
+    CollectorError400:
+      description: Malformed request or invalid cursor
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError401:
+      description: Generic authentication failure
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError403:
+      description: Insufficient permission or management freeze
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError404:
+      description: Not found or inaccessible scope
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError409:
+      description: Version, lifecycle, identity or inventory-cap conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError413:
+      description: Body exceeds 256 KiB
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError415:
+      description: Unsupported content encoding or media type
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError422:
+      description: Schema/privacy/new-event clock rejection
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+    CollectorError429:
+      description: Request or scoped event/storage quota exceeded
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+          description: Seconds before retry; source bounds delay to 300 seconds
+    CollectorError503:
+      description: Unavailable; no durable acknowledgement
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CollectorProblem'
     OpsError400:
       description: Malformed request or invalid cursor
       content:
@@ -3926,6 +4048,517 @@ components:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
   schemas:
+    CollectorEventAcknowledgement:
+      type: object
+      additionalProperties: false
+      properties:
+        schema:
+          type: integer
+          const: 1
+        accepted:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectorEventReceipt'
+          minItems: 1
+          maxItems: 100
+      required:
+        - schema
+        - accepted
+    CollectorEventBatch:
+      type: object
+      additionalProperties: false
+      properties:
+        schema:
+          type: integer
+          const: 1
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectorEvent'
+          minItems: 1
+          maxItems: 100
+      required:
+        - schema
+        - events
+    CollectorEventReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        disposition:
+          type: string
+          enum:
+            - stored
+            - duplicate
+        received_at:
+          $ref: '#/components/schemas/CollectorTime'
+      required:
+        - id
+        - disposition
+        - received_at
+    CollectorProblem:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthenticated
+            - forbidden
+            - not_found
+            - conflict
+            - too_large
+            - unsupported_media_type
+            - unprocessable
+            - rate_limited
+            - unavailable
+        message:
+          type: string
+          enum:
+            - request rejected
+            - authentication required
+            - not found
+            - service unavailable
+        request_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            event_index:
+              type: integer
+              minimum: 0
+              maximum: 99
+            field:
+              type: string
+              enum:
+                - body
+                - events
+                - id
+                - component_id
+                - occurred_at
+                - type
+                - attributes
+            rule:
+              type: string
+              enum:
+                - schema
+                - unknown_attribute
+                - scope
+                - clock
+                - privacy
+                - conflict
+                - budget
+          required: []
+      required:
+        - code
+        - message
+        - request_id
+    CollectorEvent:
+      oneOf:
+        - $ref: '#/components/schemas/CollectorComponentHeartbeatEvent'
+        - $ref: '#/components/schemas/CollectorUploadFailedEvent'
+        - $ref: '#/components/schemas/CollectorConversionFailedEvent'
+        - $ref: '#/components/schemas/CollectorScannerUnavailableEvent'
+        - $ref: '#/components/schemas/CollectorMalwareDetectedEvent'
+        - $ref: '#/components/schemas/CollectorEmailDeliveryFailedEvent'
+        - $ref: '#/components/schemas/CollectorRequestSubmissionReceivedEvent'
+        - $ref: '#/components/schemas/CollectorLinkAbuseReportedEvent'
+        - $ref: '#/components/schemas/CollectorWorkspaceRoleChangedEvent'
+    CollectorEventId:
+      type: string
+      pattern: ^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$
+    CollectorTime:
+      type: string
+      format: date-time
+      pattern: Z$
+    CollectorComponentHeartbeatEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: component.heartbeat
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            status:
+              type: string
+              enum:
+                - healthy
+                - degraded
+                - unavailable
+                - unknown
+          required:
+            - status
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorUploadFailedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: upload.failed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            stage:
+              type: string
+              enum:
+                - initiate
+                - transfer
+                - finalize
+            reason:
+              type: string
+              enum:
+                - timeout
+                - storage_unavailable
+                - quota
+                - validation
+                - internal
+            duration_ms:
+              type: integer
+              minimum: 0
+              maximum: 86400000
+            size_bucket:
+              type: string
+              enum:
+                - small
+                - medium
+                - large
+                - unknown
+          required:
+            - stage
+            - reason
+            - duration_ms
+            - size_bucket
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorConversionFailedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: conversion.failed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            source_type:
+              type: string
+              enum:
+                - pdf
+                - image
+                - office
+                - text
+                - other
+            target_type:
+              type: string
+              enum:
+                - pdf
+                - image
+                - office
+                - text
+                - other
+            reason:
+              type: string
+              enum:
+                - timeout
+                - unsupported
+                - worker_unavailable
+                - internal
+            duration_ms:
+              type: integer
+              minimum: 0
+              maximum: 86400000
+          required:
+            - source_type
+            - target_type
+            - reason
+            - duration_ms
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorScannerUnavailableEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: scanner.unavailable
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            reason:
+              type: string
+              enum:
+                - timeout
+                - connection
+                - worker_unavailable
+            queue_age_seconds:
+              type: integer
+              minimum: 0
+              maximum: 604800
+            queue_count:
+              type: integer
+              minimum: 0
+              maximum: 1000000
+          required:
+            - reason
+            - queue_age_seconds
+            - queue_count
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorMalwareDetectedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: malware.detected
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            verdict:
+              type: string
+              enum:
+                - malicious
+                - suspicious
+          required:
+            - verdict
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorEmailDeliveryFailedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: email.delivery_failed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            provider:
+              type: string
+              enum:
+                - resend
+                - cloudflare
+                - other
+            reason:
+              type: string
+              enum:
+                - timeout
+                - rejected
+                - provider_unavailable
+                - exhausted
+            attempts:
+              type: integer
+              minimum: 1
+              maximum: 100
+            queue_age_seconds:
+              type: integer
+              minimum: 0
+              maximum: 604800
+          required:
+            - provider
+            - reason
+            - attempts
+            - queue_age_seconds
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorRequestSubmissionReceivedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: request.submission_received
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            file_count:
+              type: integer
+              minimum: 0
+              maximum: 1000
+            state:
+              type: string
+              enum:
+                - received
+                - quarantined
+                - ready
+          required:
+            - file_count
+            - state
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorLinkAbuseReportedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: link.abuse_reported
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            category:
+              type: string
+              enum:
+                - spam
+                - malware
+                - phishing
+                - other
+            state:
+              type: string
+              enum:
+                - received
+                - triaged
+          required:
+            - category
+            - state
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorWorkspaceRoleChangedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CollectorEventId'
+        component_id:
+          $ref: '#/components/schemas/CollectorComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/CollectorTime'
+        type:
+          const: workspace.role_changed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            from_role:
+              type: string
+              enum:
+                - none
+                - member
+                - admin
+                - owner
+            to_role:
+              type: string
+              enum:
+                - none
+                - member
+                - admin
+                - owner
+            outcome:
+              type: string
+              enum:
+                - allowed
+                - denied
+          required:
+            - from_role
+            - to_role
+            - outcome
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    CollectorComponentId:
+      type: string
+      pattern: ^opm_[a-f0-9]{24}$
     OpsCredentialList:
       type: object
       additionalProperties: false

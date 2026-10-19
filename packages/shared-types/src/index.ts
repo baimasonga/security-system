@@ -48,6 +48,10 @@ export const ERROR_STATUS = {
   not_found: 404,
   conflict: 409,
   rate_limited: 429,
+  unprocessable: 422,
+  too_large: 413,
+  unsupported_media_type: 415,
+  unavailable: 503,
   // Licensing / activation outcomes
   invalid_license: 403,
   license_suspended: 403,

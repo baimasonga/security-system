@@ -101,9 +101,11 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
         409: 'conflict',
         413: 'too_large',
         415: 'unsupported_media_type',
+        422: 'unprocessable',
         429: 'rate_limited',
       };
       const safeStatus = status in codes ? status : 503;
+      if (safeStatus === 429) reply.header('retry-after', '60');
       return reply
         .status(safeStatus)
         .type('application/problem+json')
@@ -118,10 +120,22 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
                   ? 'service unavailable'
                   : 'request rejected',
           request_id: req.id,
+          ...(safeStatus === 422
+            ? {
+                details: {
+                  field: 'body',
+                  rule:
+                    error instanceof DomainError && error.details?.rule === 'unknown_attribute'
+                      ? 'unknown_attribute'
+                      : 'schema',
+                },
+              }
+            : {}),
         });
     });
     registerInventoryRoutes(scoped, c);
     registerCredentialRoutes(scoped, c);
+    registerEventRoutes(scoped, c);
   });
 }
 function registerInventoryRoutes(app: FastifyInstance, c: Container) {
@@ -340,4 +354,36 @@ function registerCredentialRoutes(app: FastifyInstance, c: Container) {
       }),
     );
   });
+}
+
+function registerEventRoutes(app: FastifyInstance, c: Container) {
+  app.post(
+    '/v1/operations/events',
+    {
+      logLevel: 'silent',
+      bodyLimit: 262144,
+      config: { rateLimit: { max: 120, timeWindow: '1 minute', groupId: 'operations-ingestion' } },
+      onRequest: async (req) => {
+        if (!c.config.operationsIngestionEnabled) throw new DomainError('not_found', 'not found');
+        if (req.url.includes('?')) throw new DomainError('invalid_request', 'request rejected');
+        if (
+          (req.headers['content-encoding'] && req.headers['content-encoding'] !== 'identity') ||
+          !/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] ?? '')
+        )
+          throw new DomainError('unsupported_media_type', 'request rejected');
+      },
+    },
+    async (req) => {
+      const h = req.headers.authorization;
+      const token = h && /^Bearer (ops_v1\.opc_[a-f0-9]{32}\.[a-f0-9]{64})$/.exec(h)?.[1];
+      const receipt = await c.operationsEvents.ingest(token, req.body);
+      for (const disposition of ['stored', 'duplicate'])
+        c.metrics.inc(
+          'operations_events_total',
+          { disposition },
+          receipt.accepted.filter((r) => r.disposition === disposition).length,
+        );
+      return receipt;
+    },
+  );
 }

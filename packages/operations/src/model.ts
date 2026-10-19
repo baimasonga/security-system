@@ -1,3 +1,4 @@
+import type { EventRepo } from './events-model.ts';
 import type { UserPrincipal } from '@trust/shared-types';
 import type { AuditWriter } from '@trust/audit';
 
@@ -62,7 +63,7 @@ export interface CredentialListOptions {
   activeAt?: Date;
 }
 /** All mutation work, including audit, must run inside a serialized organization transaction. */
-export interface InventoryRepo {
+export interface InventoryRepo extends EventRepo {
   findCredential(id: string): Promise<CredentialRecord | undefined>;
   listCredentials(
     scope: CredentialScope,

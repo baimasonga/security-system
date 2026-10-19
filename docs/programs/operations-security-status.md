@@ -14,15 +14,17 @@ OPS-002/003 merged in PR #24 (`919dff77`); dashboard PR #28 merged as `05e58fa8`
 PRs #23 and #25 were closed as superseded; their implementation/evidence is retained.
 Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
 Credential verification remains a guarded transaction primitive, not a collector.
-No events/health/incidents runtime or live Rokela PDF monitoring integration exists.
+OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLED`
+(default false); verification is recorded below. Health/incidents and a live Rokela PDF
+monitoring integration remain pending. No ingestion production setting was changed.
 
 | Task    | State                                 | Verification/evidence                                                                                                                        |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | OPS-001 | Contract complete; local verification | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below. |
 | OPS-002 | Production API/dashboard enabled      | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                   |
 | OPS-003 | Production API/dashboard enabled      | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                        |
-| OPS-004 | Ready; not implemented                | Nine strict backend event types specified; durable ingestion is next.                                                                        |
-| OPS-005 | Not started; depends on OPS-002/004   | Health semantics specified; network probes remain disabled.                                                                                  |
+| OPS-004 | Implemented; local verification       | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                  |
+| OPS-005 | Next; health implementation pending   | Health semantics specified; network probes remain disabled.                                                                                  |
 | OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                           |
 | OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                   |
 | OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                           |
@@ -110,20 +112,20 @@ this file and the accepted operations contract before changing the next task.
 
 ### Continue here
 
-1. Confirm the current default-branch commit and live deployment; later documentation
-   releases may supersede the deployment ID above without changing feature code.
-   Existing passing evidence is not a reason to repeat all suites absent changes.
-2. Implement OPS-004 as the next bounded vertical slice, using the exact contract
-   below. Extend InventoryRepo/InventoryTx and both adapters with contract tests
-   first; the org anchor already serializes with revocation. The guarded verifier's
-   callback must write events on that same transaction/connection.
-3. Add strict runtime event validation, durable receipt/deduplication, request and
-   event/storage quotas, indexed bounded retention, migration/app-role grants,
-   safe route errors/metrics, negative and mutation tests, and actual collector
-   commit/revoke/failure/contention evidence before claiming ingestion implemented.
-4. Then proceed to OPS-005 health/history, OPS-006 incidents/notifications, OPS-007
-   Rokela PDF integration and OPS-008 security/recovery evidence in dependency order.
-   Keep the status file and live versus planned OpenAPI aligned in every change.
+1. Reconcile the current default branch before changing code; another account has
+   been advancing it independently. The original local prototype remains preserved
+   in `/workspace/security-system`; the accepted implementation is the upstream
+   package architecture, not that old checkout's wire contracts.
+2. OPS-004 is implemented in this change. Review its exact verification evidence
+   below and keep ingestion disabled until its rollout gate is explicitly exercised.
+3. Implement OPS-005 next. First amend the health contract to bound heartbeat
+   occurrence age and order; receipt-time TTL alone must not let a queued old
+   healthy observation override a later unavailable report. Add negative/mutation
+   tests before the health state machine. Keep `/healthz` liveness separate from
+   readiness and keep all network probes disabled.
+4. Then implement OPS-006 incidents/notifications, OPS-007 Rokela PDF integration
+   and OPS-008 security/recovery evidence in dependency order. Rokela PDF's source
+   is `baimasonga/rokelapdf-online`, cloned locally, with no live monitoring setup.
 
 ### Other feature activation gates (not blockers for OPS-004 development)
 
@@ -140,22 +142,22 @@ this file and the accepted operations contract before changing the next task.
   setup. Preserve the existing operator-managed plan decision and configuration-only
   SSO scope; do not silently switch paid-plan management or generate fake credentials.
 
-## Next action: OPS-004
+## Next action: OPS-005
 
-Implement durable event ingestion using the accepted strict version-1 schemas and
-`CredentialService.withCredential` to authorize and write in one committed transaction.
-Derive scope/provenance from the credential, reject all body scope overrides, validate
-component ancestry, canonicalize validated events and deduplicate across rotation.
-Implement atomic batch receipts, clock windows, request/event/storage quotas, bounded
-retention and counters. Do not use the lossy telemetry buffer or change browser events.
-Preserve the organization-first anchor and use the same transaction connection; the
-callback must be retry-safe and have no external side effects. Add real HTTP collector
-race/DB failure/conflict/PII tests, memory/PG contracts, app-role grants, mutation and
-contention/retention evidence. Do not infer ingestion readiness from credential tests.
+Specify and implement durable component health/history using authenticated backend
+reports while preserving source labels and missing/stale/unknown distinctions.
+Before implementation, resolve the heartbeat-age/order gap described above; OPS-004
+accepts historical observations as evidence and does not itself derive health.
+Define the read routes before moving them into the live API. Add memory/PG/store,
+MFA/RBAC as applicable, safe readiness, stale/late/recovery/mutation and load evidence.
+No URL from inventory or events may become a probe destination. Preserve commercial
+access and document required independent Warrior monitoring separately.
 
-OPS-002/003 and the dashboard slice are already merged and enabled. Start OPS-004
-from the current default branch and reconcile any later changes first.
-Local ingestion work needs no production token, external account or real alert destination.
+The previous SDK review also identified a persisted-clock rollback gap in
+`packages/sdk-core/src/updates.ts` (`verifyEvidence`, reviewed at `7ad2e6c`); it is
+outside this ingestion change and remains a follow-up. The original reproduction
+is `/tmp/review-update-clock.mjs`, with review evidence in
+`/workspace/scratch/security-system-review-7ad2e6c.md`.
 
 ## OPS-003 local implementation entry (historical)
 
@@ -302,3 +304,68 @@ The unrelated local OPS-003 implementation remains preserved in the original
 workspace and is not included in this dependency integration. Next: observe the
 new CI run, then reconcile the local OPS implementation with the accepted
 upstream contracts before continuing feature work.
+
+## OPS-004 durable ingestion implementation — 19 October 2026
+
+- Baseline: `b5da658` (merged OPS-002/003, dashboard PR #28 and dependency fixes).
+  The older local inventory/credential prototype is preserved and was not merged
+  over the independent implementation. Source work is in
+  `/workspace/security-system-current` on `codex/ops004-ingestion`.
+- Behavior: integration-only `POST /v1/operations/events`, nine strict typed backend
+  schemas, fixed privacy errors, credential-derived immutable provenance, current
+  component scope/lifecycle checks, canonical content hashes and scoped UUID
+  deduplication across rotation, original receipt preservation, atomic mixed batches,
+  and acknowledgement only after the credential transaction commits.
+- Budgets: per-key sliding sixty-second authenticated-request window (duplicates and client refusals count), UTC daily
+  environment/org new-event limits, canonical bytes plus 512-byte accounting against
+  environment/org storage caps. Request/day/storage counters, event rows and hourly
+  component/type/outcome aggregates commit together under the existing organization
+  anchor. No commercial quotas or global per-event audit appends are introduced.
+- Retention: migration 0019 adds strict scoped provenance FKs and expiry indexes;
+  app grants deny event UPDATE. The existing maintenance worker deletes at most
+  1,000 event rows per org/pass, atomically releases exact storage counters, and
+  expires request/day metadata and ninety-day aggregates in bounded batches.
+  A pass visits at most 25 eligible organizations. Raw event/identity retention is
+  thirty days; no exactly-once guarantee follows after expiry.
+- HTTP/observability: 256 KiB body cap, identity encoding only, bounded pre-auth IP
+  budget, silent raw request logs, safe status/receipt metrics with fixed labels,
+  generic retryable 503 on collector failures, and Retry-After only on 429.
+  Only implemented ingestion moved to live OpenAPI. Eight pre-existing flow-map
+  response descriptions and a sharing tag required quoting for full schema validity;
+  live reference/response-map regression coverage accompanies those repairs.
+- Tests: shared memory/PG event store and committed-ingestion contracts cover
+  rollback, withheld ACKs, ambiguous commit retries, concurrent duplicates and
+  event-write/revocation ordering. HTTP tests exercise genuine issued credentials,
+  session/license rejection, privacy/scope/version/body/encoding errors, feature
+  disablement, quotas, safe outages and management-freeze ingestion.
+- Verification failures and corrections: the first negative-only validator test
+  also passed when the export was missing; added a positive control before building.
+  App-role PG exposed a retention FOR UPDATE requiring excessive privilege; removed
+  that redundant clause rather than allowing event rewrites. Outcome aggregation
+  and fixture mistakes were caught by types/adapter tests and corrected.
+- Verification: `npm run check` passed **832 tests, 3 skipped**; full
+  `npm run test:db` passed **670 tests across 63 files**, including the
+  least-privilege role (345.57 seconds). Both OpenAPI 3.1 documents validate with
+  Swagger Parser 12; npm audit reports **zero vulnerabilities**. EADDRINUSE child
+  errors in the PG log are expected occupied-port rejection probes, not failures.
+- Eighteen deliberate mutations were killed by assertions in an isolated source
+  copy, including schema/privacy boundaries, enum/integer checks, clock/scope/state,
+  canonical identity, request/day/storage budgets, rejected-request metering,
+  rollback, exact storage release and bounded deletion. Original bytes were restored.
+  Authenticated client refusals commit only fixed request accounting; event/day/
+  storage changes remain staged until all client-controlled validation succeeds.
+- Real HTTP/PG contention and retention: pool 2, 20 contenders, one stored receipt
+  and nineteen duplicates; 1,101 total event rows, one atomic conflict and two quota
+  refusals; deletion batches 1,000/101/0 release exactly 678,216 bytes; ninety-day
+  aggregates expire and the audit verifies. Final replay 3,172 ms including setup,
+  alongside regression tests; this is correctness evidence, not capacity. See
+  [collector performance note](../performance/operations-ops004.md).
+- Evidence: `/tmp/ops4-complete-check.log`, `/tmp/ops4-final-full-pg.log`,
+  `/tmp/ops4-mutations.log`, `/tmp/ops4-contention-final.log` and
+  `/tmp/ops4-audit.log`. Verification used Node 24.19.0/npm 11.9.0 and local
+  PostgreSQL 16 with synthetic fixtures and fsync on. No production ingestion flag,
+  integration secret, real destination, application source outbox or live Rokela
+  PDF connection was configured. Remote CI/deployment results are unverified.
+- Rollback: disable `OPERATIONS_INGESTION_ENABLED`; retain additive schema, digests,
+  history and ordinary retention. See [ingestion guide](../deploy/operations-ingestion.md).
+- Next: OPS-005 with the health freshness/order amendment before implementation.

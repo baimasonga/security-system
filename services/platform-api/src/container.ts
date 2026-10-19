@@ -1,4 +1,9 @@
-import { InventoryService, InMemoryInventoryStore, CredentialService } from '@trust/operations';
+import {
+  InventoryService,
+  InMemoryInventoryStore,
+  CredentialService,
+  EventService,
+} from '@trust/operations';
 import { PgInventoryStore } from './db/pg-operations-store.ts';
 import { BillingService } from './billing.ts';
 import {
@@ -88,6 +93,7 @@ export interface Container {
   auth: AuthService;
   operations: InventoryService;
   operationsCredentials: CredentialService;
+  operationsEvents: EventService;
   licensing: LicensingService;
   billing: BillingService | undefined;
   /** File sharing and short links (ADR-021); undefined when not configured. */
@@ -512,6 +518,13 @@ export async function createContainer(
     },
   });
 
+  const operationsEvents = new EventService({
+    store: operationsStore,
+    credentials: operationsCredentials,
+    clock,
+    enabled: () => config.operationsIngestionEnabled,
+  });
+
   const rateBackend: RateBackend | undefined =
     pool && config.rateLimitStore === 'postgres'
       ? new ResilientRateBackend(new PgRateBackend(pool), new MemoryRateBackend(), {
@@ -528,6 +541,7 @@ export async function createContainer(
     auth,
     operations,
     operationsCredentials,
+    operationsEvents,
     licensing,
     billing,
     sharing,

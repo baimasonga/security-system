@@ -1,6 +1,6 @@
 # ADR-029: Cross-application operations and security monitoring
 
-Status: **accepted design in OPS-001; OPS-002 inventory and OPS-003 credentials implemented, disabled by default; OPS-004 onward pending**.
+Status: **accepted design in OPS-001; OPS-002 inventory, OPS-003 credentials and OPS-004 ingestion implemented with default-off source flags; OPS-005 onward pending**.
 Date: 19 October 2026. Trust-boundary change: **yes**.
 
 ## Context and baseline
@@ -8,14 +8,15 @@ Date: 19 October 2026. Trust-boundary change: **yes**.
 Warrior needs to monitor multiple applications and systems. Reconciled against `87256b7`
 and PR #15: Products are licensing catalog, client telemetry is privacy-filtered usage data,
 and the Security Center is account/device oriented. Buffered telemetry cannot acknowledge
-committed evidence. OPS-002/003 now add inventory and credentials; the event collector remains pending.
+committed evidence. OPS-002/003/004 add inventory, credentials and a committed event collector; health and incident workflows remain pending.
 Business Admin provisioning and Rokela PDF's shared subscription/auth remain unchanged.
 
 ## Decisions
 
 The normative [operations contract](../api/operations-contract.md) resolves OPS-001's decisions.
-The [planned OpenAPI](../api/operations-planned.openapi.yaml) retains OPS-004 requests and responses. Implemented OPS-002 inventory and OPS-003
-credentials moved to the live API contract with separate rollout flags.
+Implemented inventory, credential and ingestion routes are in the live API contract
+with separate rollout flags. The [planned OpenAPI](../api/operations-planned.openapi.yaml)
+retains schema fixtures; health/incident routes are specified before their implementation.
 
 1. **Inventory and authority.** Organization → application → environment → component. An active
    organization member owns the application, with criticality and optional active Product mapping.

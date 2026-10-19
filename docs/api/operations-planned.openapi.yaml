@@ -2,79 +2,25 @@ openapi: 3.1.0
 info:
   title: Warrior operations monitoring — planned contract, NOT LIVE
   version: 1.0.0-planned
-  description: Accepted OPS-001 implementation target for OPS-002–004. No routes
-    in this file are implemented. Inventory and credential-management routes are now in openapi.yaml behind
-    their separate rollout flags; shared schemas remain here for design checks. Health, incidents and probes are specified in
-    operations-contract.md; their route contracts are deferred until their
-    implementation task.
+  description: All OPS-002–004 routes are implemented behind opt-in flags in openapi.yaml. Retained
+    schemas are design fixtures; health and incident route contracts are specified separately before
+    implementation.
 x-implementation-status: planned
 x-max-body-bytes: 262144
 servers: []
-paths:
-  /v1/operations/events:
-    post:
-      operationId: ingestOperationsEvents
-      summary: ingestOperationsEvents
-      x-implementation-status: planned
-      x-task: OPS-004
-      x-required-permission: events:write
-      security:
-        - IntegrationBearer: []
-      parameters: []
-      responses:
-        '200':
-          description: Committed durable event receipt
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EventAcknowledgement'
-        '400':
-          $ref: '#/components/responses/Error400'
-        '401':
-          $ref: '#/components/responses/Error401'
-        '403':
-          $ref: '#/components/responses/Error403'
-        '404':
-          $ref: '#/components/responses/Error404'
-        '409':
-          $ref: '#/components/responses/Error409'
-        '413':
-          $ref: '#/components/responses/Error413'
-        '415':
-          $ref: '#/components/responses/Error415'
-        '422':
-          $ref: '#/components/responses/Error422'
-        '429':
-          $ref: '#/components/responses/Error429'
-        '503':
-          $ref: '#/components/responses/Error503'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EventBatch'
-            example:
-              schema: 1
-              events:
-                - id: 00000000-0000-4000-8000-000000000001
-                  component_id: opm_cccccccccccccccccccccccc
-                  occurred_at: 2026-10-19T12:00:00Z
-                  type: component.heartbeat
-                  attributes:
-                    status: healthy
+paths: {}
 components:
   securitySchemes:
     AccountSession:
       type: http
       scheme: bearer
-      description: Existing account session; organization permission required. Never
-        an integration credential.
+      description: Existing account session; organization permission required. Never an integration credential.
     IntegrationBearer:
       type: http
       scheme: bearer
-      description: Scoped ops_v1 credential; purpose events:write, source
-        backend_report. No inventory or account authority.
+      description:
+        Scoped ops_v1 credential; purpose events:write, source backend_report. No inventory or
+        account authority.
   parameters:
     orgId:
       name: orgId

@@ -1,11 +1,12 @@
 # Operations monitoring contract
 
-Accepted design for OPS-001, 19 October 2026. OPS-002 inventory and OPS-003 credential management are implemented in
-[live OpenAPI](openapi.yaml), disabled by default behind separate rollout flags.
-The separately published [planned OpenAPI](operations-planned.openapi.yaml) remains the
-implementation target for OPS-004; event ingestion does not exist yet. Health, incident and probe
-contracts below are design requirements for OPS-005/006; their routes will be specified
-before implementation. No production configuration is applied by accepting this contract.
+Accepted design for OPS-001, 19 October 2026. Inventory (OPS-002), credential management
+(OPS-003) and durable ingestion (OPS-004) are implemented in [live OpenAPI](openapi.yaml),
+disabled by default behind separate source rollout flags. Historical production
+enablement of inventory/credentials is recorded in the handoff; this ingestion change
+applies no production setting. The [planned OpenAPI](operations-planned.openapi.yaml)
+retains schema fixtures. Health, incident and probe contracts below are requirements
+for OPS-005/006; their routes will be specified before implementation.
 
 ## Baseline and placement
 
@@ -148,7 +149,7 @@ the evidence. Credential/rule/incident/management state changes remain transacti
 ## Budgets, retention and failure semantics
 
 Reject encoded or decoded bodies above 256 KiB, unsupported content encoding, batches above 100 and JSON nesting
-above the exact schema depth. Rate limits: per credential 60 requests/minute, environment 10000 new events/day
+above the exact schema depth. Rate limits: per credential 60 requests per sliding 60-second window, environment 10000 new events/day
 and 500 MiB stored event bytes, organization 100000 new events/day and 2 GiB stored bytes; UTC calendar day.
 Count validated canonical bytes plus a fixed 512-byte row allowance against storage quota. Database counters and
 new-event insertion are atomic under org → app → env locks. Duplicates consume request budget, not event/storage

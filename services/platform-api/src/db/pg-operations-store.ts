@@ -1,3 +1,4 @@
+import { PgEventRepo } from './pg-operations-events.ts';
 import { roleAllows } from '@trust/auth';
 import { DomainError, type OrgRole } from '@trust/shared-types';
 import { AuditBuffer } from '@trust/audit';
@@ -111,9 +112,10 @@ const credentialFrom = (r: Record<string, unknown>): CredentialRecord => ({
   revokedAt: r.revoked_at ? new Date(r.revoked_at as Date) : null,
   rotatedAt: r.rotated_at ? new Date(r.rotated_at as Date) : null,
 });
-class Repo implements InventoryRepo {
+class Repo extends PgEventRepo implements InventoryRepo {
   readonly #q: Queryable;
   constructor(q: Queryable) {
+    super(q);
     this.#q = q;
   }
   async findCredential(id: string) {

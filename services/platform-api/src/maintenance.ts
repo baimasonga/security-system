@@ -35,6 +35,8 @@ export function startMaintenance(
         auth.webauthnChallenges,
       );
       c.metrics.inc('maintenance_deleted_total', { table: 'rate_limits' }, windows);
+      const operationEvents = await c.operationsEvents.retain();
+      c.metrics.inc('maintenance_deleted_total', { table: 'operations_events' }, operationEvents);
       c.metrics.inc('maintenance_runs_total', { outcome: 'ok' });
       c.metrics.inc('maintenance_deleted_total', { table: 'challenges' }, r.challenges);
       c.metrics.inc('maintenance_deleted_total', { table: 'leases' }, r.leases);
