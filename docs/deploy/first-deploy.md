@@ -86,6 +86,10 @@ Optional `WEBAUTHN_RP_NAME` is what phones show (default "Rokela Bai Bureh Warri
 every registered passkey stop working, so pick the long-term domain. Users then add passkeys under **Account →
 Passkeys** and get a **Sign in with a passkey** button.
 
+Device trust (ADR-026) starts in `DEVICE_POLICY=observe`: postures are computed and shown in device passports but
+nothing is blocked. Review `device.posture_changed` audit events for a few weeks, then set `DEVICE_POLICY=enforce`
+to require re-activation for suspected clones and to shorten offline leases for devices under attack.
+
 ## Monthly Quota Rollout (ADR-018)
 
 Apply migration `0008_monthly_quotas` with the schema owner, then run `npm run db:grants` with `APP_DB_ROLE`. The new `quota_charges` table requires SELECT/INSERT for the application role; migration alone does not grant these permissions. Verify `npm run db:check` with the application connection before deployment. A Railway pre-deploy job should run `npm run migrate && npm run db:grants` with the existing owner connection, schema and app-role settings; the API start command remains unchanged.

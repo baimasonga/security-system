@@ -2,6 +2,7 @@ import type { AuditWriter } from '@trust/audit';
 import type { EntitlementOverrides, PlanDefinition } from '@trust/entitlements';
 import type { PublicJwk } from '@trust/crypto';
 import type { ProofPurpose } from '@trust/crypto/verify';
+import type { DevicePosture, DeviceSignal } from './device-policy.ts';
 
 export interface Product {
   id: string;
@@ -276,7 +277,14 @@ export interface LicensingRepo {
   /** `findActivationForDeviceAuth` plus the activation's device, in one read. */
   findActivationWithDevice(
     id: string,
-  ): Promise<{ activation: Activation; device: Device } | undefined>;
+  ): Promise<{ activation: Activation; device: Device; posture?: DevicePosture } | undefined>;
+  // ---- device trust (ADR-026) ----
+  insertDeviceSignal(s: DeviceSignal): Promise<void>;
+  /** Oldest first; only signals observed at or after `since`. */
+  listDeviceSignals(orgId: string, deviceId: string, since: Date): Promise<DeviceSignal[]>;
+  purgeExpiredDeviceSignals(before: Date, limit?: number): Promise<number>;
+  upsertDevicePosture(p: DevicePosture): Promise<void>;
+  findDevicePosture(orgId: string, deviceId: string): Promise<DevicePosture | undefined>;
   /**
    * What activation needs to decide: this device's ACTIVE activation of the license (if any) and how many
    * active activations the license has — in one read. Call it under the license lock.

@@ -1,4 +1,5 @@
 import { AuditBuffer, type AuditEventInput, type AuditLog } from '@trust/audit';
+import type { DevicePosture, DeviceSignal } from './device-policy.ts';
 import type {
   Activation,
   QuotaCharge,
@@ -32,6 +33,8 @@ interface State {
   devices: Map<string, Device>;
   activations: Map<string, Activation>;
   leases: Map<string, LeaseRecord>;
+  deviceSignals: Map<string, DeviceSignal>;
+  devicePostures: Map<string, DevicePosture>;
   challenges: Map<string, Challenge>;
 }
 
@@ -51,6 +54,8 @@ function emptyState(): State {
     devices: new Map(),
     activations: new Map(),
     leases: new Map(),
+    deviceSignals: new Map(),
+    devicePostures: new Map(),
     challenges: new Map(),
   };
 }
@@ -336,9 +341,36 @@ class Repo implements LicensingRepo {
   async findActivationWithDevice(id: string) {
     const activation = this.s.activations.get(id);
     const device = activation && this.s.devices.get(activation.deviceId);
-    return activation && device && device.orgId === activation.orgId
-      ? clone({ activation, device })
-      : undefined;
+    if (!activation || !device || device.orgId !== activation.orgId) return undefined;
+    const posture = this.s.devicePostures.get(device.id);
+    return clone({ activation, device, ...(posture ? { posture } : {}) });
+  }
+  async insertDeviceSignal(sig: DeviceSignal) {
+    this.s.deviceSignals.set(sig.id, clone(sig));
+  }
+  async listDeviceSignals(orgId: string, deviceId: string, since: Date) {
+    return [...this.s.deviceSignals.values()]
+      .filter((x) => x.orgId === orgId && x.deviceId === deviceId && x.observedAt >= since)
+      .sort((a, b) => +a.observedAt - +b.observedAt || a.id.localeCompare(b.id))
+      .map(clone);
+  }
+  async purgeExpiredDeviceSignals(before: Date, limit = 5000) {
+    let n = 0;
+    for (const [k, x] of this.s.deviceSignals) {
+      if (n >= limit) break;
+      if (x.expiresAt < before) {
+        this.s.deviceSignals.delete(k);
+        n++;
+      }
+    }
+    return n;
+  }
+  async upsertDevicePosture(p: DevicePosture) {
+    this.s.devicePostures.set(p.deviceId, clone(p));
+  }
+  async findDevicePosture(orgId: string, deviceId: string) {
+    const p = this.s.devicePostures.get(deviceId);
+    return p && p.orgId === orgId ? clone(p) : undefined;
   }
   async findActivationSlot(licenseId: string, deviceId: string) {
     return {

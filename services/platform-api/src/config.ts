@@ -47,6 +47,8 @@ export interface PlatformConfig {
   challengeTtlSeconds: number | undefined;
   challengeRetentionSeconds: number | undefined;
   leaseRetentionSeconds: number | undefined;
+  /** DEVICE_POLICY (ADR-026): observe (default) records device posture; enforce acts on it. */
+  devicePolicyMode: 'observe' | 'enforce';
   maintenanceIntervalSeconds: number;
   /** Audit chains per organization (ADR-008). 1 = one chain per organization. */
   auditChainShards: number;
@@ -457,6 +459,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const challengeTtlSeconds = optInt('CHALLENGE_TTL_SECONDS', 10, 3600);
   const challengeRetentionSeconds = optInt('CHALLENGE_RETENTION_SECONDS', 0, 30 * 86400);
   const leaseRetentionSeconds = optInt('LEASE_RETENTION_SECONDS', 0, 3650 * 86400);
+  const devicePolicy = env['DEVICE_POLICY'] ?? 'observe';
+  if (devicePolicy !== 'observe' && devicePolicy !== 'enforce')
+    throw new Error('DEVICE_POLICY must be observe or enforce');
   const maintenanceIntervalSeconds = optInt('MAINTENANCE_INTERVAL_SECONDS', 1, 86400) ?? 60;
 
   const auditChainShards = optInt('AUDIT_CHAIN_SHARDS', 1, 64) ?? 1;
@@ -518,6 +523,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     challengeTtlSeconds,
     challengeRetentionSeconds,
     leaseRetentionSeconds,
+    devicePolicyMode: devicePolicy,
     maintenanceIntervalSeconds,
     auditChainShards,
     auditAnchor,

@@ -8,6 +8,7 @@ import {
   entitlementsQuery,
   licenseParams,
   orgParams,
+  deviceParams,
   seatBody,
   seatParams,
   trialBody,
@@ -58,6 +59,12 @@ export function registerLicenseRoutes(app: FastifyInstance, c: Container): void 
   app.post('/v1/organizations/:orgId/activations/:activationId/deactivate', pre, async (req) => {
     const { orgId, activationId } = parse(activationParams, req.params);
     return toWire(await c.licensing.deactivateActivation(principalOf(req), orgId, activationId));
+  });
+
+  // Device passport (ADR-026): key identity, attestation status, server-observed signals, posture.
+  app.get('/v1/organizations/:orgId/devices/:deviceId/passport', pre, async (req) => {
+    const { orgId, deviceId } = parse(deviceParams, req.params);
+    return toWire(await c.licensing.devicePassport(principalOf(req), orgId, deviceId));
   });
 
   // ---- seats (ADR-025) ----

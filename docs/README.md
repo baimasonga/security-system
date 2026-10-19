@@ -41,6 +41,7 @@ Current browser and identity work:
 
 - [ADR-015 — Browser portal](adr/ADR-015-browser-portal.md)
 - [ADR-016 — Email verification and password recovery](adr/ADR-016-identity-recovery.md)
+- [ADR-026 — Device trust: passport, signals, deterministic posture](adr/ADR-026-device-trust.md) · [threat model](threat-models/05-device-trust.md)
 - [ADR-025 — Named-user seats and offline transfer](adr/ADR-025-seats-and-offline-transfer.md)
 - [ADR-024 — Capability tokens for processing services](adr/ADR-024-capability-tokens.md)
 - [ADR-023 — Passkeys (WebAuthn)](adr/ADR-023-passkeys.md) · [threat model](threat-models/04-passkeys.md)
@@ -49,4 +50,4 @@ Current browser and identity work:
 - [Feature implementation program](architecture/08-feature-program.md)
 - [Proposed advanced requirements](architecture/09-advanced-feature-requirements.md)
 
-Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Authenticator MFA, passkeys and privileged operations (dual control, JIT grants, freeze, break-glass) are implemented. Advanced billing, device trust, workspace and the remaining items in the feature program are still tracked as remaining work, not completed features.
+Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Authenticator MFA, passkeys and privileged operations (dual control, JIT grants, freeze, break-glass) are implemented. Advanced billing, hardware attestation, workspace and the remaining items in the feature program are still tracked as remaining work, not completed features.

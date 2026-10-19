@@ -768,6 +768,21 @@ paths:
         '200': { description: Deactivated }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /v1/organizations/{orgId}/devices/{deviceId}/passport:
+    parameters:
+      - { $ref: '#/components/parameters/OrgId' }
+      - { name: deviceId, in: path, required: true, schema: { type: string } }
+    get:
+      summary: 'Device passport (ADR-026): key identity, attestation status (unknown unless verified), server-observed signals (90-day retention) and posture'
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '200':
+            {
+              description: '{ device_id, key, attestation, posture: { decision, reasons, review_at, mode }, signals }',
+            },
+          '404': { description: Not a member, or unknown device },
+        }
   /v1/organizations/{orgId}/licenses/{licenseId}/seats:
     parameters:
       [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
@@ -1030,6 +1045,15 @@ paths:
       summary: Terminal. Also revokes all activations of the license.
       responses:
         { '200': { description: Revoked }, '409': { $ref: '#/components/responses/Problem' } }
+  /v1/admin/organizations/{orgId}/devices/{deviceId}/passport:
+    parameters:
+      - { $ref: '#/components/parameters/OrgId' }
+      - { name: deviceId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Device passport for operators (ADR-026)
+      responses: { '200': { description: The passport }, '404': { description: Unknown device } }
   /v1/admin/audit:
     get:
       tags: [admin]
@@ -2909,6 +2933,7 @@ components:
               trial_not_available,
               seat_required,
               seat_limit_reached,
+              step_up_required,
               quota_exceeded,
               link_unavailable,
               password_required,

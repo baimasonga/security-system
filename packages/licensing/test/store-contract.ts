@@ -117,6 +117,59 @@ export function licensingStoreContract(
   }
 
   describe(`LicensingStore contract: ${name}`, () => {
+    it('keeps server-observed device signals per tenant and device, purges them after retention, and stores posture', async () => {
+      const f = await fixture();
+      const d = dev(f.orgA);
+      await f.store.insertDevice(d);
+      const signal = (
+        kind: 'installation_switch' | 'invalid_device_proof',
+        at: Date,
+        exp: Date,
+      ) => ({
+        id: uid('sig'),
+        orgId: f.orgA,
+        deviceId: d.id,
+        kind,
+        provenance: 'server_observed' as const,
+        observedAt: at,
+        expiresAt: exp,
+        attributes: { purpose: 'refresh', count: 1, flag: true },
+      });
+      const a = signal('installation_switch', later(1000), later(10_000));
+      const b = signal('invalid_device_proof', later(2000), later(20_000));
+      await f.store.insertDeviceSignal(b);
+      await f.store.insertDeviceSignal(a);
+      expect(await f.store.listDeviceSignals(f.orgA, d.id, T)).toEqual([a, b]);
+      expect(await f.store.listDeviceSignals(f.orgA, d.id, later(1500))).toEqual([b]);
+      expect(await f.store.listDeviceSignals(f.orgB, d.id, T)).toEqual([]);
+      expect(await f.store.purgeExpiredDeviceSignals(later(15_000), 10)).toBe(1);
+      expect(await f.store.listDeviceSignals(f.orgA, d.id, T)).toEqual([b]);
+
+      expect(await f.store.findDevicePosture(f.orgA, d.id)).toBeUndefined();
+      const posture = {
+        orgId: f.orgA,
+        deviceId: d.id,
+        decision: 'STEP_UP_AUTH' as const,
+        reasons: ['possible_clone:3_installation_switches_7d'],
+        reviewAt: later(7 * 86400_000),
+        updatedAt: later(3000),
+      };
+      await f.store.upsertDevicePosture(posture);
+      await f.store.upsertDevicePosture({ ...posture, decision: 'OBSERVE', reviewAt: null });
+      expect(await f.store.findDevicePosture(f.orgA, d.id)).toEqual({
+        ...posture,
+        decision: 'OBSERVE',
+        reviewAt: null,
+      });
+      expect(await f.store.findDevicePosture(f.orgB, d.id)).toBeUndefined();
+      // the device-auth lookup carries the posture (no extra round trip on refresh)
+      const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+      await f.store.insertLicense(l);
+      const ac = act({ orgId: f.orgA, licenseId: l.id, deviceId: d.id, by: f.user });
+      await f.store.insertActivation(ac);
+      expect((await f.store.findActivationWithDevice(ac.id))?.posture?.decision).toBe('OBSERVE');
+    });
+
     it('assigns each seat once per license, scoped to the organization, and removes it on request', async () => {
       const f = await fixture();
       const other = uid('usr');

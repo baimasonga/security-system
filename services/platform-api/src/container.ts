@@ -309,6 +309,7 @@ export async function createContainer(
       ...(config.leaseRetentionSeconds !== undefined
         ? { leaseRetentionSeconds: config.leaseRetentionSeconds }
         : {}),
+      devicePolicyMode: config.devicePolicyMode,
       ...overrides?.licensing,
     }),
     authorize: async (p, orgId, permission) => {

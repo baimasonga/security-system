@@ -29,6 +29,10 @@ export interface LicensingConfig {
   leaseRetentionSeconds: number;
   /** Capability token lifetime (ADR-024); clamped to 30-900 seconds. */
   capabilityTtlSeconds: number;
+  /** Device trust (ADR-026): `observe` records posture only; `enforce` acts on it. */
+  devicePolicyMode: 'observe' | 'enforce';
+  /** Offline lease cap for RESTRICTed devices in enforce mode (seconds). */
+  restrictedLeaseTtlSeconds: number;
 }
 
 export const DEFAULT_LEASE_TTL_SECONDS: Record<Tier, number> = {
@@ -53,6 +57,8 @@ export function defaultLicensingConfig(
     challengeRetentionSeconds: 3600,
     leaseRetentionSeconds: 90 * DAY,
     capabilityTtlSeconds: 300,
+    devicePolicyMode: 'observe',
+    restrictedLeaseTtlSeconds: DAY,
     ...overrides,
   };
   validateLicensingConfig(cfg);
@@ -72,6 +78,14 @@ export function validateLicensingConfig(cfg: LicensingConfig): void {
     cfg.capabilityTtlSeconds > 900
   )
     throw new Error('capabilityTtlSeconds must be an integer between 30 and 900');
+  if (cfg.devicePolicyMode !== 'observe' && cfg.devicePolicyMode !== 'enforce')
+    throw new Error('devicePolicyMode must be observe or enforce');
+  if (
+    !Number.isInteger(cfg.restrictedLeaseTtlSeconds) ||
+    cfg.restrictedLeaseTtlSeconds < 3600 ||
+    cfg.restrictedLeaseTtlSeconds > 7 * DAY
+  )
+    throw new Error('restrictedLeaseTtlSeconds must be between 1 hour and 7 days');
   for (const t of TIERS) {
     const ttl = cfg.leaseTtlSeconds[t];
     if (!Number.isInteger(ttl) || ttl < 60 || ttl > 366 * DAY)
@@ -171,8 +185,11 @@ export function computeLeaseTimes(
   kind: License['kind'],
   entitlementEnd: Date | null,
   config: LicensingConfig,
+  /** Optional tighter cap (a RESTRICTed device, ADR-026). */
+  capSeconds?: number,
 ): LeaseTimes {
   let expMs = now.getTime() + config.leaseTtlSeconds[tier] * 1000;
+  if (capSeconds !== undefined) expMs = Math.min(expMs, now.getTime() + capSeconds * 1000);
   if (entitlementEnd) {
     const grace = kind === 'subscription' ? config.subscriptionLeaseGraceSeconds * 1000 : 0;
     expMs = Math.min(expMs, entitlementEnd.getTime() + grace);

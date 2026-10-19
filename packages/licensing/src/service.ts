@@ -25,6 +25,7 @@ import {
 } from '@trust/entitlements';
 import {
   CAPABILITY_TYP,
+  Decision,
   DomainError,
   LEASE_TYP,
   MAX_CAPABILITY_TTL_SECONDS,
@@ -47,6 +48,7 @@ import {
   type LicenseKind,
   type LicensingRepo,
   type LicensingStore,
+  type LicensingTx,
   type Plan,
   type Product,
   type Subscription,
@@ -59,6 +61,13 @@ import {
   type AccessEvaluator,
   type LicensingConfig,
 } from './policy.ts';
+import {
+  SIGNAL_RETENTION_MS,
+  SWITCH_WINDOW_MS,
+  evaluateDevicePosture,
+  type DevicePosture,
+  type DeviceSignalKind,
+} from './device-policy.ts';
 
 export type OrgPermission =
   | 'license:read'
@@ -1025,6 +1034,13 @@ export class LicensingService {
         let reissued = false;
         if (act) {
           // Idempotent: same device re-activating (retry, reinstall) does not consume another slot.
+          // Device trust (ADR-026): a new installation id for the same key is a clone/reinstall signal; a person
+          // re-activating with their session and the license key completes a pending step-up.
+          const priorPosture = await tx.findDevicePosture(device.orgId, device.id);
+          if (act.installationId !== input.installationId)
+            await this.#recordDeviceSignal(device, 'installation_switch', {}, tx);
+          if (priorPosture?.decision === Decision.STEP_UP_AUTH)
+            await this.#recordDeviceSignal(device, 'step_up_completed', {}, tx);
           act = { ...act, installationId: input.installationId, lastValidatedAt: now };
           await tx.updateActivation(act);
           reissued = true;
@@ -1144,9 +1160,11 @@ export class LicensingService {
     const ctx = await this.#proveDevice('refresh', input);
     const now = this.#d.clock.now();
     let denied: DomainError | undefined;
+    let stepUp = false;
     const grant = await this.#d.store
       .transaction(async (tx) => {
         denied = undefined; // the callback may be re-run after a deadlock
+        stepUp = false;
         // The license is evaluated ONCE, here, under the lock (no separate unlocked pre-check: that was a
         // duplicate read of license/plan/product/subscription). Lock order is always license -> activation.
         // SHARED lock: keeps the license state stable while we issue, but concurrent refreshes of a hot
@@ -1158,6 +1176,10 @@ export class LicensingService {
         if (ev.outcome.decision !== 'ALLOW') {
           denied = new DomainError(ev.code ?? 'invalid_license', ev.outcome.reasons[0] ?? 'denied');
           throw denied;
+        }
+        if (this.#stepUpRequired(ctx.posture)) {
+          stepUp = true;
+          throw new DomainError('step_up_required', 'step-up required');
         }
         const act = await tx.findActivationForDeviceAuth(ctx.act.id);
         if (!act || act.status !== 'active')
@@ -1172,6 +1194,10 @@ export class LicensingService {
           resolved,
           ev,
           now,
+          ...(this.#d.config.devicePolicyMode === 'enforce' &&
+          ctx.posture?.decision === Decision.RESTRICT
+            ? { capSeconds: this.#d.config.restrictedLeaseTtlSeconds }
+            : {}),
         });
         await tx.audit.append({
           actor: { type: 'device', id: ctx.device.id },
@@ -1191,6 +1217,8 @@ export class LicensingService {
         if (denied && e === denied) {
           await this.#recordValidationFailed('refresh', ctx.device, ctx.act, denied.code);
         }
+        if (stepUp)
+          throw await this.#refuseForStepUp('refresh', ctx.device, ctx.act, ctx.posture!.reasons);
         throw e;
       });
     await this.#d.telemetry.track('lease.refreshed', { tier: grant.entitlements.tier });
@@ -1278,11 +1306,11 @@ export class LicensingService {
   async runMaintenance(opts?: {
     batch?: number;
     maxBatches?: number;
-  }): Promise<{ challenges: number; leases: number }> {
+  }): Promise<{ challenges: number; leases: number; deviceSignals: number }> {
     const batch = opts?.batch ?? 5000;
     const maxBatches = opts?.maxBatches ?? 20;
     const now = this.#d.clock.now().getTime();
-    const out = { challenges: 0, leases: 0 };
+    const out = { challenges: 0, leases: 0, deviceSignals: 0 };
     const challengeCutoff = new Date(now - this.#d.config.challengeRetentionSeconds * 1000);
     const leaseCutoff = new Date(now - this.#d.config.leaseRetentionSeconds * 1000);
     for (let i = 0; i < maxBatches; i++) {
@@ -1293,6 +1321,11 @@ export class LicensingService {
     for (let i = 0; i < maxBatches; i++) {
       const n = await this.#d.store.purgeExpiredLeases(leaseCutoff, batch);
       out.leases += n;
+      if (n < batch) break;
+    }
+    for (let i = 0; i < maxBatches; i++) {
+      const n = await this.#d.store.purgeExpiredDeviceSignals(new Date(now), batch);
+      out.deviceSignals += n;
       if (n < batch) break;
     }
     return out;
@@ -1379,6 +1412,7 @@ export class LicensingService {
       resolved: ResolvedEntitlements;
       ev: AccessEvaluation;
       now: Date;
+      capSeconds?: number;
     },
   ): Promise<LeaseGrant> {
     const kind = a.lic.kind as 'subscription' | 'trial' | 'perpetual';
@@ -1388,6 +1422,7 @@ export class LicensingService {
       kind,
       a.ev.entitlementEnd,
       this.#d.config,
+      a.capSeconds,
     );
     const sec = (d: Date) => Math.floor(d.getTime() / 1000);
     const jti = newId('lse');
@@ -1459,6 +1494,8 @@ export class LicensingService {
     publicKey: PublicJwk;
     thumbprint: string;
     signature: string;
+    /** The registered device, when known (device-auth flows): failures become device signals. */
+    device?: Device;
   }): Promise<void> {
     const now = this.#d.clock.now();
     const nonceOk =
@@ -1495,6 +1532,8 @@ export class LicensingService {
       thumbprint: a.thumbprint,
     });
     if (!verifySignature(a.publicKey, msg, a.signature)) {
+      if (a.device)
+        await this.#recordDeviceSignal(a.device, 'invalid_device_proof', { purpose: a.purpose });
       await this.#d.telemetry.signal('invalid_device_proof', {
         subject: a.installationId,
         attributes: { purpose: a.purpose },
@@ -1513,6 +1552,7 @@ export class LicensingService {
     }
     const { activation: act, device } = found;
     if (act.installationId !== input.installationId) {
+      await this.#recordDeviceSignal(device, 'installation_mismatch', { purpose });
       throw new DomainError('invalid_device_proof', 'device proof is invalid');
     }
     await this.#consumeAndVerify({
@@ -1523,8 +1563,131 @@ export class LicensingService {
       publicKey: device.publicKey,
       thumbprint: device.thumbprint,
       signature: input.signature,
+      device,
     });
-    return { act, device };
+    let posture = found.posture;
+    if (posture?.reviewAt && posture.reviewAt <= this.#d.clock.now())
+      posture = await this.#d.store.transaction((tx) => this.#recomputePosture(tx, device));
+    return { act, device, posture };
+  }
+
+  /**
+   * Enforce mode (ADR-026): a device under clone suspicion must be re-activated by its person first. Called only
+   * AFTER the license's hard invariants allowed the request, so a score never replaces or hides a denial.
+   */
+  #stepUpRequired(posture: DevicePosture | undefined): boolean {
+    return (
+      this.#d.config.devicePolicyMode === 'enforce' && posture?.decision === Decision.STEP_UP_AUTH
+    );
+  }
+  async #refuseForStepUp(purpose: string, device: Device, act: Activation, reasons: string[]) {
+    await this.#d.audit.append({
+      actor: { type: 'device', id: device.id },
+      action: 'device.step_up_required',
+      target: { type: 'activation', id: act.id },
+      orgId: act.orgId,
+      metadata: { purpose, reasons },
+    });
+    return new DomainError(
+      'step_up_required',
+      'sign in again on this device (re-activate with your account) to continue',
+    );
+  }
+
+  // ---- device trust (ADR-026) -------------------------------------------------------------------------------
+
+  /** Records a server-observed signal and recomputes the device's posture, in its own transaction. */
+  async #recordDeviceSignal(
+    device: Device,
+    kind: DeviceSignalKind,
+    attributes: Record<string, string | number | boolean>,
+    tx?: LicensingTx,
+  ): Promise<DevicePosture> {
+    const run = async (t: LicensingTx) => {
+      const now = this.#d.clock.now();
+      await t.insertDeviceSignal({
+        id: newId('sig'),
+        orgId: device.orgId,
+        deviceId: device.id,
+        kind,
+        provenance: 'server_observed',
+        observedAt: now,
+        expiresAt: new Date(now.getTime() + SIGNAL_RETENTION_MS),
+        attributes,
+      });
+      return this.#recomputePosture(t, device);
+    };
+    return tx ? run(tx) : this.#d.store.transaction(run);
+  }
+
+  async #recomputePosture(tx: LicensingTx, device: Device): Promise<DevicePosture> {
+    const now = this.#d.clock.now();
+    const signals = await tx.listDeviceSignals(
+      device.orgId,
+      device.id,
+      new Date(now.getTime() - SWITCH_WINDOW_MS),
+    );
+    const before = await tx.findDevicePosture(device.orgId, device.id);
+    const r = evaluateDevicePosture({
+      // Hard license invariants are decided per request before posture is consulted.
+      license: { decision: Decision.ALLOW, reasons: [] },
+      attestation: 'unknown', // no verified attestation adapter yet: missing evidence is labeled, not assumed
+      signals,
+      now,
+    });
+    const next: DevicePosture = {
+      orgId: device.orgId,
+      deviceId: device.id,
+      decision: r.decision,
+      reasons: r.reasons,
+      reviewAt: r.reviewAt,
+      updatedAt: now,
+    };
+    await tx.upsertDevicePosture(next);
+    if ((before?.decision ?? Decision.ALLOW) !== next.decision)
+      await tx.audit.append({
+        actor: { type: 'system' },
+        action: 'device.posture_changed',
+        target: { type: 'device', id: device.id },
+        orgId: device.orgId,
+        metadata: { from: before?.decision ?? 'ALLOW', to: next.decision, reasons: next.reasons },
+      });
+    return next;
+  }
+
+  /** The device passport: key identity, attestation status, recent signals and posture. Never secrets. */
+  async devicePassport(p: UserPrincipal | null, orgId: string, deviceId: string) {
+    if (p) await this.#d.authorize(p, orgId, 'device:read');
+    const device = await this.#d.store.findDevice(orgId, deviceId);
+    if (!device) throw new DomainError('not_found', 'device not found');
+    const now = this.#d.clock.now();
+    const signals = await this.#d.store.listDeviceSignals(
+      orgId,
+      deviceId,
+      new Date(now.getTime() - SIGNAL_RETENTION_MS),
+    );
+    const posture = await this.#d.store.findDevicePosture(orgId, deviceId);
+    return {
+      deviceId: device.id,
+      key: { algorithm: 'Ed25519', thumbprint: device.thumbprint, registeredAt: device.createdAt },
+      attestation: {
+        status: 'unknown',
+        reason:
+          'no verified hardware attestation for this device; self-reported claims are not evidence',
+      },
+      posture: {
+        decision: posture?.decision ?? Decision.ALLOW,
+        reasons: posture?.reasons ?? ['attestation_unknown'],
+        reviewAt: posture?.reviewAt ?? null,
+        mode: this.#d.config.devicePolicyMode,
+      },
+      signals: signals.map((x) => ({
+        kind: x.kind,
+        provenance: x.provenance,
+        observedAt: x.observedAt,
+        expiresAt: x.expiresAt,
+      })),
+    };
   }
 
   async #recordValidationFailed(
@@ -1548,7 +1711,7 @@ export class LicensingService {
     input: DeviceAuthInput,
     opts?: { requireValidLicense?: boolean },
   ) {
-    const { act, device } = await this.#proveDevice(purpose, input);
+    const { act, device, posture } = await this.#proveDevice(purpose, input);
     const lctx = await this.#d.store.findLicenseContext(act.orgId, act.licenseId, 'none');
     if (!lctx) throw new DomainError('internal', 'license missing');
     const { license: lic, plan, product, subscription: sub } = lctx;
@@ -1558,6 +1721,8 @@ export class LicensingService {
       await this.#recordValidationFailed(purpose, device, act, code);
       throw new DomainError(code, ev.outcome.reasons[0] ?? 'denied');
     }
+    if (opts?.requireValidLicense !== false && this.#stepUpRequired(posture))
+      throw await this.#refuseForStepUp(purpose, device, act, posture!.reasons);
     return { act, device, lic, plan, product, sub, ev };
   }
 

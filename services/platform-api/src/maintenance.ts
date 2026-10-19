@@ -38,6 +38,7 @@ export function startMaintenance(
       c.metrics.inc('maintenance_runs_total', { outcome: 'ok' });
       c.metrics.inc('maintenance_deleted_total', { table: 'challenges' }, r.challenges);
       c.metrics.inc('maintenance_deleted_total', { table: 'leases' }, r.leases);
+      c.metrics.inc('maintenance_deleted_total', { table: 'device_signals' }, r.deviceSignals);
       c.metrics.observe('maintenance_duration_ms', performance.now() - t0);
       return r;
     } catch (e) {

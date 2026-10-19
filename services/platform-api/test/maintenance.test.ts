@@ -49,7 +49,7 @@ describe('background maintenance', () => {
       expect(errors).toHaveLength(1);
       expect(env.c.metrics.snapshot().counters['maintenance_runs_total{outcome="error"}']).toBe(1);
       env.c.licensing.runMaintenance = original;
-      expect(await m.runOnce()).toEqual({ challenges: 0, leases: 0 });
+      expect(await m.runOnce()).toEqual({ challenges: 0, leases: 0, deviceSignals: 0 });
     } finally {
       m.stop();
     }
@@ -67,9 +67,9 @@ describe('operator knobs actually reach the running service (regression: they we
     const m = startMaintenance(env.c, { everyMs: 3_600_000 });
     try {
       env.clock.advance(24_000); // expired 4 s ago, retention is 5 s: still kept
-      expect(await m.runOnce()).toEqual({ challenges: 0, leases: 0 });
+      expect(await m.runOnce()).toEqual({ challenges: 0, leases: 0, deviceSignals: 0 });
       env.clock.advance(2_000); // expired 6 s ago > 5 s retention: deleted
-      expect(await m.runOnce()).toEqual({ challenges: 1, leases: 0 });
+      expect(await m.runOnce()).toEqual({ challenges: 1, leases: 0, deviceSignals: 0 });
     } finally {
       m.stop();
     }

@@ -3,6 +3,8 @@ import { appendAuditInTx } from './pg-audit-log.ts';
 import type { Clock } from '@trust/shared-types';
 import type {
   Activation,
+  DevicePosture,
+  DeviceSignal,
   QuotaCharge,
   Seat,
   BillingCheckout,
@@ -182,6 +184,32 @@ const SUB_COLS = [
   'created_at',
 ] as const;
 const DEVICE_COLS = ['id', 'org_id', 'thumbprint', 'public_key_jwk', 'created_at'] as const;
+const POSTURE_COLS = [
+  'device_id',
+  'org_id',
+  'decision',
+  'reasons',
+  'review_at',
+  'updated_at',
+] as const;
+const posture = (r: Row): DevicePosture => ({
+  orgId: r['org_id'] as string,
+  deviceId: r['device_id'] as string,
+  decision: r['decision'] as DevicePosture['decision'],
+  reasons: r['reasons'] as string[],
+  reviewAt: r['review_at'] ? new Date(r['review_at'] as string | Date) : null,
+  updatedAt: new Date(r['updated_at'] as string | Date),
+});
+const signal = (r: Row): DeviceSignal => ({
+  id: r['id'] as string,
+  orgId: r['org_id'] as string,
+  deviceId: r['device_id'] as string,
+  kind: r['kind'] as DeviceSignal['kind'],
+  provenance: 'server_observed',
+  observedAt: new Date(r['observed_at'] as string | Date),
+  expiresAt: new Date(r['expires_at'] as string | Date),
+  attributes: r['attributes'] as DeviceSignal['attributes'],
+});
 const ACTIVATION_COLS = [
   'id',
   'org_id',
@@ -678,14 +706,64 @@ class PgRepo implements LicensingRepo {
   }
   async findActivationWithDevice(id: string) {
     const r = await this.#one(
-      `SELECT ${prefixed('a', 'a', ACTIVATION_COLS)}, ${prefixed('d', 'd', DEVICE_COLS)}
+      `SELECT ${prefixed('a', 'a', ACTIVATION_COLS)}, ${prefixed('d', 'd', DEVICE_COLS)},
+              ${prefixed('dp', 'dp', POSTURE_COLS)}
          FROM activations a JOIN devices d ON d.id = a.device_id AND d.org_id = a.org_id
+         LEFT JOIN device_posture dp ON dp.device_id = d.id AND dp.org_id = d.org_id
         WHERE a.id = $1${this.#tx ? ' FOR UPDATE OF a' : ''}`,
       [id],
     );
-    return r
-      ? { activation: activation(unprefix(r, 'a')), device: device(unprefix(r, 'd')) }
-      : undefined;
+    if (!r) return undefined;
+    const dp = unprefix(r, 'dp');
+    return {
+      activation: activation(unprefix(r, 'a')),
+      device: device(unprefix(r, 'd')),
+      ...(dp['device_id'] ? { posture: posture(dp) } : {}),
+    };
+  }
+  async insertDeviceSignal(x: DeviceSignal) {
+    await this.#q.query(
+      'INSERT INTO device_signals (id,org_id,device_id,kind,provenance,observed_at,expires_at,attributes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)',
+      [
+        x.id,
+        x.orgId,
+        x.deviceId,
+        x.kind,
+        x.provenance,
+        x.observedAt,
+        x.expiresAt,
+        JSON.stringify(x.attributes),
+      ],
+    );
+  }
+  async listDeviceSignals(orgId: string, deviceId: string, since: Date) {
+    const r = await this.#q.query(
+      'SELECT * FROM device_signals WHERE org_id=$1 AND device_id=$2 AND observed_at >= $3 ORDER BY observed_at, id',
+      [orgId, deviceId, since],
+    );
+    return r.rows.map((x) => signal(x as Row));
+  }
+  async purgeExpiredDeviceSignals(before: Date, limit = 5000) {
+    const r = await this.#q.query(
+      'DELETE FROM device_signals WHERE id IN (SELECT id FROM device_signals WHERE expires_at < $1 LIMIT $2)',
+      [before, Math.max(1, Math.min(50_000, Math.floor(limit)))],
+    );
+    return r.rowCount ?? 0;
+  }
+  async upsertDevicePosture(p: DevicePosture) {
+    await this.#q.query(
+      `INSERT INTO device_posture (device_id,org_id,decision,reasons,review_at,updated_at) VALUES ($1,$2,$3,$4::jsonb,$5,$6)
+       ON CONFLICT (device_id) DO UPDATE SET decision=EXCLUDED.decision, reasons=EXCLUDED.reasons,
+         review_at=EXCLUDED.review_at, updated_at=EXCLUDED.updated_at`,
+      [p.deviceId, p.orgId, p.decision, JSON.stringify(p.reasons), p.reviewAt, p.updatedAt],
+    );
+  }
+  async findDevicePosture(orgId: string, deviceId: string) {
+    const r = await this.#q.query('SELECT * FROM device_posture WHERE device_id=$1 AND org_id=$2', [
+      deviceId,
+      orgId,
+    ]);
+    return r.rows[0] ? posture(r.rows[0] as Row) : undefined;
   }
   async findActivationSlot(licenseId: string, deviceId: string) {
     // Both facts in one read; the count row always exists, the activation columns are NULL when absent.

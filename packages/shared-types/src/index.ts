@@ -62,6 +62,7 @@ export const ERROR_STATUS = {
   trial_not_available: 409,
   seat_required: 403,
   seat_limit_reached: 409,
+  step_up_required: 403,
   // Sharing outcomes
   quota_exceeded: 409,
   link_unavailable: 410,

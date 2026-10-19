@@ -726,7 +726,7 @@ describe('retention (runMaintenance)', () => {
       installationId: dev.installationId,
     });
     // Nothing is old enough yet.
-    expect(await w.svc.runMaintenance()).toEqual({ challenges: 0, leases: 0 });
+    expect(await w.svc.runMaintenance()).toEqual({ challenges: 0, leases: 0, deviceSignals: 0 });
     // Past challenge retention (1h default) but well inside lease retention (90d):
     w.clock.advance(2 * 3600_000);
     const first = await w.svc.runMaintenance({ batch: 2, maxBatches: 2 }); // bounded: 2 batches x 2
@@ -739,7 +739,7 @@ describe('retention (runMaintenance)', () => {
       purpose: 'activate',
       installationId: dev.installationId,
     });
-    expect(await w.svc.runMaintenance()).toEqual({ challenges: 0, leases: 0 });
+    expect(await w.svc.runMaintenance()).toEqual({ challenges: 0, leases: 0, deviceSignals: 0 });
     expect(live.nonce).not.toBe(fresh.nonce);
     // Lease records only after expiry (day 30) + retention (90 days), i.e. beyond day 120
     w.clock.advance(60 * DAY);

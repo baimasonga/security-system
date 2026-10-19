@@ -4,6 +4,7 @@ import type { Container } from '../container.ts';
 import { operator, parse, principalOf, toWire } from '../http.ts';
 import {
   auditQuery,
+  deviceParams,
   anchorManifestBody,
   anchorsQuery,
   auditVerifyQuery,
@@ -169,6 +170,11 @@ export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
       );
     });
   }
+
+  app.get('/v1/admin/organizations/:orgId/devices/:deviceId/passport', pre, async (req) => {
+    const { orgId, deviceId } = parse(deviceParams, req.params);
+    return toWire(await c.licensing.devicePassport(null, orgId, deviceId));
+  });
 
   app.get('/v1/admin/audit', pre, async (req) => {
     const q = parse(auditQuery, req.query);

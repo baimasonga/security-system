@@ -31,6 +31,8 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   licenses: RIU,
   quota_charges: RI,
   license_seats: ALL, // admins unassign seats
+  device_signals: ['SELECT', 'INSERT', 'DELETE'], // server-observed evidence: never rewritten, purged after retention
+  device_posture: RIU, // derived, recomputed from signals
   billing_checkouts: RIU,
   billing_events: RI, // immutable accounting receipts; no rewrite or deletion by the app
   trial_claims: RI,
