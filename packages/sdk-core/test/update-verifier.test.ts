@@ -204,3 +204,125 @@ it('supports release-key revocation through root rotation', async () => {
   );
   expect(await s.sdk.verifyManifest(await s.sign(s.manifest, nextKey.kid))).toEqual(s.manifest);
 });
+
+it.each([
+  {
+    installed: 0,
+    minimum: 1,
+    sequence: 3,
+    paused: false,
+    support: 'update_required',
+    release: 'available',
+  },
+  {
+    installed: 0,
+    minimum: 0,
+    sequence: 3,
+    paused: false,
+    support: 'supported',
+    release: 'available',
+  },
+  {
+    installed: 1,
+    minimum: 2,
+    sequence: 3,
+    paused: true,
+    support: 'update_required',
+    release: 'paused',
+  },
+  {
+    installed: 2,
+    minimum: 2,
+    sequence: 3,
+    paused: false,
+    support: 'supported',
+    release: 'available',
+  },
+  { installed: 2, minimum: 2, sequence: 3, paused: true, support: 'supported', release: 'paused' },
+  {
+    installed: 3,
+    minimum: 2,
+    sequence: 3,
+    paused: false,
+    support: 'supported',
+    release: 'current',
+  },
+  { installed: 3, minimum: 2, sequence: 3, paused: true, support: 'supported', release: 'current' },
+  {
+    installed: 4,
+    minimum: 2,
+    sequence: 3,
+    paused: false,
+    support: 'supported',
+    release: 'installed_ahead',
+  },
+  {
+    installed: 4,
+    minimum: 2,
+    sequence: 3,
+    paused: true,
+    support: 'supported',
+    release: 'installed_ahead',
+  },
+])(
+  'assesses installed sequence $installed with floor $minimum, release $sequence and pause $paused',
+  async (row) => {
+    const s = setup();
+    const manifest = {
+      ...s.manifest,
+      minimum_sequence: row.minimum,
+      sequence: row.sequence,
+      paused: row.paused,
+      version: '0.0.1',
+    };
+    const result = await s.sdk.getUpdateStatus(await s.sign(manifest), row.installed);
+    expect(result).toEqual({
+      manifest,
+      installedSequence: row.installed,
+      support: row.support,
+      release: row.release,
+    });
+  },
+);
+
+it.each([-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+  'rejects invalid installed sequence %s before saving checkpoint state',
+  async (installed) => {
+    const s = setup();
+    await expect(s.sdk.getUpdateStatus(await s.sign(s.manifest), installed)).rejects.toThrow(
+      'installed sequence',
+    );
+    expect(s.values.size).toBe(0);
+  },
+);
+
+it('uses the actual installed build rather than the highest observed manifest sequence', async () => {
+  const s = setup();
+  const manifest = { ...s.manifest, sequence: 10, minimum_sequence: 8 };
+  const envelope = await s.sign(manifest);
+  await s.sdk.verifyManifest(envelope);
+  expect(await s.sdk.getUpdateStatus(envelope, 2)).toMatchObject({
+    installedSequence: 2,
+    support: 'update_required',
+    release: 'available',
+  });
+  expect(await s.sdk.getUpdateStatus(envelope, 10)).toMatchObject({
+    support: 'supported',
+    release: 'current',
+  });
+  await expect(s.sdk.getUpdateStatus(await s.sign(s.manifest), 2)).rejects.toThrow('rollback');
+});
+
+it('refuses untrusted and expired manifests instead of returning update status', async () => {
+  const s = setup();
+  await expect(s.sdk.getUpdateStatus(await s.sign(s.manifest, s.rootKey.kid), 1)).rejects.toThrow(
+    'signature threshold',
+  );
+  await expect(
+    s.sdk.getUpdateStatus(await s.sign({ ...s.manifest, expires: now }), 1),
+  ).rejects.toThrow('freshness');
+  await expect(
+    s.sdk.getUpdateStatus(await s.sign({ ...s.manifest, product: 'wrong' }), 1),
+  ).rejects.toThrow('binding');
+  expect(s.values.size).toBe(0);
+});
