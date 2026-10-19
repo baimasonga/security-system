@@ -2,6 +2,11 @@
 
 This is a security-critical trust platform. Prefer boring, auditable code. Correctness first.
 
+Cross-application monitoring work starts at [AGENTS.md](AGENTS.md), then the
+[operations/security program](docs/programs/operations-security.md) and its
+[current handoff](docs/programs/operations-security-status.md). The program is planned
+work, not an implemented monitoring service; keep its evidence/status current.
+
 ## Commands
 
 - `npm run check` — format check, lint + architecture boundaries, typecheck, unit/integration/security tests (must pass before any push)

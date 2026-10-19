@@ -1,5 +1,11 @@
 # Rokela Bai Bureh Warrior
 
+**Cross-application monitoring roadmap:** the planned operations/security expansion
+is tracked in [the implementation program](docs/programs/operations-security.md) and
+[agent handoff](docs/programs/operations-security-status.md). Agents start at
+[AGENTS.md](AGENTS.md). These are implementation requirements, not a claim that
+cross-application monitoring or the Rokela PDF connection is already deployed.
+
 Secure software licensing platform. Centralized identity, licensing, entitlement, device-trust and (later) secure-update
 platform for all desktop and web products. Not a license-key server: the server is
 the only authority; clients receive **signed, device-bound, expiring evidence** they
