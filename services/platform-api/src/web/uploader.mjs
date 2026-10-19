@@ -82,6 +82,7 @@ export async function uploadFile(o) {
           if (attempt >= 4)
             throw new Error(
               `Upload interrupted (${e.message}). Choose the same file again to resume.`,
+              { cause: e },
             );
           await sleep(500 * 2 ** attempt);
         }

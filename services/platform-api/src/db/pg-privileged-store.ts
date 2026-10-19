@@ -173,6 +173,7 @@ class PgPrivilegedRepo implements PrivilegedRepo {
         [f.scope, f.reason, f.frozenBy, f.frozenAt],
       );
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_freeze');
       throw e;
     }

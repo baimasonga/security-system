@@ -40,7 +40,7 @@ export class Http {
           res.on('data', (c) => chunks.push(c));
           res.on('end', () => {
             const text = Buffer.concat(chunks).toString('utf8');
-            let parsed: any = undefined;
+            let parsed: any;
             try {
               parsed = text ? JSON.parse(text) : undefined;
             } catch {

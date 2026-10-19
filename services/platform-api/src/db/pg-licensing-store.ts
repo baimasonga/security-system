@@ -296,7 +296,9 @@ class PgRepo implements LicensingRepo {
         ],
       );
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_checkout');
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === FK_VIOLATION) throw new Error('cross_tenant_reference');
       throw e;
     }
@@ -322,6 +324,7 @@ class PgRepo implements LicensingRepo {
       );
       if (!result.rowCount) throw new Error('checkout_not_found');
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_checkout');
       throw e;
     }
@@ -337,7 +340,9 @@ class PgRepo implements LicensingRepo {
         [e.id, e.checkoutId, e.bodyHash, e.occurredAt, e.createdAt],
       );
     } catch (error) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(error).code === UNIQUE_VIOLATION) throw new Error('duplicate_billing_event');
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(error).code === FK_VIOLATION) throw new Error('cross_tenant_reference');
       throw error;
     }
@@ -420,7 +425,9 @@ class PgRepo implements LicensingRepo {
         ],
       );
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_quota_request');
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === FK_VIOLATION) throw new Error('cross_tenant_reference');
       throw e;
     }

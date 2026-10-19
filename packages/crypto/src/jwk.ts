@@ -1,10 +1,4 @@
-import {
-  createHash,
-  createPublicKey,
-  generateKeyPairSync,
-  type JsonWebKey,
-  type KeyObject,
-} from 'node:crypto';
+import { createHash, createPublicKey, generateKeyPairSync, type KeyObject } from 'node:crypto';
 import { b64urlDecode, b64urlEncode, canonicalJson } from './encoding.ts';
 
 /** The only key type the platform accepts: Ed25519 public keys in JWK (RFC 8037) form. */
@@ -42,7 +36,7 @@ export function jwkThumbprint(jwk: PublicJwk): string {
 }
 
 export function publicKeyObject(jwk: PublicJwk): KeyObject {
-  return createPublicKey({ key: normalizePublicJwk(jwk) as JsonWebKey, format: 'jwk' });
+  return createPublicKey({ key: { ...normalizePublicJwk(jwk) }, format: 'jwk' });
 }
 
 export function generateEd25519(): { publicJwk: PublicJwk; privateKey: KeyObject } {

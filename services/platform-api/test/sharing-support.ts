@@ -40,7 +40,7 @@ export async function grantPlan(
 ) {
   const token = await env.operatorToken();
   const reason = 'test provisioning';
-  let prod = await env.call('POST', '/v1/admin/products', {
+  const prod = await env.call('POST', '/v1/admin/products', {
     token,
     body: { code: `pdf-pro-${code}`, name: 'PDF Pro', reason },
   });
@@ -69,7 +69,6 @@ export async function grantPlan(
     },
   });
   expect(lic.status).toBe(201);
-  prod = lic;
   return lic.body.license.id as string;
 }
 

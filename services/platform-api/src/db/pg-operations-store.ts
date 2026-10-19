@@ -202,6 +202,7 @@ class Repo implements InventoryRepo {
         values(type, row),
       );
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_inventory');
       throw e;
     }

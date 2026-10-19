@@ -348,6 +348,7 @@ class PgAuthRepo implements AuthRepo {
         [u.id, u.email, u.passwordHash, u.status, u.platformRole, u.createdAt],
       );
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_email');
       throw e;
     }
@@ -382,6 +383,7 @@ class PgAuthRepo implements AuthRepo {
         [m.orgId, m.userId, m.role, m.createdAt],
       );
     } catch (e) {
+      // eslint-disable-next-line preserve-caught-error -- Constraint details may contain tenant data; expose only the stable code.
       if (pgErr(e).code === UNIQUE_VIOLATION) throw new Error('duplicate_membership');
       throw e;
     }
