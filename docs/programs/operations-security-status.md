@@ -60,6 +60,9 @@ User requested usable dashboard controls for the implemented APIs, followed by t
 remaining monitoring program, with a durable handoff for the next agent. Work branch: `feat/operations-dashboard`, based on
 production merge `919dff77` plus the production evidence commit `8b44184` (PR #25).
 Do not mistake this working branch for a production deployment.
+Implementation commit `e522703`, published as [PR #28](https://github.com/baimasonga/security-system/pull/28).
+CI/merge/rollout remain pending; the last confirmed live deployment is still the
+backend-only `6d8966b9-d8c7-421a-999e-43622c351767`.
 
 - Added `web/operations.mjs` and Applications navigation: applications, environments,
   components/dependencies, ownership/Product/criticality editing, versioned lifecycle
