@@ -307,6 +307,8 @@ upstream contracts before continuing feature work.
 
 ## OPS-004 durable ingestion implementation — 19 October 2026
 
+- Implementation commit: [`74e708c`](https://github.com/baimasonga/security-system/commit/74e708c8e68ca924cbb03603fc8c21e19015e276), followed by this evidence-only publication entry.
+
 - Baseline: `b5da658` (merged OPS-002/003, dashboard PR #28 and dependency fixes).
   The older local inventory/credential prototype is preserved and was not merged
   over the independent implementation. Source work is in
