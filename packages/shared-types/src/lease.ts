@@ -39,3 +39,31 @@ export interface LeaseClaims {
 }
 
 export const audienceForProduct = (productCode: string): string => `product:${productCode}`;
+
+/** Capability tokens for processing services (ADR-024). Explicitly typed so a lease can never pass as one. */
+export const CAPABILITY_TYP = 'cap+jws';
+export const MAX_CAPABILITY_TTL_SECONDS = 900;
+
+export interface CapabilityClaims {
+  v: 1;
+  jti: string;
+  iss: string;
+  /** Audience: `svc:<service name>`. */
+  aud: string;
+  /** Activation id. */
+  sub: string;
+  org: string;
+  lic: string;
+  /** Product code. */
+  prd: string;
+  /** The single capability this token grants. */
+  cap: string;
+  /** Confirmation: thumbprint of the device key the token was issued to. */
+  cnf: { jkt: string };
+  iat: number;
+  nbf: number;
+  exp: number;
+}
+
+export const SERVICE_NAME = /^[a-z][a-z0-9-]{0,39}$/;
+export const audienceForService = (service: string): string => `svc:${service}`;

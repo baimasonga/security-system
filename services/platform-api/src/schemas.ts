@@ -59,7 +59,7 @@ const overrides = z
 
 export const challengeBody = z
   .object({
-    purpose: z.enum(['activate', 'validate', 'refresh', 'deactivate']),
+    purpose: z.enum(['activate', 'validate', 'refresh', 'deactivate', 'capability']),
     installation_id: str(64),
     subject_id: str(64).optional(),
   })
@@ -84,6 +84,9 @@ export const deviceAuthBody = z
     nonce: str(128),
     signature: str(128),
   })
+  .strict();
+export const capabilityTokenBody = deviceAuthBody
+  .extend({ capability: str(64), service: str(40) })
   .strict();
 
 // ---- operator -------------------------------------------------------------------------------

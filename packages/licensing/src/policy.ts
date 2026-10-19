@@ -27,6 +27,8 @@ export interface LicensingConfig {
   challengeRetentionSeconds: number;
   /** How long expired lease records are kept for forensics before maintenance deletes them. */
   leaseRetentionSeconds: number;
+  /** Capability token lifetime (ADR-024); clamped to 30-900 seconds. */
+  capabilityTtlSeconds: number;
 }
 
 export const DEFAULT_LEASE_TTL_SECONDS: Record<Tier, number> = {
@@ -50,6 +52,7 @@ export function defaultLicensingConfig(
     maxOutstandingChallenges: 10,
     challengeRetentionSeconds: 3600,
     leaseRetentionSeconds: 90 * DAY,
+    capabilityTtlSeconds: 300,
     ...overrides,
   };
   validateLicensingConfig(cfg);
@@ -63,6 +66,12 @@ export function validateLicensingConfig(cfg: LicensingConfig): void {
     throw new Error('invalid challengeRetentionSeconds');
   if (!Number.isInteger(cfg.leaseRetentionSeconds) || cfg.leaseRetentionSeconds < 0)
     throw new Error('invalid leaseRetentionSeconds');
+  if (
+    !Number.isInteger(cfg.capabilityTtlSeconds) ||
+    cfg.capabilityTtlSeconds < 30 ||
+    cfg.capabilityTtlSeconds > 900
+  )
+    throw new Error('capabilityTtlSeconds must be an integer between 30 and 900');
   for (const t of TIERS) {
     const ttl = cfg.leaseTtlSeconds[t];
     if (!Number.isInteger(ttl) || ttl < 60 || ttl > 366 * DAY)

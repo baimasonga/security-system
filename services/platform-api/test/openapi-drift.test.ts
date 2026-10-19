@@ -72,6 +72,7 @@ describe('OpenAPI ↔ implementation drift', () => {
         'post /v1/devices/challenges',
         'post /v1/licenses/deactivate',
         'post /v1/licenses/refresh',
+        'post /v1/capabilities/token',
         'post /v1/licenses/validate',
         // File sharing (ADR-021): public pages and endpoints authorize by unpredictable token, grant or
         // submission secret, and accept an optional session for restricted recipients.

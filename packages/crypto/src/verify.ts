@@ -100,7 +100,7 @@ export function verifySignature(jwk: PublicJwk, message: string, signatureB64u: 
   }
 }
 
-export type ProofPurpose = 'activate' | 'validate' | 'refresh' | 'deactivate';
+export type ProofPurpose = 'activate' | 'validate' | 'refresh' | 'deactivate' | 'capability';
 
 /**
  * Domain-separated message a device signs to answer a challenge. Binding purpose, installation,

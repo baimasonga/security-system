@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.ts';
 import { authenticated, parse, principalOf, toWire } from '../http.ts';
-import { activateBody, challengeBody, deviceAuthBody } from '../schemas.ts';
+import { activateBody, capabilityTokenBody, challengeBody, deviceAuthBody } from '../schemas.ts';
 
 /**
  * Device-facing endpoints. Activation needs a user session; refresh/validate/deactivate are
@@ -54,6 +54,17 @@ export function registerDeviceRoutes(app: FastifyInstance, c: Container): void {
   app.post('/v1/licenses/validate', deviceRl, async (req) =>
     toWire(await c.licensing.validate(toInput(parse(deviceAuthBody, req.body)))),
   );
+  // Short-lived, device-bound token for one capability, verified offline by processing services (ADR-024).
+  app.post('/v1/capabilities/token', deviceRl, async (req) => {
+    const b = parse(capabilityTokenBody, req.body);
+    return toWire(
+      await c.licensing.issueCapabilityToken({
+        ...toInput(b),
+        capability: b.capability,
+        service: b.service,
+      }),
+    );
+  });
   app.post('/v1/licenses/refresh', deviceRl, async (req) =>
     toWire(await c.licensing.refresh(toInput(parse(deviceAuthBody, req.body)))),
   );

@@ -271,6 +271,28 @@ export class TrustPlatformClient {
     return this.#acceptLease(grant.lease, grant.activation_id);
   }
 
+  /**
+   * A short-lived token proving this activation may use `capability` at processing service `service` (ADR-024).
+   * Pass it to that service with the request; never cache it beyond `expires_at`.
+   */
+  async capabilityToken(
+    capability: string,
+    service: string,
+  ): Promise<{ token: string; expires_at: string; capability: string; audience: string }> {
+    const activationId = await this.#o.store.get(K.activation);
+    if (!activationId)
+      throw new PlatformError('not_activated', 0, 'this installation is not activated');
+    const { installationId, nonce, signature } = await this.#challenge('capability', activationId);
+    return this.#call('POST', '/v1/capabilities/token', {
+      activation_id: activationId,
+      installation_id: installationId,
+      nonce,
+      signature,
+      capability,
+      service,
+    });
+  }
+
   async deactivate(): Promise<void> {
     await this.#deviceCall('deactivate', '/v1/licenses/deactivate');
     await this.#o.store.delete(K.lease);

@@ -848,6 +848,28 @@ paths:
           }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /v1/capabilities/token:
+    post:
+      tags: [devices]
+      summary: 'Short-lived (default 5 min, max 15) device-bound token for ONE capability of the resolved plan, for a processing service (ADR-024). Device-proved with a challenge of purpose capability. JWS typ cap+jws, aud svc:<service>; verify with verifyCapabilityToken.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activation_id, installation_id, nonce, signature, capability, service]
+              additionalProperties: false
+              properties:
+                activation_id: { type: string }
+                installation_id: { type: string }
+                nonce: { type: string }
+                signature: { type: string }
+                capability: { type: string, pattern: '^[A-Z][A-Z0-9_]{0,63}$' }
+                service: { type: string, pattern: '^[a-z][a-z0-9-]{0,39}$' }
+      responses:
+        '200': { description: '{ token, expires_at, capability, audience }' }
+        '403': { description: 'Capability not granted, license not valid, or device proof invalid' }
   /v1/licenses/deactivate:
     post:
       tags: [devices]
@@ -2898,7 +2920,7 @@ components:
       type: object
       properties:
         nonce: { type: string }
-        purpose: { type: string, enum: [activate, validate, refresh, deactivate] }
+        purpose: { type: string, enum: [activate, validate, refresh, deactivate, capability] }
         expires_at: { type: string }
     LeaseGrant:
       type: object

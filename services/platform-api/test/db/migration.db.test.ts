@@ -61,6 +61,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0011_file_sharing',
       '0012_privileged_operations',
       '0013_passkeys',
+      '0014_capability_challenges',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
@@ -79,6 +80,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         '0011_file_sharing',
         '0012_privileged_operations',
         '0013_passkeys',
+        '0014_capability_challenges',
       ],
     });
   });

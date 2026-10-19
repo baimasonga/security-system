@@ -24,10 +24,15 @@ import {
   type ResolvedEntitlements,
 } from '@trust/entitlements';
 import {
+  CAPABILITY_TYP,
   DomainError,
   LEASE_TYP,
+  MAX_CAPABILITY_TTL_SECONDS,
+  SERVICE_NAME,
   audienceForProduct,
+  audienceForService,
   TIERS,
+  type CapabilityClaims,
   type Clock,
   type LeaseClaims,
   type Tier,
@@ -808,7 +813,7 @@ export class LicensingService {
     subjectId?: string;
   }): Promise<ChallengeGrant> {
     need(
-      ['activate', 'validate', 'refresh', 'deactivate'].includes(input.purpose),
+      ['activate', 'validate', 'refresh', 'deactivate', 'capability'].includes(input.purpose),
       'invalid purpose',
     );
     need(INSTALLATION_ID.test(input.installationId), 'invalid installation id');
@@ -1101,6 +1106,67 @@ export class LicensingService {
       });
     await this.#d.telemetry.track('lease.refreshed', { tier: grant.entitlements.tier });
     return grant;
+  }
+
+  /**
+   * A short-lived token a processing service verifies offline (ADR-024). Device-proved like a refresh; grants
+   * exactly one capability from the RESOLVED entitlements of a currently valid license.
+   */
+  async issueCapabilityToken(
+    input: DeviceAuthInput & { capability: string; service: string },
+  ): Promise<{ token: string; expiresAt: string; capability: string; audience: string }> {
+    need(SERVICE_NAME.test(input.service), 'invalid service name');
+    need(/^[A-Z][A-Z0-9_]{0,63}$/.test(input.capability), 'invalid capability');
+    const ctx = await this.#authenticateDevice('capability', input);
+    const resolved = resolveEntitlements(ctx.plan, ctx.lic.overrides);
+    const audience = audienceForService(input.service);
+    if (!resolved.capabilities.includes(input.capability)) {
+      await this.#d.audit.append({
+        actor: { type: 'device', id: ctx.device.id },
+        action: 'capability.denied',
+        target: { type: 'activation', id: ctx.act.id },
+        orgId: ctx.lic.orgId,
+        metadata: { capability: input.capability, audience },
+      });
+      throw new DomainError('forbidden', 'capability not granted by this license');
+    }
+    const now = this.#d.clock.now();
+    const iat = Math.floor(now.getTime() / 1000);
+    const ttl = Math.min(MAX_CAPABILITY_TTL_SECONDS, this.#d.config.capabilityTtlSeconds);
+    const claims: CapabilityClaims = {
+      v: 1,
+      jti: newId('cap'),
+      iss: this.#d.config.issuer,
+      aud: audience,
+      sub: ctx.act.id,
+      org: ctx.lic.orgId,
+      lic: ctx.lic.id,
+      prd: ctx.product.code,
+      cap: input.capability,
+      cnf: { jkt: ctx.device.thumbprint },
+      iat,
+      nbf: iat,
+      exp: iat + ttl,
+    };
+    let token: string;
+    try {
+      token = await signJws(
+        claims as unknown as Record<string, unknown>,
+        { typ: CAPABILITY_TYP, kid: this.#d.keyring.activeKeyId('license') },
+        this.#d.keyring.custody,
+      );
+    } catch {
+      throw new DomainError('internal', 'token signing unavailable');
+    }
+    const expiresAt = new Date((iat + ttl) * 1000).toISOString();
+    await this.#d.audit.append({
+      actor: { type: 'device', id: ctx.device.id },
+      action: 'capability.issued',
+      target: { type: 'activation', id: ctx.act.id },
+      orgId: ctx.lic.orgId,
+      metadata: { capability: input.capability, audience, jti: claims.jti, expires_at: expiresAt },
+    });
+    return { token, expiresAt, capability: input.capability, audience };
   }
 
   /** Self-deactivation by the device (e.g. uninstall or "sign out this device"). */
