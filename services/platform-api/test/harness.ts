@@ -128,7 +128,7 @@ export async function makeEnv(over?: {
       },
       ...(opts?.body !== undefined ? { payload: opts.body as object } : {}),
     });
-    let body: unknown = undefined;
+    let body: unknown;
     try {
       body = res.body ? JSON.parse(res.body) : undefined;
     } catch {

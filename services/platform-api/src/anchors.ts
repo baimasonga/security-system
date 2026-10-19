@@ -107,6 +107,7 @@ export class HttpsAnchorSink implements AnchorSink {
       });
     } catch (e) {
       // Do not forward the error text: it can contain the URL. The class of failure is enough to act on.
+      // eslint-disable-next-line preserve-caught-error -- The cause can expose private witness URLs.
       throw new Error(
         (e as Error)?.name === 'TimeoutError' ? 'witness timed out' : 'witness unreachable',
       );

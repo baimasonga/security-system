@@ -12,6 +12,10 @@ updates:
           - typescript-eslint
           - '@typescript-eslint/*'
           - eslint-plugin-security
+    # CI targets Node 22. Upgrade its types with the runtime, not independently.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }

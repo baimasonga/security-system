@@ -10,7 +10,7 @@ function fakeClamd(decide: (bytes: Buffer) => string): Promise<number> {
   server = createServer((socket) => {
     let buf = Buffer.alloc(0);
     socket.on('data', (d) => {
-      buf = Buffer.concat([buf, d]);
+      buf = Buffer.concat([buf, typeof d === 'string' ? Buffer.from(d) : d]);
       if (!buf.subarray(0, 10).equals(Buffer.from('zINSTREAM\0'))) return;
       let off = 10;
       const chunks: Buffer[] = [];
