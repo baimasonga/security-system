@@ -51,6 +51,12 @@ export interface UpdateManifest {
 export interface SignedUpdateEnvelope {
   signatures: string[];
 }
+export interface UpdateStatus {
+  manifest: UpdateManifest;
+  installedSequence: number;
+  support: 'supported' | 'update_required';
+  release: 'available' | 'paused' | 'current' | 'installed_ahead';
+}
 export interface UpdateOptions {
   root: UpdateRoot;
   product: string;
@@ -328,6 +334,28 @@ export class SecureUpdateClient {
       return m;
     });
   }
+  /** Compare trusted local build metadata with a freshly verified release; never installs or restricts data. */
+  async getUpdateStatus(
+    envelope: SignedUpdateEnvelope,
+    installedSequence: number,
+  ): Promise<UpdateStatus> {
+    if (!integer(installedSequence, 0)) reject('installed sequence');
+    const m = await this.verifyManifest(envelope);
+    const release =
+      installedSequence > m.sequence
+        ? 'installed_ahead'
+        : installedSequence === m.sequence
+          ? 'current'
+          : m.paused
+            ? 'paused'
+            : 'available';
+    return {
+      manifest: m,
+      installedSequence,
+      support: installedSequence < m.minimum_sequence ? 'update_required' : 'supported',
+      release,
+    };
+  }
   /** Fetch a bounded signed feed from a root-allowed origin, then verify and persist its watermark. */
   async checkForUpdates(
     manifestUrl: string,
@@ -373,11 +401,25 @@ export class SecureUpdateClient {
     envelope: SignedUpdateEnvelope,
     policy: EvidencePolicy,
   ): Promise<VerifiedEvidence & { manifest: UpdateManifest }> {
-    const m = await this.verifyManifest(envelope);
+    return this.#serial(async () => {
+      const now = this.#now(),
+        state = await this.#state(now),
+        m = this.#check(envelope, state, now);
+      await this.#save(state, now);
+      const evidence = await this.#evidence(m, state, now, policy);
+      return { ...evidence, manifest: m };
+    });
+  }
+
+  async #evidence(
+    m: UpdateManifest,
+    state: Checkpoint,
+    started: number,
+    policy: EvidencePolicy,
+  ): Promise<VerifiedEvidence> {
     const urls = evidenceUrls(m.artifact.url);
     const get = async (u: string): Promise<Uint8Array> => {
       const url = httpsUrl(u);
-      const state = await this.#state(this.#now());
       if (!state.root.artifact_origins.includes(url.origin)) reject('evidence origin');
       const response = await (this.#o.fetch ?? fetch)(url.href, {
         redirect: 'error',
@@ -395,13 +437,22 @@ export class SecureUpdateClient {
       return Buffer.concat(chunks);
     };
     const [sbom, provenance] = [await get(urls.sbom), await get(urls.provenance)];
-    return { ...verifyReleaseEvidence(m, { sbom, provenance }, policy), manifest: m };
+    const evidence = verifyReleaseEvidence(m, { sbom, provenance }, policy);
+    const finished = this.#now();
+    if (m.expires <= finished || state.root.expires <= finished || finished < started - 60)
+      reject('freshness');
+    await this.#save(state, finished);
+    return evidence;
   }
 
-  /** Returns a private verified staging file. Caller removes its directory after installation. */
+  /**
+   * Returns a private verified staging file. With an evidence policy, validates SBOM/provenance before
+   * downloading the installer. Caller removes its directory after installation.
+   */
   async stageArtifact(
     envelope: SignedUpdateEnvelope,
     directory: string,
+    evidencePolicy?: EvidencePolicy,
   ): Promise<{ path: string; manifest: UpdateManifest }> {
     return this.#serial(async () => {
       const now = this.#now(),
@@ -411,6 +462,7 @@ export class SecureUpdateClient {
       const max = this.#o.maxArtifactBytes ?? 256 * 1024 * 1024;
       if (m.artifact.size > max) reject('download limit');
       await this.#save(state, now);
+      if (evidencePolicy) await this.#evidence(m, state, now, evidencePolicy);
       const tmp = await mkdtemp(join(directory, 'trust-update-'));
       const path = join(tmp, 'artifact');
       try {
@@ -444,7 +496,11 @@ export class SecureUpdateClient {
         }
         // Metadata cannot expire or be revoked through rotation during this serialized download.
         const finished = this.#now();
-        if (m.expires <= finished || state.root.expires <= finished || finished < now - 60)
+        if (
+          m.expires <= finished ||
+          state.root.expires <= finished ||
+          finished < state.last_seen - 60
+        )
           reject('freshness');
         await this.#save(state, finished);
         return { path, manifest: m };

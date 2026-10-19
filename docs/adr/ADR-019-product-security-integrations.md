@@ -10,6 +10,16 @@ Update keys and metadata have distinct JWS purposes from licensing. Clients star
 
 Clients persist root, per-target sequence/digest watermarks and last-observed time in protected state; operations must be serialized by the host across processes. A lower sequence, same-sequence different metadata, stale root/manifest, wrong binding, unknown key, clock rollback, or bad signature fails closed. Equal metadata may be retried until expiry. A signed pause preserves watermarks while preventing download. Root rotation clears no release history. Expiry bounds freeze attacks but a disconnected client cannot know a new revocation until it receives fresh roots.
 
+`getUpdateStatus(envelope, installedSequence)` verifies the signed manifest through the same checkpointed path
+before comparing the host's installed build sequence with signed `minimum_sequence` and `sequence`. Installed
+sequence must be a nonnegative safe integer taken from trusted local application metadata, never from the feed
+or the highest observed checkpoint. Sequence zero represents a legacy unnumbered installation. Display versions
+are not ordered. The result reports support (`supported` / `update_required`) separately from release action
+(`available` / `paused` / `current` / `installed_ahead`). A pause cannot conceal that an installation is below the
+support floor. An installed build newer than the feed is never offered a downgrade. Errors remain errors rather
+than becoming a successful supported/current status. Assessment never stages, installs, revokes licensing, or
+restricts document read/export access; host UX and operating policy remain explicit responsibilities.
+
 Artifact downloads are HTTPS-only, origin-allowlisted, without redirects, and stream into a private temporary directory with a configured size/time limit. The signed size and SHA-256 must match before returning a staging path. Failed or interrupted downloads remove temporary data. Installation and platform code-signature checks are host responsibilities; no downloaded bytes execute automatically. Provenance/SBOM digests bind metadata, but digest presence alone is not verification of a build's provenance.
 
 This is a bounded signed-update protocol, not a claim of TUF conformance. Production root custody, KMS/HSM signing, immutable storage, OS installation/recovery and operational rotation drills are external prerequisites. Test software signers never establish production custody.

@@ -95,7 +95,11 @@ export function verifyReleaseEvidence(
 }
 
 /** Evidence lives next to the artifact on the same approved origin. */
-export const evidenceUrls = (artifactUrl: string) => ({
-  sbom: `${artifactUrl}.cdx.json`,
-  provenance: `${artifactUrl}.intoto.json`,
-});
+export function evidenceUrls(artifactUrl: string): { sbom: string; provenance: string } {
+  const sibling = (suffix: string) => {
+    const url = new URL(artifactUrl);
+    url.pathname += suffix;
+    return url.href;
+  };
+  return { sbom: sibling('.cdx.json'), provenance: sibling('.intoto.json') };
+}

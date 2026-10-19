@@ -24,7 +24,17 @@ provenance are attached to each release and linked by digest.
   downloads both files from the artifact's origin (no redirects, 2 MiB cap while streaming), checks both digests
   against the signed pins, then checks the content: the SBOM describes this installer; the provenance is about this
   installer and was produced by a builder in the product's own allow-list (an empty list is refused).
-  `verifyReleaseEvidence` is the same check for hosts with their own transport.
+  Evidence suffixes are appended to the artifact URL pathname; query parameters are preserved verbatim.
+  Query authentication must authorize sibling objects too; an artifact-specific presigned URL is not a grant
+  to its evidence files. Verification runs under the client's serialization lock, rechecks manifest/root expiry
+  and clock rollback after both downloads, and persists the completion-time checkpoint.
+  `verifyReleaseEvidence` is the same content/digest check for hosts with their own transport; the host must
+  separately verify the manifest signature, freshness and rollback policy.
+- **Evidence-gated staging.** `stageArtifact(envelope, directory, { trustedBuilders })` checks the same signed
+  manifest's evidence before creating a staging directory or downloading the installer. Evidence and installer
+  downloads share one serialization lock; root rotation cannot interleave. Invalid evidence fails closed.
+  The two-argument staging API remains available for hosts with independent evidence validation. Existing
+  size/digest, pause, completion-time freshness and cleanup checks still apply to the installer.
 - **Signing keys.** Unchanged: release metadata is signed by the update release role under the pinned root; the
   provenance itself is unsigned and gets its integrity from the signed digest. A builder-signed (e.g. Sigstore)
   attestation can be layered on later without changing the manifest.
