@@ -220,3 +220,44 @@ export const freezeBody = z.discriminatedUnion('scope', [
   z.object({ scope: z.literal('platform'), reason }).strict(),
   z.object({ scope: z.literal('organization'), org_id: id, reason }).strict(),
 ]);
+
+// ---- passkeys (ADR-023) ----
+const b64url = (max: number) =>
+  z
+    .string()
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .max(max);
+export const passkeyBeginBody = z.object({ password: str(256) }).strict();
+export const passkeyRegisterFinishBody = z
+  .object({
+    name: z.string().trim().min(1).max(100),
+    credential: z
+      .object({
+        id: b64url(1400),
+        type: z.literal('public-key'),
+        response: z
+          .object({ clientDataJSON: b64url(6000), attestationObject: b64url(22000) })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+export const passkeyLoginFinishBody = z
+  .object({
+    credential: z
+      .object({
+        id: b64url(1400),
+        type: z.literal('public-key'),
+        response: z
+          .object({
+            clientDataJSON: b64url(6000),
+            authenticatorData: b64url(6000),
+            signature: b64url(1400),
+            userHandle: b64url(100).optional(),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+export const passkeyParams = z.object({ credentialId: b64url(1400) }).strict();

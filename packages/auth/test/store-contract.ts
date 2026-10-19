@@ -216,6 +216,91 @@ export function authStoreContract(name: string, make: () => AuthHarness | Promis
       expect(results.sort()).toEqual([false, true]);
     });
 
+    it('stores passkeys per user; credential ids are globally unique; use updates the counter only', async () => {
+      const { store: s } = await make();
+      const a = user('pka');
+      const b = user('pkb');
+      await s.insertUser(a);
+      await s.insertUser(b);
+      const pk = {
+        credentialId: 'cred_' + 'A'.repeat(40),
+        userId: a.id,
+        name: 'Work laptop',
+        alg: -7,
+        publicKeyJwk: { kty: 'EC', crv: 'P-256', x: 'xx', y: 'yy' },
+        signCount: 3,
+        backupEligible: true,
+        backedUp: false,
+        createdAt: T,
+        lastUsedAt: null,
+      };
+      await s.insertPasskey(pk);
+      await s.insertPasskey({
+        ...pk,
+        credentialId: 'cred_second',
+        name: 'Phone',
+        createdAt: new Date(+T + 5),
+      });
+      await expect(s.insertPasskey({ ...pk, userId: b.id })).rejects.toThrow();
+      expect(await s.findPasskey(pk.credentialId)).toEqual(pk);
+      expect((await s.listPasskeys(a.id)).map((p) => p.name)).toEqual(['Work laptop', 'Phone']);
+      expect(await s.listPasskeys(b.id)).toEqual([]);
+      const used = new Date(+T + 1000);
+      await s.transaction(async (tx) => {
+        expect((await tx.findPasskeyForUpdate(pk.credentialId))?.signCount).toBe(3);
+        await tx.updatePasskeyUse(pk.credentialId, 9, true, used);
+      });
+      expect(await s.findPasskey(pk.credentialId)).toEqual({
+        ...pk,
+        signCount: 9,
+        backedUp: true,
+        lastUsedAt: used,
+      });
+      // a user removes only their own credentials
+      expect(await s.deletePasskey(b.id, pk.credentialId)).toBe(false);
+      expect(await s.deletePasskey(a.id, pk.credentialId)).toBe(true);
+      expect(await s.deletePasskey(a.id, pk.credentialId)).toBe(false);
+      expect(await s.findPasskey(pk.credentialId)).toBeUndefined();
+    });
+
+    it('consumes a WebAuthn challenge once, only for its purpose and before it expires; purges old ones', async () => {
+      const { store: s } = await make();
+      const u = user('chal');
+      await s.insertUser(u);
+      const c = {
+        challengeHash: 'c'.repeat(64),
+        purpose: 'register' as const,
+        userId: u.id,
+        sessionId: 'ses_1',
+        createdAt: T,
+        expiresAt: new Date(+T + 300_000),
+      };
+      await s.putWebauthnChallenge(c);
+      await s.putWebauthnChallenge({
+        ...c,
+        challengeHash: 'd'.repeat(64),
+        purpose: 'login',
+        userId: null,
+        sessionId: null,
+      });
+      await s.putWebauthnChallenge({
+        ...c,
+        challengeHash: 'e'.repeat(64),
+        expiresAt: new Date(+T + 10),
+      });
+      expect(await s.consumeWebauthnChallenge(c.challengeHash, 'login', T)).toBeUndefined();
+      const once = await Promise.all([
+        s.consumeWebauthnChallenge(c.challengeHash, 'register', T),
+        s.consumeWebauthnChallenge(c.challengeHash, 'register', T),
+      ]);
+      expect(once.filter(Boolean)).toEqual([c]);
+      expect(
+        await s.consumeWebauthnChallenge('e'.repeat(64), 'register', new Date(+T + 10)),
+      ).toBeUndefined();
+      expect(await s.purgeWebauthnChallenges(new Date(+T + 400_000), 10)).toBe(2);
+      expect(await s.consumeWebauthnChallenge('d'.repeat(64), 'login', T)).toBeUndefined();
+    });
+
     it('stores users; email is unique; lookups by id and email; platform role is updatable', async () => {
       const { store: s } = await make();
       await s.insertUser(user('a'));

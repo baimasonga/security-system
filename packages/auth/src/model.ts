@@ -51,6 +51,33 @@ export interface IdentityToken {
   expiresAt: Date;
   usedAt: Date | null;
 }
+/** A registered WebAuthn credential (ADR-023). The key is public; nothing secret is stored. */
+export interface Passkey {
+  /** base64url credential id, globally unique. */
+  credentialId: string;
+  userId: string;
+  name: string;
+  /** COSE algorithm (-8 EdDSA, -7 ES256, -257 RS256). */
+  alg: number;
+  publicKeyJwk: Record<string, string>;
+  signCount: number;
+  backupEligible: boolean;
+  backedUp: boolean;
+  createdAt: Date;
+  lastUsedAt: Date | null;
+}
+
+/** A pending WebAuthn ceremony; only the challenge digest is stored. */
+export interface WebauthnChallenge {
+  challengeHash: string;
+  purpose: 'register' | 'login';
+  /** Registration: the signed-in user and session the challenge is bound to. Login: null. */
+  userId: string | null;
+  sessionId: string | null;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
 /** Identity data access. */
 export interface IdentityMail {
   userId: string;
@@ -65,6 +92,30 @@ export interface IdentityMail {
   lockedUntil: Date | null;
 }
 export interface AuthRepo {
+  /** Fails when the credential id is already registered (to anyone). */
+  insertPasskey(p: Passkey): Promise<void>;
+  findPasskey(credentialId: string): Promise<Passkey | undefined>;
+  /** As `findPasskey`, plus a row lock until the transaction ends (PostgreSQL). */
+  findPasskeyForUpdate(credentialId: string): Promise<Passkey | undefined>;
+  /** Oldest first. */
+  listPasskeys(userId: string): Promise<Passkey[]>;
+  updatePasskeyUse(
+    credentialId: string,
+    signCount: number,
+    backedUp: boolean,
+    at: Date,
+  ): Promise<void>;
+  /** Removes the user's own credential; false when it does not exist or belongs to someone else. */
+  deletePasskey(userId: string, credentialId: string): Promise<boolean>;
+  putWebauthnChallenge(c: WebauthnChallenge): Promise<void>;
+  /** Atomically removes and returns an unexpired challenge of that purpose (single use); expired ones stay for purge. */
+  consumeWebauthnChallenge(
+    hash: string,
+    purpose: WebauthnChallenge['purpose'],
+    now: Date,
+  ): Promise<WebauthnChallenge | undefined>;
+  /** Deletes up to `limit` challenges that expired before `before`. */
+  purgeWebauthnChallenges(before: Date, limit?: number): Promise<number>;
   putIdentityMail(row: IdentityMail): Promise<void>;
   listDueIdentityMail(now: Date, limit: number): Promise<IdentityMail[]>;
   /** Inside a transaction, acquire the user's lock before the message lock. */
@@ -141,6 +192,8 @@ export interface AuthStore extends AuthRepo {
 }
 
 interface State {
+  passkeys: Map<string, Passkey>;
+  webauthnChallenges: Map<string, WebauthnChallenge>;
   identityMail: Map<string, IdentityMail>;
   identityTokens: Map<string, IdentityToken>;
   loginFailures: Map<string, LoginFailure & { updatedAt: Date }>;
@@ -152,6 +205,8 @@ interface State {
 
 class MemoryRepo implements AuthRepo {
   readonly s: State = {
+    passkeys: new Map(),
+    webauthnChallenges: new Map(),
     identityMail: new Map(),
     identityTokens: new Map(),
     loginFailures: new Map(),
@@ -160,6 +215,55 @@ class MemoryRepo implements AuthRepo {
     memberships: new Map(),
     sessions: new Map(),
   };
+
+  async insertPasskey(p: Passkey) {
+    if (!this.s.users.has(p.userId)) throw new Error('user_not_found');
+    if (this.s.passkeys.has(p.credentialId)) throw new Error('duplicate_passkey');
+    this.s.passkeys.set(p.credentialId, structuredClone(p));
+  }
+  async findPasskey(credentialId: string) {
+    const p = this.s.passkeys.get(credentialId);
+    return p ? structuredClone(p) : undefined;
+  }
+  async findPasskeyForUpdate(credentialId: string) {
+    return this.findPasskey(credentialId);
+  }
+  async listPasskeys(userId: string) {
+    return [...this.s.passkeys.values()]
+      .filter((p) => p.userId === userId)
+      .sort((a, b) => +a.createdAt - +b.createdAt || a.credentialId.localeCompare(b.credentialId))
+      .map((p) => structuredClone(p));
+  }
+  async updatePasskeyUse(credentialId: string, signCount: number, backedUp: boolean, at: Date) {
+    const p = this.s.passkeys.get(credentialId);
+    if (p) Object.assign(p, { signCount, backedUp, lastUsedAt: at });
+  }
+  async deletePasskey(userId: string, credentialId: string) {
+    const p = this.s.passkeys.get(credentialId);
+    if (!p || p.userId !== userId) return false;
+    this.s.passkeys.delete(credentialId);
+    return true;
+  }
+  async putWebauthnChallenge(c: WebauthnChallenge) {
+    this.s.webauthnChallenges.set(c.challengeHash, structuredClone(c));
+  }
+  async consumeWebauthnChallenge(hash: string, purpose: WebauthnChallenge['purpose'], now: Date) {
+    const c = this.s.webauthnChallenges.get(hash);
+    if (!c || c.purpose !== purpose || c.expiresAt <= now) return undefined;
+    this.s.webauthnChallenges.delete(hash);
+    return structuredClone(c);
+  }
+  async purgeWebauthnChallenges(before: Date, limit = 5000) {
+    let n = 0;
+    for (const [k, c] of this.s.webauthnChallenges) {
+      if (n >= limit) break;
+      if (c.expiresAt < before) {
+        this.s.webauthnChallenges.delete(k);
+        n++;
+      }
+    }
+    return n;
+  }
 
   async putIdentityMail(row: IdentityMail) {
     if (!this.s.users.has(row.userId)) throw new Error('user_not_found');

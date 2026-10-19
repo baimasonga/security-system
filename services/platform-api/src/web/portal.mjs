@@ -12,6 +12,7 @@ const state = {
 };
 const content = $('content');
 let recoveryAvailable = false;
+let passkeysAvailable = false;
 const device = new BrowserDevice();
 const node = (tag, text, cls) => {
   const n = document.createElement(tag);
@@ -211,6 +212,37 @@ function renderAuth(register = false) {
       renderAuth(!register),
     ),
   );
+  if (!register && passkeysAvailable)
+    card.append(
+      button('Sign in with a passkey', async () => {
+        const options = await api('/v1/auth/passkeys/login/begin', 'POST', {});
+        const cred = await navigator.credentials.get({
+          publicKey: {
+            challenge: fromB64u(options.challenge),
+            rpId: options.rpId,
+            timeout: options.timeout,
+            userVerification: 'required',
+            allowCredentials: [],
+          },
+        });
+        if (!cred) return;
+        const r = cred.response;
+        const result = await api('/v1/auth/passkeys/login/finish', 'POST', {
+          credential: {
+            id: cred.id,
+            type: 'public-key',
+            response: {
+              clientDataJSON: toB64u(r.clientDataJSON),
+              authenticatorData: toB64u(r.authenticatorData),
+              signature: toB64u(r.signature),
+              ...(r.userHandle ? { userHandle: toB64u(r.userHandle) } : {}),
+            },
+          },
+        });
+        state.token = result.token;
+        await initialize();
+      }),
+    );
   if (!register && recoveryAvailable)
     card.append(button('Forgot password?', renderRecoveryRequest));
   content.replaceChildren(card);
@@ -246,7 +278,9 @@ async function startPortal() {
     history.replaceState(null, '', '/');
   }
   try {
-    recoveryAvailable = (await api('/v1/auth/options')).email_recovery_configured;
+    const options = await api('/v1/auth/options');
+    recoveryAvailable = options.email_recovery_configured;
+    passkeysAvailable = !!options.passkeys_configured && !!window.PublicKeyCredential;
   } catch {
     recoveryAvailable = false;
   }
@@ -624,10 +658,93 @@ async function renderView(view) {
         button('Sign out', () => $('signout').click()),
       ),
       mfaPanel(),
+      await passkeyPanel(),
     ];
   if (view === 'Operator console') return operatorView();
   return [];
 }
+// WebAuthn binary fields travel as base64url; nothing about a passkey is kept in browser storage.
+const toB64u = (buffer) =>
+  btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+const fromB64u = (text) =>
+  Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+
+async function passkeyPanel() {
+  const card = panel(node('h2', 'Passkeys'));
+  if (!passkeysAvailable) {
+    card.append(node('p', 'Passkeys are not available on this deployment or in this browser.'));
+    return card;
+  }
+  const keys = (await api('/v1/auth/passkeys')).items;
+  card.append(
+    node(
+      'p',
+      'Sign in with your fingerprint, face or device PIN instead of a password. Passkeys cannot be phished: they only work on this site.',
+    ),
+    keys.length
+      ? table(
+          ['Name', 'Added', 'Last used', ''],
+          keys.map((k) => [
+            k.name,
+            new Date(k.created_at).toLocaleDateString(),
+            k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never',
+            button('Remove', async () => {
+              const password = prompt(`Enter your password to remove "${k.name}"`);
+              if (!password) return;
+              await api(`/v1/auth/passkeys/${encodeURIComponent(k.id)}/delete`, 'POST', {
+                password,
+              });
+              await navigate('Account');
+              notice('Passkey removed.');
+            }),
+          ]),
+        )
+      : empty('No passkeys yet.'),
+    fieldsForm(
+      [
+        { name: 'name', label: 'Name for this passkey (for example "Work laptop")', min: 1 },
+        { name: 'password', label: 'Current password', type: 'password' },
+      ],
+      'Add a passkey',
+      async (data, form) => {
+        const options = await api('/v1/auth/passkeys/register/begin', 'POST', {
+          password: data.password,
+        });
+        const cred = await navigator.credentials.create({
+          publicKey: {
+            ...options,
+            challenge: fromB64u(options.challenge),
+            user: { ...options.user, id: fromB64u(options.user.id) },
+            excludeCredentials: options.excludeCredentials.map((c) => ({
+              ...c,
+              id: fromB64u(c.id),
+            })),
+          },
+        });
+        if (!cred) return;
+        await api('/v1/auth/passkeys/register/finish', 'POST', {
+          name: data.name,
+          credential: {
+            id: cred.id,
+            type: 'public-key',
+            response: {
+              clientDataJSON: toB64u(cred.response.clientDataJSON),
+              attestationObject: toB64u(cred.response.attestationObject),
+            },
+          },
+        });
+        form.reset();
+        await navigate('Account');
+        notice('Passkey added. You can now sign in with it.');
+      },
+    ),
+  );
+  return card;
+}
+
 function mfaPanel() {
   if (!state.principal.mfa_configured)
     return panel(

@@ -39,6 +39,7 @@ export const SECURITY_SIGNALS = {
   activation_rejected: 'low',
   admin_action_denied: 'medium',
   audit_chain_broken: 'critical',
+  passkey_counter_regression: 'high',
 } as const;
 export type SecurityKind = keyof typeof SECURITY_SIGNALS;
 export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical';

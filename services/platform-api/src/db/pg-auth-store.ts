@@ -8,8 +8,10 @@ import type {
   AuthTx,
   Membership,
   Organization,
+  Passkey,
   Session,
   User,
+  WebauthnChallenge,
 } from '@trust/auth';
 import type { Clock, OrgRole, PlatformRole } from '@trust/shared-types';
 import { appendAuditInTx } from './pg-audit-log.ts';
@@ -107,10 +109,124 @@ const mailRow = (r: {
   claim: r.claim,
   lockedUntil: r.locked_until,
 });
+interface PasskeyRow {
+  credential_id: string;
+  user_id: string;
+  name: string;
+  alg: number;
+  public_key_jwk: Record<string, string>;
+  sign_count: string | number;
+  backup_eligible: boolean;
+  backed_up: boolean;
+  created_at: Date;
+  last_used_at: Date | null;
+}
+const passkey = (r: PasskeyRow): Passkey => ({
+  credentialId: r.credential_id,
+  userId: r.user_id,
+  name: r.name,
+  alg: r.alg,
+  publicKeyJwk: r.public_key_jwk,
+  signCount: Number(r.sign_count),
+  backupEligible: r.backup_eligible,
+  backedUp: r.backed_up,
+  createdAt: r.created_at,
+  lastUsedAt: r.last_used_at,
+});
+const challengeOf = (r: {
+  challenge_hash: string;
+  purpose: WebauthnChallenge['purpose'];
+  user_id: string | null;
+  session_id: string | null;
+  created_at: Date;
+  expires_at: Date;
+}): WebauthnChallenge => ({
+  challengeHash: r.challenge_hash,
+  purpose: r.purpose,
+  userId: r.user_id,
+  sessionId: r.session_id,
+  createdAt: r.created_at,
+  expiresAt: r.expires_at,
+});
+
 class PgAuthRepo implements AuthRepo {
   readonly #db: Queryable;
   constructor(db: Queryable) {
     this.#db = db;
+  }
+
+  async insertPasskey(p: Passkey) {
+    await this.#db.query(
+      `INSERT INTO passkeys (credential_id,user_id,name,alg,public_key_jwk,sign_count,backup_eligible,backed_up,created_at,last_used_at)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10)`,
+      [
+        p.credentialId,
+        p.userId,
+        p.name,
+        p.alg,
+        JSON.stringify(p.publicKeyJwk),
+        p.signCount,
+        p.backupEligible,
+        p.backedUp,
+        p.createdAt,
+        p.lastUsedAt,
+      ],
+    );
+  }
+  async findPasskey(credentialId: string) {
+    const r = await this.#db.query<PasskeyRow>('SELECT * FROM passkeys WHERE credential_id=$1', [
+      credentialId,
+    ]);
+    return r.rows[0] ? passkey(r.rows[0]) : undefined;
+  }
+  async findPasskeyForUpdate(credentialId: string) {
+    const r = await this.#db.query<PasskeyRow>(
+      'SELECT * FROM passkeys WHERE credential_id=$1 FOR UPDATE',
+      [credentialId],
+    );
+    return r.rows[0] ? passkey(r.rows[0]) : undefined;
+  }
+  async listPasskeys(userId: string) {
+    const r = await this.#db.query<PasskeyRow>(
+      'SELECT * FROM passkeys WHERE user_id=$1 ORDER BY created_at, credential_id',
+      [userId],
+    );
+    return r.rows.map(passkey);
+  }
+  async updatePasskeyUse(credentialId: string, signCount: number, backedUp: boolean, at: Date) {
+    await this.#db.query(
+      'UPDATE passkeys SET sign_count=$2, backed_up=$3, last_used_at=$4 WHERE credential_id=$1',
+      [credentialId, signCount, backedUp, at],
+    );
+  }
+  async deletePasskey(userId: string, credentialId: string) {
+    const r = await this.#db.query('DELETE FROM passkeys WHERE credential_id=$1 AND user_id=$2', [
+      credentialId,
+      userId,
+    ]);
+    return (r.rowCount ?? 0) > 0;
+  }
+  async putWebauthnChallenge(c: WebauthnChallenge) {
+    await this.#db.query(
+      'INSERT INTO webauthn_challenges (challenge_hash,purpose,user_id,session_id,created_at,expires_at) VALUES ($1,$2,$3,$4,$5,$6)',
+      [c.challengeHash, c.purpose, c.userId, c.sessionId, c.createdAt, c.expiresAt],
+    );
+  }
+  async consumeWebauthnChallenge(hash: string, purpose: WebauthnChallenge['purpose'], now: Date) {
+    // One statement: concurrent consumers cannot both receive the row.
+    const r = await this.#db.query(
+      'DELETE FROM webauthn_challenges WHERE challenge_hash=$1 AND purpose=$2 AND expires_at > $3 RETURNING *',
+      [hash, purpose, now],
+    );
+    return r.rows[0] ? challengeOf(r.rows[0] as Parameters<typeof challengeOf>[0]) : undefined;
+  }
+  async purgeWebauthnChallenges(before: Date, limit = 5000) {
+    const r = await this.#db.query(
+      `DELETE FROM webauthn_challenges WHERE challenge_hash IN
+         (SELECT challenge_hash FROM webauthn_challenges WHERE expires_at < $1 LIMIT $2)`,
+      [before, Math.max(1, Math.min(50_000, Math.floor(limit)))],
+    );
+    return r.rowCount ?? 0;
   }
 
   async setMfa(userId: string, state: MfaState | null) {

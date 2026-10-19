@@ -289,7 +289,139 @@ paths:
       security: []
       responses:
         '200':
-          description: Public recovery configuration
+          description: '{ email_recovery_configured, passkeys_configured }'
+  # ---- passkeys (ADR-023) ----
+  /v1/auth/passkeys/register/begin:
+    post:
+      summary: Passkey registration options (password re-authentication; 5-minute single-use challenge bound to this session)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [password],
+                additionalProperties: false,
+                properties: { password: { type: string, maxLength: 256 } },
+              }
+      responses:
+        {
+          '200': { description: PublicKeyCredentialCreationOptions (binary fields base64url) },
+          '401': { description: Wrong password },
+          '409': { description: Passkeys not configured },
+        }
+  /v1/auth/passkeys/register/finish:
+    post:
+      summary: Register the credential (origin, RP, challenge, user verification; attestation not trusted)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, credential]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                credential:
+                  type: object
+                  required: [id, type, response]
+                  additionalProperties: false
+                  properties:
+                    id: { type: string }
+                    type: { type: string, enum: [public-key] }
+                    response:
+                      type: object
+                      required: [clientDataJSON, attestationObject]
+                      additionalProperties: false
+                      properties:
+                        { clientDataJSON: { type: string }, attestationObject: { type: string } }
+      responses:
+        {
+          '201': { description: '{ id, name, created_at }' },
+          '400': { description: Verification failed },
+          '409': { description: Already registered },
+        }
+  /v1/auth/passkeys/login/begin:
+    post:
+      summary: Sign-in challenge for discoverable credentials (5 minutes, single use)
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        {
+          '200':
+            { description: '{ challenge, rpId, timeout, userVerification, allowCredentials }' },
+        }
+  /v1/auth/passkeys/login/finish:
+    post:
+      summary: Sign in with a passkey (signature, origin, RP, user verification, counter); one generic 401 for every failure
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credential]
+              additionalProperties: false
+              properties:
+                credential:
+                  type: object
+                  required: [id, type, response]
+                  additionalProperties: false
+                  properties:
+                    id: { type: string }
+                    type: { type: string, enum: [public-key] }
+                    response:
+                      type: object
+                      required: [clientDataJSON, authenticatorData, signature]
+                      additionalProperties: false
+                      properties:
+                        clientDataJSON: { type: string }
+                        authenticatorData: { type: string }
+                        signature: { type: string }
+                        userHandle: { type: string }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/SessionResponse' },
+          '401': { description: passkey sign-in failed },
+        }
+  /v1/auth/passkeys:
+    get:
+      summary: The caller's passkeys (name, created_at, last_used_at, backed_up; never keys)
+      security: [{ bearer: [] }]
+      responses: { '200': { description: '{ items }' } }
+  /v1/auth/passkeys/{credentialId}/delete:
+    parameters:
+      - {
+          name: credentialId,
+          in: path,
+          required: true,
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]+$' },
+        }
+    post:
+      summary: Remove one of the caller's passkeys (password re-authentication)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [password],
+                additionalProperties: false,
+                properties: { password: { type: string, maxLength: 256 } },
+              }
+      responses:
+        {
+          '204': { description: Removed },
+          '401': { description: Wrong password },
+          '404': { description: Not yours or unknown },
+        }
   /v1/auth/password/request:
     post:
       summary: password request
@@ -2671,6 +2803,8 @@ components:
                   description: 'base64url Ed25519 over the proof message (see DeviceProof message)',
                 }
   responses:
+    SessionResponse:
+      description: '{ token, expires_at, user_id }'
     PrivilegedRequest:
       description: 'A privileged request: id, operation, org_id, target_id, reason, requested_by, created_at, expires_at, status (pending|approved|executing|executed|rejected|cancelled|failed|expired), decided_by, decided_at, decision_reason, break_glass, witnessed_at, witness_anchor, execute_before, executed_at, failure'
     Problem:

@@ -13,6 +13,18 @@ import {
 import { hashPassword, verifyPassword, DEFAULT_SCRYPT, type ScryptParams } from './password.ts';
 import { canGrantRole, roleAllows, type Permission } from './rbac.ts';
 import type { AuthStore, AuthTx, MfaState, Membership, Organization, User } from './model.ts';
+import {
+  COSE_ALGS,
+  checkClientData,
+  counterAcceptable,
+  verifyAssertion,
+  verifyRegistration,
+  type CoseAlg,
+  type RelyingParty,
+} from './webauthn.ts';
+
+const PASSKEY_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const PASSKEY_FAILED = 'passkey sign-in failed';
 
 export interface AuthConfig {
   sessionTtlMs: number;
@@ -36,6 +48,13 @@ export interface IdentityDelivery {
 }
 export class AuthService {
   readonly #mfa: MfaCipher | undefined;
+  readonly #rp: (RelyingParty & { rpName: string }) | undefined;
+  readonly #signal:
+    | ((
+        kind: 'passkey_counter_regression',
+        ctx: { subject: string; attributes: Record<string, unknown> },
+      ) => void)
+    | undefined;
   readonly #requireOperatorMfa: boolean;
   readonly #mail: IdentityDelivery | undefined;
   readonly #outbox: IdentityMailOutbox | undefined;
@@ -58,7 +77,16 @@ export class AuthService {
     publicOrigin?: string;
     mfaEncryptionKey?: string;
     requireOperatorMfa?: boolean;
+    /** Passkeys (ADR-023): validated relying party; undefined disables them. */
+    webauthn?: RelyingParty & { rpName: string };
+    /** Security signals the identity context raises (e.g. a cloned authenticator). */
+    onSecuritySignal?: (
+      kind: 'passkey_counter_regression',
+      ctx: { subject: string; attributes: Record<string, unknown> },
+    ) => void;
   }) {
+    this.#rp = deps.webauthn;
+    this.#signal = deps.onSecuritySignal;
     this.#store = deps.store;
     this.#mfa = deps.mfaEncryptionKey ? new MfaCipher(deps.mfaEncryptionKey) : undefined;
     this.#requireOperatorMfa = deps.requireOperatorMfa ?? false;
@@ -276,6 +304,14 @@ export class AuthService {
     change: (tx: AuthTx, user: User, now: Date) => Promise<T>,
   ): Promise<T> {
     if (!this.#mfa) throw new DomainError('conflict', 'MFA is not configured');
+    return this.#reauthenticated(principal, password, change);
+  }
+  /** Password re-authentication for account-security changes, under the user lock with a live-session check. */
+  async #reauthenticated<T>(
+    principal: UserPrincipal,
+    password: string,
+    change: (tx: AuthTx, user: User, now: Date) => Promise<T>,
+  ): Promise<T> {
     const user = await this.#store.findUserById(principal.userId);
     if (!user) throw new DomainError('unauthenticated', 'authentication required');
     const key = sha256Hex(user.email);
@@ -376,6 +412,249 @@ export class AuthService {
         actor: { type: 'user', id: user.id },
         action: 'identity.mfa_disabled',
         reason: reason.trim(),
+      });
+    });
+  }
+
+  // ---- passkeys (ADR-023) -------------------------------------------------------------------------------------
+
+  get passkeysConfigured(): boolean {
+    return this.#rp !== undefined;
+  }
+  #relyingParty(): RelyingParty & { rpName: string } {
+    if (!this.#rp) throw new DomainError('conflict', 'passkeys are not configured');
+    return this.#rp;
+  }
+
+  /** Password re-authentication, then creation options bound to this user and session (5 minutes, single use). */
+  async beginPasskeyRegistration(principal: UserPrincipal, password: string) {
+    const rp = this.#relyingParty();
+    const challenge = randomBytes(32).toString('base64url');
+    return this.#reauthenticated(principal, password, async (tx, user, now) => {
+      await tx.putWebauthnChallenge({
+        challengeHash: sha256Hex(challenge),
+        purpose: 'register',
+        userId: user.id,
+        sessionId: principal.sessionId,
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + PASSKEY_CHALLENGE_TTL_MS),
+      });
+      const existing = await tx.listPasskeys(user.id);
+      return {
+        challenge,
+        rp: { id: rp.rpId, name: rp.rpName },
+        user: {
+          id: Buffer.from(user.id).toString('base64url'),
+          name: user.email,
+          displayName: user.email,
+        },
+        pubKeyCredParams: COSE_ALGS.map((alg) => ({ type: 'public-key', alg })),
+        timeout: PASSKEY_CHALLENGE_TTL_MS,
+        attestation: 'none',
+        authenticatorSelection: {
+          residentKey: 'required',
+          requireResidentKey: true,
+          userVerification: 'required',
+        },
+        excludeCredentials: existing.map((p) => ({ type: 'public-key', id: p.credentialId })),
+      };
+    });
+  }
+
+  async finishPasskeyRegistration(
+    principal: UserPrincipal,
+    input: { name: string; clientDataJSON: Uint8Array; attestationObject: Uint8Array },
+  ): Promise<{ id: string; name: string; createdAt: Date }> {
+    const rp = this.#relyingParty();
+    const name = input.name.trim();
+    if (name.length < 1 || name.length > 100)
+      throw new DomainError('invalid_request', 'a passkey name is required');
+    const failed = () => new DomainError('invalid_request', 'passkey registration failed');
+    let challenge: string;
+    try {
+      challenge = checkClientData(input.clientDataJSON, 'webauthn.create', rp);
+    } catch {
+      throw failed();
+    }
+    // Consumed on its own first: a failed verification still burns the challenge.
+    const c = await this.#store.consumeWebauthnChallenge(
+      sha256Hex(challenge),
+      'register',
+      this.#clock.now(),
+    );
+    if (!c || c.userId !== principal.userId || c.sessionId !== principal.sessionId) throw failed();
+    let reg: ReturnType<typeof verifyRegistration>;
+    try {
+      reg = verifyRegistration(input, rp);
+    } catch {
+      throw failed();
+    }
+    return this.#store.transaction(async (tx) => {
+      const now = this.#clock.now();
+      const user = await tx.findUserForUpdate(principal.userId);
+      const session = await tx.findSessionById(principal.sessionId);
+      if (
+        !user ||
+        user.status !== 'active' ||
+        !session ||
+        session.userId !== user.id ||
+        session.revokedAt ||
+        session.expiresAt <= now
+      )
+        throw new DomainError('unauthenticated', 'authentication required');
+      if (await tx.findPasskey(reg.credentialId))
+        throw new DomainError('conflict', 'this passkey is already registered');
+      await tx.insertPasskey({
+        credentialId: reg.credentialId,
+        userId: user.id,
+        name,
+        alg: reg.key.alg,
+        publicKeyJwk: reg.key.jwk,
+        signCount: reg.signCount,
+        backupEligible: reg.backupEligible,
+        backedUp: reg.backedUp,
+        createdAt: now,
+        lastUsedAt: null,
+      });
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'identity.passkey_added',
+        metadata: { credential: sha256Hex(reg.credentialId).slice(0, 16), alg: reg.key.alg },
+      });
+      return { id: reg.credentialId, name, createdAt: now };
+    });
+  }
+
+  /** A sign-in challenge (5 minutes, single use) for discoverable credentials. */
+  async beginPasskeyLogin() {
+    const rp = this.#relyingParty();
+    const challenge = randomBytes(32).toString('base64url');
+    const now = this.#clock.now();
+    await this.#store.putWebauthnChallenge({
+      challengeHash: sha256Hex(challenge),
+      purpose: 'login',
+      userId: null,
+      sessionId: null,
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + PASSKEY_CHALLENGE_TTL_MS),
+    });
+    return {
+      challenge,
+      rpId: rp.rpId,
+      timeout: PASSKEY_CHALLENGE_TTL_MS,
+      userVerification: 'required',
+      allowCredentials: [] as never[],
+    };
+  }
+
+  async finishPasskeyLogin(input: {
+    credentialId: string;
+    clientDataJSON: Uint8Array;
+    authenticatorData: Uint8Array;
+    signature: Uint8Array;
+    userHandle?: Uint8Array | undefined;
+  }): Promise<{ token: string; expiresAt: Date; userId: string }> {
+    const rp = this.#relyingParty();
+    const failed = () => new DomainError('unauthenticated', PASSKEY_FAILED);
+    let challenge: string;
+    try {
+      challenge = checkClientData(input.clientDataJSON, 'webauthn.get', rp);
+    } catch {
+      throw failed();
+    }
+    const c = await this.#store.consumeWebauthnChallenge(
+      sha256Hex(challenge),
+      'login',
+      this.#clock.now(),
+    );
+    const pk = c ? await this.#store.findPasskey(input.credentialId) : undefined;
+    const handleOk =
+      !input.userHandle || (pk && Buffer.from(input.userHandle).toString('utf8') === pk.userId);
+    let verified: ReturnType<typeof verifyAssertion> | undefined;
+    if (pk && handleOk) {
+      try {
+        verified = verifyAssertion(input, { alg: pk.alg as CoseAlg, jwk: pk.publicKeyJwk }, rp);
+      } catch {
+        verified = undefined;
+      }
+    }
+    if (!pk || !verified) {
+      await this.#audit.append({
+        actor: pk ? { type: 'user', id: pk.userId } : { type: 'anonymous' },
+        action: 'user.passkey_login_failed',
+        metadata: { credential: sha256Hex(input.credentialId).slice(0, 16) },
+      });
+      throw failed();
+    }
+    const assertion = verified;
+    const token = newSecretToken('sess');
+    const sessionId = newId('ses');
+    const result = await this.#store.transaction(async (tx) => {
+      const now = this.#clock.now();
+      const user = await tx.findUserForUpdate(pk.userId);
+      const current = await tx.findPasskeyForUpdate(pk.credentialId);
+      if (!user || user.status !== 'active' || !current) return { ok: false as const };
+      if (!counterAcceptable(current.signCount, assertion.signCount)) {
+        await tx.audit.append({
+          actor: { type: 'user', id: user.id },
+          action: 'identity.passkey_counter_regression',
+          metadata: {
+            credential: sha256Hex(pk.credentialId).slice(0, 16),
+            stored: current.signCount,
+            presented: assertion.signCount,
+          },
+        });
+        return {
+          ok: false as const,
+          regression: { stored: current.signCount, presented: assertion.signCount },
+        };
+      }
+      await tx.updatePasskeyUse(pk.credentialId, assertion.signCount, assertion.backedUp, now);
+      const expiresAt = new Date(now.getTime() + this.#cfg.sessionTtlMs);
+      await tx.insertSession({
+        id: sessionId,
+        userId: user.id,
+        tokenHash: sha256Hex(token),
+        createdAt: now,
+        expiresAt,
+        revokedAt: null,
+      });
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'user.login_succeeded',
+        metadata: { session_id: sessionId, method: 'passkey' },
+      });
+      return { ok: true as const, expiresAt, userId: user.id };
+    });
+    if (!result.ok) {
+      if ('regression' in result && result.regression)
+        this.#signal?.('passkey_counter_regression', {
+          subject: pk.userId,
+          attributes: result.regression,
+        });
+      throw failed();
+    }
+    return { token, expiresAt: result.expiresAt, userId: result.userId };
+  }
+
+  async listPasskeys(principal: UserPrincipal) {
+    return (await this.#store.listPasskeys(principal.userId)).map((p) => ({
+      id: p.credentialId,
+      name: p.name,
+      createdAt: p.createdAt,
+      lastUsedAt: p.lastUsedAt,
+      backedUp: p.backedUp,
+    }));
+  }
+
+  async deletePasskey(principal: UserPrincipal, credentialId: string, password: string) {
+    return this.#reauthenticated(principal, password, async (tx, user) => {
+      if (!(await tx.deletePasskey(user.id, credentialId)))
+        throw new DomainError('not_found', 'passkey not found');
+      await tx.audit.append({
+        actor: { type: 'user', id: user.id },
+        action: 'identity.passkey_removed',
+        metadata: { credential: sha256Hex(credentialId).slice(0, 16) },
       });
     });
   }
@@ -799,7 +1078,7 @@ export class AuthService {
   async runMaintenance(opts?: {
     batch?: number;
     maxBatches?: number;
-  }): Promise<{ loginFailures: number }> {
+  }): Promise<{ loginFailures: number; webauthnChallenges: number }> {
     const batch = opts?.batch ?? 5000;
     const keep = Math.max(24 * 60 * 60 * 1000, this.#cfg.lockoutMs * 2);
     const cutoff = new Date(this.#clock.now().getTime() - keep);
@@ -809,7 +1088,13 @@ export class AuthService {
       total += n;
       if (n < batch) break;
     }
-    return { loginFailures: total };
+    let challenges = 0;
+    for (let i = 0; i < (opts?.maxBatches ?? 20); i++) {
+      const n = await this.#store.purgeWebauthnChallenges(this.#clock.now(), batch);
+      challenges += n;
+      if (n < batch) break;
+    }
+    return { loginFailures: total, webauthnChallenges: challenges };
   }
 
   #dummy(): Promise<string> {

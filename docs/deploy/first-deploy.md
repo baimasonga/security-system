@@ -80,6 +80,12 @@ Privileged operations (ADR-022): once at least **two** operators have enrolled M
 lifting a freeze always do. New operators can now be promoted with an `operator.grant` request instead of shell access.
 Break-glass (self-approval when nobody else is available) works only when external audit anchoring is configured.
 
+Passkeys (ADR-023): set `WEBAUTHN_RP_ID` to your domain (for example `rokela.example`) and `WEBAUTHN_ORIGIN` to the
+exact portal address (for example `https://app.rokela.example`, no trailing slash; it must be on that domain).
+Optional `WEBAUTHN_RP_NAME` is what phones show (default "Rokela Bai Bureh Warrior"). Changing the RP ID later makes
+every registered passkey stop working, so pick the long-term domain. Users then add passkeys under **Account →
+Passkeys** and get a **Sign in with a passkey** button.
+
 ## Monthly Quota Rollout (ADR-018)
 
 Apply migration `0008_monthly_quotas` with the schema owner, then run `npm run db:grants` with `APP_DB_ROLE`. The new `quota_charges` table requires SELECT/INSERT for the application role; migration alone does not grant these permissions. Verify `npm run db:check` with the application connection before deployment. A Railway pre-deploy job should run `npm run migrate && npm run db:grants` with the existing owner connection, schema and app-role settings; the API start command remains unchanged.

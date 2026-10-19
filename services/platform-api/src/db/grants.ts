@@ -22,6 +22,8 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   organizations: RI,
   memberships: RI,
   sessions: RIU,
+  passkeys: ALL, // users remove their own credentials (ADR-023)
+  webauthn_challenges: ALL, // single-use consumption + retention
   login_failures: ALL, // lockout counters; purged by maintenance
   products: RI,
   plans: RIU,

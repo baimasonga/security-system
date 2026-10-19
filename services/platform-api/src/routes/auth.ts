@@ -11,6 +11,10 @@ import {
   recoveryCompleteBody,
   verificationBody,
   emptyBody,
+  passkeyBeginBody,
+  passkeyLoginFinishBody,
+  passkeyParams,
+  passkeyRegisterFinishBody,
 } from '../schemas.ts';
 
 export function registerAuthRoutes(app: FastifyInstance, c: Container): void {
@@ -34,7 +38,49 @@ export function registerAuthRoutes(app: FastifyInstance, c: Container): void {
   });
   app.get('/v1/auth/options', async () => ({
     email_recovery_configured: c.auth.deliveryConfigured,
+    passkeys_configured: c.auth.passkeysConfigured,
   }));
+
+  // ---- passkeys (ADR-023) ----
+  const bytes = (s: string) => Buffer.from(s, 'base64url');
+  const anonLimited = { config: { rateLimit: { max: rl.login, timeWindow: '1 minute' } } };
+  app.post('/v1/auth/passkeys/register/begin', mfaOptions, async (req) => {
+    const { password } = parse(passkeyBeginBody, req.body);
+    return c.auth.beginPasskeyRegistration(principalOf(req), password);
+  });
+  app.post('/v1/auth/passkeys/register/finish', mfaOptions, async (req, reply) => {
+    const b = parse(passkeyRegisterFinishBody, req.body);
+    const out = await c.auth.finishPasskeyRegistration(principalOf(req), {
+      name: b.name,
+      clientDataJSON: bytes(b.credential.response.clientDataJSON),
+      attestationObject: bytes(b.credential.response.attestationObject),
+    });
+    return reply.status(201).send(toWire(out));
+  });
+  app.post('/v1/auth/passkeys/login/begin', anonLimited, async (req) => {
+    parse(emptyBody, req.body);
+    return c.auth.beginPasskeyLogin();
+  });
+  app.post('/v1/auth/passkeys/login/finish', anonLimited, async (req) => {
+    const { credential: cr } = parse(passkeyLoginFinishBody, req.body);
+    const s = await c.auth.finishPasskeyLogin({
+      credentialId: cr.id,
+      clientDataJSON: bytes(cr.response.clientDataJSON),
+      authenticatorData: bytes(cr.response.authenticatorData),
+      signature: bytes(cr.response.signature),
+      ...(cr.response.userHandle ? { userHandle: bytes(cr.response.userHandle) } : {}),
+    });
+    return { token: s.token, expires_at: s.expiresAt.toISOString(), user_id: s.userId };
+  });
+  app.get('/v1/auth/passkeys', { preHandler: authenticated(c) }, async (req) => ({
+    items: toWire(await c.auth.listPasskeys(principalOf(req))),
+  }));
+  app.post('/v1/auth/passkeys/:credentialId/delete', mfaOptions, async (req, reply) => {
+    const { credentialId } = parse(passkeyParams, req.params);
+    const { password } = parse(passkeyBeginBody, req.body);
+    await c.auth.deletePasskey(principalOf(req), credentialId, password);
+    return reply.status(204).send();
+  });
   app.post(
     '/v1/auth/password/request',
     { config: { rateLimit: { max: rl.register, timeWindow: '1 minute' } } },

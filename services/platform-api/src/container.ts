@@ -284,6 +284,8 @@ export async function createContainer(
     publicOrigin: config.emailDelivery?.publicOrigin,
     mfaEncryptionKey: config.mfaEncryptionKey,
     requireOperatorMfa: config.requireOperatorMfa,
+    ...(config.webauthn ? { webauthn: config.webauthn } : {}),
+    onSecuritySignal: (kind, ctx) => void telemetry.signal(kind, ctx).catch(() => undefined),
     clock,
     audit,
     ...(config.scrypt ? { config: { scrypt: config.scrypt } } : {}),

@@ -62,6 +62,8 @@ describe('OpenAPI ↔ implementation drift', () => {
         'get /v1/auth/options',
         'get /v1/keys/trust-bundle',
         'post /v1/auth/login',
+        'post /v1/auth/passkeys/login/begin',
+        'post /v1/auth/passkeys/login/finish',
         'post /v1/billing/webhooks/paddle',
         'post /v1/auth/register',
         'post /v1/auth/password/request',

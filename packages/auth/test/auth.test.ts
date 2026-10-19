@@ -142,9 +142,9 @@ describe('registration and login', () => {
     expect(await store.findLoginFailure(key)).toBeUndefined();
 
     await code(auth.login({ email: 'a@b.co', password: 'bad-bad-bad-bad' }));
-    expect(await auth.runMaintenance()).toEqual({ loginFailures: 0 }); // too recent
+    expect(await auth.runMaintenance()).toEqual({ loginFailures: 0, webauthnChallenges: 0 }); // too recent
     now = new Date(now.getTime() + 25 * 60 * 60 * 1000);
-    expect(await auth.runMaintenance()).toEqual({ loginFailures: 1 });
+    expect(await auth.runMaintenance()).toEqual({ loginFailures: 1, webauthnChallenges: 0 });
     expect(await store.findLoginFailure(key)).toBeUndefined();
   });
 });

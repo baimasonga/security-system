@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import { validateHostname } from '@trust/sharing';
 import type { BillingConfig } from './billing.ts';
 import { PaddleCheckoutProvider, PaddleWebhookVerifier } from './integrations/billing.ts';
-import { IdentityMailCipher, MfaCipher, type ScryptParams } from '@trust/auth';
+import {
+  IdentityMailCipher,
+  MfaCipher,
+  validateRelyingParty,
+  type ScryptParams,
+} from '@trust/auth';
 import { validateAnchorUrl } from './anchors.ts';
 import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 
@@ -15,6 +20,8 @@ export interface PlatformConfig {
   requireOperatorMfa: boolean;
   /** PRIVILEGED_DUAL_CONTROL: license revocation needs a second operator's approval (ADR-022). */
   privilegedDualControl: boolean;
+  /** Passkeys (ADR-023): WEBAUTHN_RP_ID + WEBAUTHN_ORIGIN (+ optional WEBAUTHN_RP_NAME); undefined = disabled. */
+  webauthn?: { rpId: string; origin: string; rpName: string };
   emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
   billing?: BillingConfig;
   host: string;
@@ -254,6 +261,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   if (dualControlEnv && !['true', 'false'].includes(dualControlEnv))
     throw new Error('PRIVILEGED_DUAL_CONTROL must be true or false');
   const privilegedDualControl = dualControlEnv === 'true';
+  let webauthn: PlatformConfig['webauthn'];
+  if (env['WEBAUTHN_RP_ID'] || env['WEBAUTHN_ORIGIN']) {
+    if (!env['WEBAUTHN_RP_ID'] || !env['WEBAUTHN_ORIGIN'])
+      throw new Error('passkeys need both WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN');
+    const rp = validateRelyingParty(
+      { rpId: env['WEBAUTHN_RP_ID'], origin: env['WEBAUTHN_ORIGIN'] },
+      env['NODE_ENV'] === 'production',
+    );
+    const rpName = (env['WEBAUTHN_RP_NAME'] ?? 'Rokela Bai Bureh Warrior').trim();
+    if (rpName.length < 1 || rpName.length > 64)
+      throw new Error('WEBAUTHN_RP_NAME must be 1-64 characters');
+    webauthn = { ...rp, rpName };
+  }
   // Approvals need a fresh authenticator code, which needs the MFA key.
   if (privilegedDualControl && !mfaEncryptionKey)
     throw new Error('MFA_ENCRYPTION_KEY is required for PRIVILEGED_DUAL_CONTROL');
@@ -482,6 +502,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     mfaEncryptionKey,
     requireOperatorMfa,
     privilegedDualControl,
+    ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',
     port,
     trustProxy: env['TRUST_PROXY'] === '1',
