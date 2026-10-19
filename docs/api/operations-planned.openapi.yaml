@@ -1,0 +1,2078 @@
+openapi: 3.1.0
+info:
+  title: Warrior operations monitoring — planned contract, NOT LIVE
+  version: 1.0.0-planned
+  description: Accepted OPS-001 implementation target for OPS-002–004. No routes
+    in this file are implemented. Health, incidents and probes are specified in
+    operations-contract.md; their route contracts are deferred until their
+    implementation task.
+x-implementation-status: planned
+x-max-body-bytes: 262144
+servers: []
+paths:
+  /v1/organizations/{orgId}/operations/applications:
+    get:
+      operationId: listApplications
+      summary: listApplications
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationList'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    post:
+      operationId: createApplication
+      summary: createApplication
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApplication'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}:
+    get:
+      operationId: getApplication
+      summary: getApplication
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: updateApplication
+      summary: updateApplication
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApplication'
+    delete:
+      operationId: archiveApplication
+      summary: archiveApplication
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Archive'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments:
+    get:
+      operationId: listEnvironments
+      summary: listEnvironments
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentList'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    post:
+      operationId: createEnvironment
+      summary: createEnvironment
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEnvironment'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}:
+    get:
+      operationId: getEnvironment
+      summary: getEnvironment
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: updateEnvironment
+      summary: updateEnvironment
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEnvironment'
+    delete:
+      operationId: archiveEnvironment
+      summary: archiveEnvironment
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Archive'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/components:
+    get:
+      operationId: listComponents
+      summary: listComponents
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComponentList'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    post:
+      operationId: createComponent
+      summary: createComponent
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Component'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateComponent'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/components/{componentId}:
+    get:
+      operationId: getComponent
+      summary: getComponent
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:read
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/componentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Component'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: updateComponent
+      summary: updateComponent
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/componentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Component'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateComponent'
+    delete:
+      operationId: archiveComponent
+      summary: archiveComponent
+      x-implementation-status: planned
+      x-task: OPS-002
+      x-required-permission: ops:manage_inventory
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/componentId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Component'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Archive'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/credentials:
+    get:
+      operationId: listCredentials
+      summary: listCredentials
+      x-implementation-status: planned
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialList'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+    post:
+      operationId: issueCredential
+      summary: issueCredential
+      x-implementation-status: planned
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedCredential'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueCredential'
+      x-fresh-mfa-required: true
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/credentials/{credentialId}/rotate:
+    post:
+      operationId: rotateCredential
+      summary: rotateCredential
+      x-implementation-status: planned
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/credentialId'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedCredential'
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RotateCredential'
+      x-fresh-mfa-required: true
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/credentials/{credentialId}/revoke:
+    post:
+      operationId: revokeCredential
+      summary: revokeCredential
+      x-implementation-status: planned
+      x-task: OPS-003
+      x-required-permission: ops:manage_credentials
+      security:
+        - AccountSession: []
+      parameters:
+        - $ref: '#/components/parameters/orgId'
+        - $ref: '#/components/parameters/applicationId'
+        - $ref: '#/components/parameters/environmentId'
+        - $ref: '#/components/parameters/credentialId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokedCredential'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevokeCredential'
+      x-fresh-mfa-required: true
+  /v1/operations/events:
+    post:
+      operationId: ingestOperationsEvents
+      summary: ingestOperationsEvents
+      x-implementation-status: planned
+      x-task: OPS-004
+      x-required-permission: events:write
+      security:
+        - IntegrationBearer: []
+      parameters: []
+      responses:
+        '200':
+          description: Committed durable event receipt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAcknowledgement'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventBatch'
+            example:
+              schema: 1
+              events:
+                - id: 00000000-0000-4000-8000-000000000001
+                  component_id: opm_cccccccccccccccccccccccc
+                  occurred_at: 2026-10-19T12:00:00Z
+                  type: component.heartbeat
+                  attributes:
+                    status: healthy
+components:
+  securitySchemes:
+    AccountSession:
+      type: http
+      scheme: bearer
+      description: Existing account session; organization permission required. Never
+        an integration credential.
+    IntegrationBearer:
+      type: http
+      scheme: bearer
+      description: Scoped ops_v1 credential; purpose events:write, source
+        backend_report. No inventory or account authority.
+  parameters:
+    orgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/OrgId'
+    applicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ApplicationId'
+    environmentId:
+      name: environmentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/EnvironmentId'
+    componentId:
+      name: componentId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ComponentId'
+    credentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/CredentialId'
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+        pattern: ^[A-Za-z0-9_-]+$
+  responses:
+    Error400:
+      description: Malformed request or invalid cursor
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error401:
+      description: Generic authentication failure
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error403:
+      description: Insufficient permission or management freeze
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error404:
+      description: Not found or inaccessible scope
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error409:
+      description: Version, lifecycle, identity or inventory-cap conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error413:
+      description: Body exceeds 256 KiB
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error415:
+      description: Unsupported content encoding or media type
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error422:
+      description: Schema/privacy/new-event clock rejection
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error429:
+      description: Request or scoped event/storage quota exceeded
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+          description: Seconds before retry; source bounds delay to 300 seconds
+    Error503:
+      description: Unavailable; no durable acknowledgement
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    OrgId:
+      type: string
+      pattern: ^org_[a-f0-9]{24}$
+    UserId:
+      type: string
+      pattern: ^usr_[a-f0-9]{24}$
+    ProductId:
+      type: string
+      pattern: ^prd_[a-f0-9]{24}$
+    ApplicationId:
+      type: string
+      pattern: ^opa_[a-f0-9]{24}$
+    EnvironmentId:
+      type: string
+      pattern: ^ope_[a-f0-9]{24}$
+    ComponentId:
+      type: string
+      pattern: ^opm_[a-f0-9]{24}$
+    CredentialId:
+      type: string
+      pattern: ^opc_[a-f0-9]{32}$
+    MfaCode:
+      type: string
+      pattern: ^[0-9]{6}$
+    Code:
+      type: string
+      pattern: ^[a-z][a-z0-9-]{1,47}$
+    Reason:
+      type: string
+      enum:
+        - initial_setup
+        - owner_transfer
+        - maintenance
+        - retirement
+        - restore
+        - security_response
+        - routine_rotation
+        - config_change
+        - incident_ack
+        - incident_resolution
+        - assignment
+    State:
+      type: string
+      enum:
+        - active
+        - disabled
+        - archived
+    Time:
+      type: string
+      format: date-time
+      pattern: Z$
+    EventId:
+      type: string
+      pattern: ^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$
+    Problem:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthenticated
+            - forbidden
+            - not_found
+            - conflict
+            - too_large
+            - unsupported_media_type
+            - unprocessable
+            - rate_limited
+            - unavailable
+        message:
+          type: string
+          enum:
+            - request rejected
+            - authentication required
+            - not found
+            - service unavailable
+        request_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        details:
+          type: object
+          additionalProperties: false
+          properties:
+            event_index:
+              type: integer
+              minimum: 0
+              maximum: 99
+            field:
+              type: string
+              enum:
+                - body
+                - events
+                - id
+                - component_id
+                - occurred_at
+                - type
+                - attributes
+            rule:
+              type: string
+              enum:
+                - schema
+                - unknown_attribute
+                - scope
+                - clock
+                - privacy
+                - conflict
+                - budget
+          required: []
+      required:
+        - code
+        - message
+        - request_id
+    Application:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ApplicationId'
+        org_id:
+          $ref: '#/components/schemas/OrgId'
+        code:
+          $ref: '#/components/schemas/Code'
+        state:
+          $ref: '#/components/schemas/State'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          $ref: '#/components/schemas/Time'
+        updated_at:
+          $ref: '#/components/schemas/Time'
+        owner_user_id:
+          $ref: '#/components/schemas/UserId'
+        criticality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        product_id:
+          anyOf:
+            - $ref: '#/components/schemas/ProductId'
+            - type: 'null'
+      required:
+        - id
+        - org_id
+        - code
+        - state
+        - version
+        - created_at
+        - updated_at
+        - owner_user_id
+        - criticality
+        - product_id
+    CreateApplication:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/Code'
+        owner_user_id:
+          $ref: '#/components/schemas/UserId'
+        criticality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        product_id:
+          anyOf:
+            - $ref: '#/components/schemas/ProductId'
+            - type: 'null'
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - code
+        - owner_user_id
+        - criticality
+        - product_id
+        - reason
+    UpdateApplication:
+      type: object
+      additionalProperties: false
+      properties:
+        owner_user_id:
+          $ref: '#/components/schemas/UserId'
+        criticality:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        product_id:
+          anyOf:
+            - $ref: '#/components/schemas/ProductId'
+            - type: 'null'
+        state:
+          type: string
+          enum:
+            - active
+            - disabled
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - expected_version
+        - reason
+      minProperties: 3
+    ApplicationList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Application'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    Environment:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EnvironmentId'
+        org_id:
+          $ref: '#/components/schemas/OrgId'
+        code:
+          $ref: '#/components/schemas/Code'
+        state:
+          $ref: '#/components/schemas/State'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          $ref: '#/components/schemas/Time'
+        updated_at:
+          $ref: '#/components/schemas/Time'
+        application_id:
+          $ref: '#/components/schemas/ApplicationId'
+        kind:
+          type: string
+          enum:
+            - development
+            - staging
+            - production
+      required:
+        - id
+        - org_id
+        - code
+        - state
+        - version
+        - created_at
+        - updated_at
+        - application_id
+        - kind
+    CreateEnvironment:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/Code'
+        kind:
+          type: string
+          enum:
+            - development
+            - staging
+            - production
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - code
+        - kind
+        - reason
+    UpdateEnvironment:
+      type: object
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+          enum:
+            - active
+            - disabled
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - expected_version
+        - reason
+      minProperties: 3
+    EnvironmentList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Environment'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    Component:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ComponentId'
+        org_id:
+          $ref: '#/components/schemas/OrgId'
+        code:
+          $ref: '#/components/schemas/Code'
+        state:
+          $ref: '#/components/schemas/State'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          $ref: '#/components/schemas/Time'
+        updated_at:
+          $ref: '#/components/schemas/Time'
+        application_id:
+          $ref: '#/components/schemas/ApplicationId'
+        environment_id:
+          $ref: '#/components/schemas/EnvironmentId'
+        kind:
+          type: string
+          enum:
+            - service
+            - database
+            - storage
+            - worker
+            - scanner
+            - desktop
+            - provider
+        dependency_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentId'
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+      required:
+        - id
+        - org_id
+        - code
+        - state
+        - version
+        - created_at
+        - updated_at
+        - application_id
+        - environment_id
+        - kind
+        - dependency_ids
+    CreateComponent:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          $ref: '#/components/schemas/Code'
+        kind:
+          type: string
+          enum:
+            - service
+            - database
+            - storage
+            - worker
+            - scanner
+            - desktop
+            - provider
+        dependency_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentId'
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - code
+        - kind
+        - dependency_ids
+        - reason
+    UpdateComponent:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum:
+            - service
+            - database
+            - storage
+            - worker
+            - scanner
+            - desktop
+            - provider
+        dependency_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentId'
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+        state:
+          type: string
+          enum:
+            - active
+            - disabled
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - expected_version
+        - reason
+      minProperties: 3
+    ComponentList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Component'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    Archive:
+      type: object
+      additionalProperties: false
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - expected_version
+        - reason
+    Credential:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/CredentialId'
+        org_id:
+          $ref: '#/components/schemas/OrgId'
+        application_id:
+          $ref: '#/components/schemas/ApplicationId'
+        environment_id:
+          $ref: '#/components/schemas/EnvironmentId'
+        purpose:
+          type: string
+          enum:
+            - events:write
+        source:
+          type: string
+          enum:
+            - backend_report
+        expires_at:
+          $ref: '#/components/schemas/Time'
+        revoked_at:
+          anyOf:
+            - $ref: '#/components/schemas/Time'
+            - type: 'null'
+        created_at:
+          $ref: '#/components/schemas/Time'
+      required:
+        - id
+        - org_id
+        - application_id
+        - environment_id
+        - purpose
+        - source
+        - expires_at
+        - revoked_at
+        - created_at
+    CredentialList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Credential'
+          minItems: 0
+          maxItems: 100
+        next_cursor:
+          type:
+            - string
+            - 'null'
+          maxLength: 512
+      required:
+        - items
+        - next_cursor
+    IssueCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        purpose:
+          type: string
+          enum:
+            - events:write
+        ttl_seconds:
+          type: integer
+          minimum: 86400
+          maximum: 7776000
+        mfa_code:
+          $ref: '#/components/schemas/MfaCode'
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - purpose
+        - ttl_seconds
+        - mfa_code
+        - reason
+    RotateCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        ttl_seconds:
+          type: integer
+          minimum: 86400
+          maximum: 7776000
+        overlap_seconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+        mfa_code:
+          $ref: '#/components/schemas/MfaCode'
+        reason:
+          $ref: '#/components/schemas/Reason'
+      required:
+        - ttl_seconds
+        - overlap_seconds
+        - mfa_code
+        - reason
+    RevokeCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          $ref: '#/components/schemas/Reason'
+        mfa_code:
+          $ref: '#/components/schemas/MfaCode'
+      required:
+        - reason
+        - mfa_code
+    IssuedCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        credential:
+          $ref: '#/components/schemas/Credential'
+        token:
+          type: string
+          pattern: ^ops_v1\.opc_[a-f0-9]{32}\.[a-f0-9]{64}$
+      required:
+        - credential
+        - token
+    RevokedCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        credential:
+          $ref: '#/components/schemas/Credential'
+      required:
+        - credential
+    ComponentHeartbeatEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: component.heartbeat
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            status:
+              type: string
+              enum:
+                - healthy
+                - degraded
+                - unavailable
+                - unknown
+          required:
+            - status
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    UploadFailedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: upload.failed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            stage:
+              type: string
+              enum:
+                - initiate
+                - transfer
+                - finalize
+            reason:
+              type: string
+              enum:
+                - timeout
+                - storage_unavailable
+                - quota
+                - validation
+                - internal
+            duration_ms:
+              type: integer
+              minimum: 0
+              maximum: 86400000
+            size_bucket:
+              type: string
+              enum:
+                - small
+                - medium
+                - large
+                - unknown
+          required:
+            - stage
+            - reason
+            - duration_ms
+            - size_bucket
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    ConversionFailedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: conversion.failed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            source_type:
+              type: string
+              enum:
+                - pdf
+                - image
+                - office
+                - text
+                - other
+            target_type:
+              type: string
+              enum:
+                - pdf
+                - image
+                - office
+                - text
+                - other
+            reason:
+              type: string
+              enum:
+                - timeout
+                - unsupported
+                - worker_unavailable
+                - internal
+            duration_ms:
+              type: integer
+              minimum: 0
+              maximum: 86400000
+          required:
+            - source_type
+            - target_type
+            - reason
+            - duration_ms
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    ScannerUnavailableEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: scanner.unavailable
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            reason:
+              type: string
+              enum:
+                - timeout
+                - connection
+                - worker_unavailable
+            queue_age_seconds:
+              type: integer
+              minimum: 0
+              maximum: 604800
+            queue_count:
+              type: integer
+              minimum: 0
+              maximum: 1000000
+          required:
+            - reason
+            - queue_age_seconds
+            - queue_count
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    MalwareDetectedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: malware.detected
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            verdict:
+              type: string
+              enum:
+                - malicious
+                - suspicious
+          required:
+            - verdict
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    EmailDeliveryFailedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: email.delivery_failed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            provider:
+              type: string
+              enum:
+                - resend
+                - cloudflare
+                - other
+            reason:
+              type: string
+              enum:
+                - timeout
+                - rejected
+                - provider_unavailable
+                - exhausted
+            attempts:
+              type: integer
+              minimum: 1
+              maximum: 100
+            queue_age_seconds:
+              type: integer
+              minimum: 0
+              maximum: 604800
+          required:
+            - provider
+            - reason
+            - attempts
+            - queue_age_seconds
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    RequestSubmissionReceivedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: request.submission_received
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            file_count:
+              type: integer
+              minimum: 0
+              maximum: 1000
+            state:
+              type: string
+              enum:
+                - received
+                - quarantined
+                - ready
+          required:
+            - file_count
+            - state
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    LinkAbuseReportedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: link.abuse_reported
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            category:
+              type: string
+              enum:
+                - spam
+                - malware
+                - phishing
+                - other
+            state:
+              type: string
+              enum:
+                - received
+                - triaged
+          required:
+            - category
+            - state
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    WorkspaceRoleChangedEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        component_id:
+          $ref: '#/components/schemas/ComponentId'
+        occurred_at:
+          $ref: '#/components/schemas/Time'
+        type:
+          const: workspace.role_changed
+          type: string
+        attributes:
+          type: object
+          additionalProperties: false
+          properties:
+            from_role:
+              type: string
+              enum:
+                - none
+                - member
+                - admin
+                - owner
+            to_role:
+              type: string
+              enum:
+                - none
+                - member
+                - admin
+                - owner
+            outcome:
+              type: string
+              enum:
+                - allowed
+                - denied
+          required:
+            - from_role
+            - to_role
+            - outcome
+      required:
+        - id
+        - component_id
+        - occurred_at
+        - type
+        - attributes
+    Event:
+      oneOf:
+        - $ref: '#/components/schemas/ComponentHeartbeatEvent'
+        - $ref: '#/components/schemas/UploadFailedEvent'
+        - $ref: '#/components/schemas/ConversionFailedEvent'
+        - $ref: '#/components/schemas/ScannerUnavailableEvent'
+        - $ref: '#/components/schemas/MalwareDetectedEvent'
+        - $ref: '#/components/schemas/EmailDeliveryFailedEvent'
+        - $ref: '#/components/schemas/RequestSubmissionReceivedEvent'
+        - $ref: '#/components/schemas/LinkAbuseReportedEvent'
+        - $ref: '#/components/schemas/WorkspaceRoleChangedEvent'
+    EventBatch:
+      type: object
+      additionalProperties: false
+      properties:
+        schema:
+          type: integer
+          const: 1
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+          minItems: 1
+          maxItems: 100
+      required:
+        - schema
+        - events
+    EventReceipt:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/EventId'
+        disposition:
+          type: string
+          enum:
+            - stored
+            - duplicate
+        received_at:
+          $ref: '#/components/schemas/Time'
+      required:
+        - id
+        - disposition
+        - received_at
+    EventAcknowledgement:
+      type: object
+      additionalProperties: false
+      properties:
+        schema:
+          type: integer
+          const: 1
+        accepted:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventReceipt'
+          minItems: 1
+          maxItems: 100
+      required:
+        - schema
+        - accepted

@@ -1,45 +1,81 @@
 # ADR-029: Cross-application operations and security monitoring
 
-Status: **proposed; implementation contract to finalize in OPS-001**.
+Status: **accepted design in OPS-001; runtime implementation pending OPS-002 onward**.
 Date: 19 October 2026. Trust-boundary change: **yes**.
 
-## Context
+## Context and baseline
 
-Warrior needs to monitor multiple applications and systems. The current Product
-model is commercial licensing inventory, client telemetry is privacy-filtered usage
-data, and the Security Center is account/device oriented. None alone supplies an
-authenticated, durable operational event collector or cross-application incident lifecycle.
+Warrior needs to monitor multiple applications and systems. Reconciled against `87256b7`
+and PR #15: Products are licensing catalog, client telemetry is privacy-filtered usage data,
+and the Security Center is account/device oriented. Buffered telemetry cannot acknowledge
+committed evidence. No monitoring inventory, integration credential or event collector exists.
+Business Admin provisioning and Rokela PDF's shared subscription/auth remain unchanged.
 
-## Proposed direction
+## Decisions
 
-Add a separate operations domain with organization-scoped applications, environments,
-components, integrations, events, health observations, alert rules and incidents.
-Reuse identity, RBAC, audit and cryptographic primitives where appropriate. Link an
-application to a licensing Product optionally; do not require licensing every system.
+The normative [operations contract](../api/operations-contract.md) resolves OPS-001's decisions.
+The [planned OpenAPI](../api/operations-planned.openapi.yaml) specifies OPS-002–004 requests and
+responses and is deliberately separate from the live API contract.
 
-Separate backend integrations from user sessions and browser telemetry. Bind source
-identity to a dedicated revocable credential. Use strict versioned schemas, durable
-at-least-once acceptance, scoped deduplication and bounded source retry. Preserve
-ADR-027 privacy controls and identify observation provenance. Begin with read-only
-monitoring; do not introduce automated infrastructure changes through event payloads.
+1. **Inventory and authority.** Organization → application → environment → component. An active
+   organization member owns the application, with criticality and optional active Product mapping.
+   Immutable codes, versioned updates and terminal archive prevent attribution reuse. Separate
+   `ops:*` permissions default to admin/owner only; no implicit licensing, membership, operator,
+   remediation or cross-tenant authority. Reuse membership checks before freeze checks. Management
+   mutations require reviewed reason codes and atomic audit. Freeze preserves reads/ingestion and
+   emergency credential revocation, and blocks other management writes.
+2. **Credentials.** Random 256-bit bearer secret and public credential ID per environment/purpose;
+   SHA-256 verification material and timing-safe comparisons; secret returned once with no-store.
+   Initial purpose `events:write`, source `backend_report`. TTL 1–90 days, at most two active
+   credentials, rotation overlap 0–3600 seconds without extending old expiry. Transactional locks
+   serialize ingestion with revocation. A lost issue response requires rotate/revoke, never secret
+   recovery. Bearer authentication proves source attribution, not truth or freshness of its claims.
+3. **Ingestion.** Nine strict version-1 event schemas with enums/bounded integers; no free text,
+   scope overrides, severity, URLs, personal/document data or job/request identifiers. Preserve
+   ADR-027; backend integration types never enter browser telemetry. Batches 1–100 and <=256 KiB,
+   occurrence window 24 hours past/5 minutes future for new events. Store server receipt time and
+   credential-derived scope/source. Commit before 200 acknowledgements. Dedup per scoped UUID and
+   canonical content across rotation; changed retries are 409, exact old retries survive until
+   30-day retention. Atomic batches and quota accounting; no exactly-once promise.
+4. **Budgets and failure.** Collector/source limits, jittered retries, durable bounded source
+   outbox, 429 backpressure and 503 on unavailable commits are specified explicitly. Monitoring
+   must never block business transactions or consume commercial quotas. Raw operational evidence
+   and dedup identities retain 30 days; aggregates 90, incidents 365, notification metadata 30;
+   audit policy remains separate. Source drops/backlog and collector failure are visible.
+5. **Health and probes.** Receipt-time heartbeat freshness, unknown/stale distinct from healthy;
+   durable history and independent Warrior monitoring. Network probes remain disabled. Future
+   probe deployment requires an ADR amendment, ownership proof, approved destinations, pinned DNS,
+   TLS checks, no redirects/private/metadata access and an isolated budgeted worker. Inventory or
+   events never become destinations to execute.
+6. **Incidents and delivery.** Typed rules, one active incident per scoped rule/component, explicit
+   open/acknowledged/resolved states, same-organization assignment and atomic audit/notification
+   intent. Notification workers use fenced claims and bounded at-least-once delivery; duplicate
+   sends remain possible after ambiguous provider responses. Only verified configured destinations,
+   fake recipients in acceptance, no remediation authority. Incident routes are specified in OPS-006.
+7. **Placement and rollout.** Independent `operations` package with audit/crypto/shared-types and
+   telemetry-detector dependencies, auth/catalog checks injected by the composition root. New PG
+   adapters use strict ancestor keys, app-role grants, contract/negative/mutation tests and applicable
+   load checks. Task order is OPS-001 through OPS-008. Roll out disabled to a test organization first;
+   rollback disables routes/workers and revokes credentials while preserving evidence and licensing.
 
-## Decisions required to accept this ADR
+## Alternatives and consequences
 
-OPS-001 must specify, with rationale and negative examples:
+User sessions and license keys are rejected as collector credentials because their authority and
+lifecycle are unrelated. HMAC request signing is deferred: random scoped bearer credentials over TLS,
+durable IDs and strict replay/conflict limits supply the initial protocol without ambiguous signing
+canonicalization. This does not resist a stolen active credential fabricating new event IDs.
 
-- Inventory ownership, RBAC permissions and lifecycle; relationship to existing
-  organizations, licensing Products and privileged-operation controls.
-- Credential protocol, safe storage, scope, rotation overlap, revocation behavior,
-  replay protection and one-time secret delivery.
-- Exact versioned wire schema and route contract, batch/size/time limits, occurrence
-  vs receipt time, source attribution, allowed metadata, idempotency/conflict behavior
-  and durable acknowledgement semantics.
-- Event retention/aggregation and how security evidence differs from lossy usage
-  telemetry. Backpressure, quotas and outage behavior at source and collector.
-- Probe ownership verification and SSRF defenses; health/stale/unknown semantics.
-- Alert/incident state transitions, notification guarantees and audit requirements.
-- Package placement consistent with the enforced dependency graph; migration and
-  grants strategy, rollout/rollback and memory/PostgreSQL contract verification.
+Reusing the lossy telemetry sink is rejected because an in-memory buffer cannot promise durable
+acknowledgement. Per-event audit chaining is also deferred to avoid serializing ingestion on a global
+audit lock; operational evidence is committed separately, with privileged changes still audited.
 
-Do not infer accepted wire contracts or production readiness from this proposal.
-The [program](../programs/operations-security.md) defines deliverables and sequencing.
+No network probes in the initial milestone is a deliberate scope decision, not an unresolved safety
+policy. Backend health reports must remain labeled as assertions. Public probe implementation, bespoke
+per-application role delegation, additional event types and remediation need later reviewed changes.
+
+## Evidence and limits
+
+OPS-001 adds documentation, machine-readable planned schemas and contract-example tests only. These
+are executable schema checks, not implemented authorization, storage, credentials, event ingestion,
+alerting or a live Rokela PDF integration. Subsequent tasks must record runtime/PG/load/mutation evidence
+in [the status file](../programs/operations-security-status.md) before claiming those controls exist.

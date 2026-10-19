@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "events": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "component.heartbeat",
+      "attributes": {
+        "status": "healthy"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "upload.failed",
+      "attributes": {
+        "stage": "initiate",
+        "reason": "timeout",
+        "duration_ms": 0,
+        "size_bucket": "small"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "conversion.failed",
+      "attributes": {
+        "source_type": "pdf",
+        "target_type": "pdf",
+        "reason": "timeout",
+        "duration_ms": 0
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "scanner.unavailable",
+      "attributes": {
+        "reason": "timeout",
+        "queue_age_seconds": 0,
+        "queue_count": 0
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "malware.detected",
+      "attributes": {
+        "verdict": "malicious"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "email.delivery_failed",
+      "attributes": {
+        "provider": "resend",
+        "reason": "timeout",
+        "attempts": 1,
+        "queue_age_seconds": 0
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "request.submission_received",
+      "attributes": {
+        "file_count": 0,
+        "state": "received"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "link.abuse_reported",
+      "attributes": {
+        "category": "spam",
+        "state": "received"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "component_id": "opm_cccccccccccccccccccccccc",
+      "occurred_at": "2026-10-19T12:00:00Z",
+      "type": "workspace.role_changed",
+      "attributes": {
+        "from_role": "none",
+        "to_role": "none",
+        "outcome": "allowed"
+      }
+    }
+  ]
+}

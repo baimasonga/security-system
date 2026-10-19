@@ -5,7 +5,7 @@ as OPS-007 in [the program](../programs/operations-security.md).
 
 ## Inventory and scope
 
-Application code suggestion: `rokela-pdf` (finalize in OPS-001). Register production
+Application code: `rokela-pdf` (OPS-001 accepted contract). Register production
 and a separate staging environment. Components: web app/API, PDF converter, ClamAV,
 database, object storage and email worker/provider. Preserve the existing shared
 subscription for PDF, file transfer and short links, and existing authentication.
@@ -19,7 +19,7 @@ or private file/request/share links into this document.
 
 ## Candidate backend events
 
-These names are proposals for reviewed schemas, not accepted existing telemetry types.
+These backend names/attributes are specified in the [OPS-001 contract](../api/operations-contract.md) and planned OpenAPI. They are not implemented telemetry endpoints; browser telemetry remains unchanged.
 
 | Event                         | Safe attributes to specify                              | Intended use                                                                     |
 | ----------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -32,10 +32,7 @@ These names are proposals for reviewed schemas, not accepted existing telemetry 
 | `link.abuse_reported`         | category, processing state                              | Triage reports; do not forward the private link or report free text.             |
 | `workspace.role_changed`      | allowed role transition and result                      | Security review; use only approved opaque/pseudonymous references.               |
 
-The envelope needs version, scoped event ID, component, occurrence time and outcome.
-Warrior assigns receipt time and trusted source identity. Derive severity under
-server-owned rules. Decide safe request/job correlation IDs in OPS-001; arbitrary
-URLs, headers, bodies, stack traces and email addresses are not permitted metadata.
+The accepted version-1 envelope contains schema, UUIDv4 event ID, component ID, occurrence time, type and strict attributes. Warrior assigns receipt time, scope and backend-report provenance. Severity is server-owned. Request/job/person/document correlation IDs are excluded in version 1; arbitrary URLs, headers, bodies, stack traces and email addresses are not permitted. Heartbeats use the separately specified `component.heartbeat` event and are not independent probes.
 
 ## Delivery and credentials
 

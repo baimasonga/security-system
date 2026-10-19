@@ -6,8 +6,7 @@ The owner also wants Warrior to monitor and help protect all applications/system
 with Rokela Business Admin first and Rokela PDF next. This is tracked separately in
 [the operations/security program](../programs/operations-security.md) and
 [status/handoff](../programs/operations-security-status.md). It extends, rather than
-replaces, the licensing/trust program below. Start at OPS-001; proposed design and
-roadmap entries are not implementation or live-deployment evidence.
+replaces, the licensing/trust program below. OPS-001 now defines the accepted contract and planned schemas; OPS-002 inventory is next. Design/schema checks and roadmap entries are not runtime or live-deployment evidence.
 
 ## Source and limits
 

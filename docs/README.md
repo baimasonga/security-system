@@ -61,3 +61,6 @@ Current browser and identity work:
 - [Proposed advanced requirements](architecture/09-advanced-feature-requirements.md)
 
 Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Authenticator MFA, passkeys and privileged operations (dual control, JIT grants, freeze, break-glass) are implemented. Advanced billing, hardware attestation, workspace and the remaining items in the feature program are still tracked as remaining work, not completed features.
+
+Operations implementation targets (OPS-001; not live endpoints): [contract](api/operations-contract.md),
+[planned OpenAPI](api/operations-planned.openapi.yaml), [safe examples](api/operations-safe-examples.json).

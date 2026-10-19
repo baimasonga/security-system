@@ -5,8 +5,8 @@ protect all of the owner's applications and systems. Rokela Business Admin is th
 first integration reported by the owner; Rokela PDF is the second candidate.
 
 This document records a roadmap, not a claim that its proposed APIs, credentials,
-monitoring jobs or incident workflows already exist. Design proposals are recorded
-in ADR-029. Implementation progress belongs in
+monitoring jobs or incident workflows already exist. The accepted OPS-001 design is recorded
+in ADR-029 and the [operations contract](../api/operations-contract.md); runtime implementation remains pending. Implementation progress belongs in
 [the status file](operations-security-status.md).
 
 ## Source baseline and evidence limits
