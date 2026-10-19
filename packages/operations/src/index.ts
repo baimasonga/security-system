@@ -4,3 +4,4 @@ export * from './service.ts';
 export * from './credentials.ts';
 export * from './events-model.ts';
 export * from './events.ts';
+export * from './health.ts';

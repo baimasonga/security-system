@@ -1,12 +1,12 @@
 # Operations monitoring contract
 
 Accepted design for OPS-001, 19 October 2026. Inventory (OPS-002), credential management
-(OPS-003) and durable ingestion (OPS-004) are implemented in [live OpenAPI](openapi.yaml),
+(OPS-003), durable ingestion (OPS-004) and health/history (OPS-005) are implemented in [live OpenAPI](openapi.yaml),
 disabled by default behind separate source rollout flags. Historical production
-enablement of inventory/credentials is recorded in the handoff; this ingestion change
+enablement of inventory/credentials is recorded in the handoff; this health change
 applies no production setting. The [planned OpenAPI](operations-planned.openapi.yaml)
-retains schema fixtures. Health, incident and probe contracts below are requirements
-for OPS-005/006; their routes will be specified before implementation.
+retains schema fixtures. Incident and probe contracts below remain future requirements;
+incident routes will be specified before OPS-006 implementation.
 
 ## Baseline and placement
 
@@ -189,6 +189,17 @@ statuses require `ops:read`. A component heartbeat is a backend report, not an i
 `unknown`; late expected observations are `stale`; neither is `healthy`. Explicit unavailable wins until a fresh
 healthy report; recovery requires fresh evidence. Persist observations/history and maintenance windows. Warrior
 must have an external independent monitor; its own dashboard cannot prove its own availability.
+
+OPS-005 freshness amendment: only heartbeats occurring between receipt minus 120 seconds
+and receipt can establish current state. Future and older reports are retained evidence only.
+The latest eligible occurrence wins regardless of arrival order. Equal-occurrence ties prefer
+unavailable, degraded, unknown, healthy; repeated occurrence cannot refresh TTL. Latest eligible
+state commits with the event and survives restarts. Inactive ancestry forces unknown. Each read
+reports own state and dependency states; unavailable dependencies propagate unavailable, and
+other non-healthy dependencies downgrade otherwise healthy reports to degraded. History counts
+backend assertions, with no success inference from empty buckets. See [health rollout and read
+protocol](../deploy/operations-health.md) and live OpenAPI for window, truncation and gap semantics.
+Maintenance-window configuration and notification suppression remain OPS-006.
 
 Network probes are **disabled in the initial milestone**. Inventory and event fields cannot create a destination.
 Future probes require a separate ADR amendment and operator-approved ownership proof on an exact host, HTTPS 443,

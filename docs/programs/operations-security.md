@@ -5,7 +5,7 @@ protect all of the owner's applications and systems. Rokela Business Admin is th
 first integration reported by the owner; Rokela PDF is the second candidate.
 
 This document records the roadmap. OPS-002 inventory, OPS-003 credentials and OPS-004 durable ingestion are implemented behind opt-in flags;
-health, monitoring jobs and incident workflows remain planned. The accepted OPS-001 design is recorded
+health/history reads are implemented; incident workflows remain planned. The accepted OPS-001 design is recorded
 in ADR-029 and the [operations contract](../api/operations-contract.md); runtime implementation remains pending. Implementation progress belongs in
 [the status file](operations-security-status.md).
 

@@ -15,19 +15,19 @@ PRs #23 and #25 were closed as superseded; their implementation/evidence is reta
 Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
 Credential verification remains a guarded transaction primitive, not a collector.
 OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLED`
-(default false); verification is recorded below. Health/incidents and a live Rokela PDF
-monitoring integration remain pending. No ingestion production setting was changed.
+(default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
+Incidents and a live Rokela PDF monitoring integration remain pending. No ingestion production setting was changed.
 
-| Task    | State                                 | Verification/evidence                                                                                                                        |
-| ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPS-001 | Contract complete; local verification | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below. |
-| OPS-002 | Production API/dashboard enabled      | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                   |
-| OPS-003 | Production API/dashboard enabled      | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                        |
-| OPS-004 | Implemented; local verification       | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                  |
-| OPS-005 | Next; health implementation pending   | Health semantics specified; network probes remain disabled.                                                                                  |
-| OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                           |
-| OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                   |
-| OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                           |
+| Task    | State                                 | Verification/evidence                                                                                                                          |
+| ------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPS-001 | Contract complete; local verification | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
+| OPS-002 | Production API/dashboard enabled      | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
+| OPS-003 | Production API/dashboard enabled      | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
+| OPS-004 | Implemented; local verification       | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
+| OPS-005 | Implemented; local verification       | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
+| OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                             |
+| OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                     |
+| OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                             |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -142,16 +142,14 @@ this file and the accepted operations contract before changing the next task.
   setup. Preserve the existing operator-managed plan decision and configuration-only
   SSO scope; do not silently switch paid-plan management or generate fake credentials.
 
-## Next action: OPS-005
+## Next action: OPS-006
 
-Specify and implement durable component health/history using authenticated backend
-reports while preserving source labels and missing/stale/unknown distinctions.
-Before implementation, resolve the heartbeat-age/order gap described above; OPS-004
-accepts historical observations as evidence and does not itself derive health.
-Define the read routes before moving them into the live API. Add memory/PG/store,
-MFA/RBAC as applicable, safe readiness, stale/late/recovery/mutation and load evidence.
-No URL from inventory or events may become a probe destination. Preserve commercial
-access and document required independent Warrior monitoring separately.
+Implement incidents and notifications against the accepted typed-rule design. Specify
+routes first, require current scoped authority and audited transitions, commit incident/
+audit/notification intent atomically, and use fenced bounded delivery with fake/local
+recipients. Add maintenance-window suppression without turning missing/stale observations
+healthy. OPS-005 exposes backend assertions, not independent probe truth. Preserve existing
+commercial access; live Rokela source delivery is OPS-007 and restore evidence is OPS-008.
 
 The previous SDK review also identified a persisted-clock rollback gap in
 `packages/sdk-core/src/updates.ts` (`verifyEvidence`, reviewed at `7ad2e6c`); it is
@@ -371,3 +369,39 @@ upstream contracts before continuing feature work.
 - Rollback: disable `OPERATIONS_INGESTION_ENABLED`; retain additive schema, digests,
   history and ordinary retention. See [ingestion guide](../deploy/operations-ingestion.md).
 - Next: OPS-005 with the health freshness/order amendment before implementation.
+
+## OPS-005 takeover implementation — 19 October 2026
+
+- Baseline `381a31b`, reconciled from the other Codex's published collector/handoff.
+  Preserved the overlapping old checkout untouched; isolated worktree
+  `/workspace/security-system-health`, branch `codex/ops005-health`.
+- Latest eligible heartbeat metadata commits atomically with evidence; 120-second age
+  bound, no future reports, occurrence ordering and conservative ties prevent queued
+  recovery and receipt refresh. Snapshot TTL is 180 seconds, with explicit unknown/
+  stale/inactive and dependency states. Migration 0020 adds bounded retained metadata.
+- Live-session ops:read controls protect scoped health and hourly history. Read-only
+  dashboard panels expose reported health and recent event counts with explicit gaps.
+  Fixed internal persistence readiness is separate from process liveness.
+- No production setting, live credential, provider destination or external monitor was
+  configured. Optional-provider readiness, independent external Warrior monitoring,
+  incident maintenance suppression and the live source integration remain explicit
+  rollout/next-task requirements. See [health guide](../deploy/operations-health.md).
+- Verification: `npm run check` passed **843 tests, 3 skipped**. Full PostgreSQL
+  owner/app-role regression passed **678 tests in 65 files** (345.13 s); final
+  health/event PG replay passed **22 tests**, and migration replay passed **14**.
+  Existing occupied-port child errors are intentional negative-path probes.
+- All **four browser workflows** passed under Chromium/CSP. Thirteen deliberate
+  mutations were caught, including PostgreSQL ordering/scope; reproducible tool:
+  `tools/mutation-check-operations-health.mjs` (disposable source copy).
+- Real HTTP/fsync-on, pool=2 load retained all expected collector totals and
+  verified **20 concurrent health snapshots** plus the **180-second stale boundary**.
+  Total smoke time 7,678 ms alongside other suites; no capacity claim. See
+  [OPS-005 performance note](../performance/operations-ops005.md). Dependency audit
+  reports **zero vulnerabilities**. OpenAPI drift/reference checks passed.
+- Validation caught an ambiguous browser selector after adding the second component
+  table; scoped it to inventory. Mutation checks exposed overlapping history
+  rejection predicates, so range and retention tests now exercise each independently.
+- Publication: branch `codex/ops005-health`; implementation/PR reference follows
+  publication. Remote CI and production health rollout remain unverified here.
+- Next: OPS-006 typed incidents, maintenance suppression and fenced notification
+  delivery, using fake/local recipients; preserve the explicit external-monitor gate.

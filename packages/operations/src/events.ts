@@ -1,3 +1,4 @@
+import { eligibleHeartbeat } from './health.ts';
 import { timingSafeEqual } from 'node:crypto';
 import { sha256Hex } from '@trust/crypto';
 import { contentViolation } from '@trust/telemetry';
@@ -270,6 +271,8 @@ export class EventService {
         for (const counter of prepared.updates) await tx.putEventCounter(counter);
         for (const event of prepared.fresh) {
           await tx.insertEvent(event);
+          const heartbeat = eligibleHeartbeat(event);
+          if (heartbeat) await tx.recordHeartbeat(heartbeat);
           const hour = new Date(Math.floor(+now / 3600000) * 3600000);
           await tx.addEventAggregate({
             orgId: event.orgId,

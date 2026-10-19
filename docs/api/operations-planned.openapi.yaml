@@ -2,9 +2,8 @@ openapi: 3.1.0
 info:
   title: Warrior operations monitoring — planned contract, NOT LIVE
   version: 1.0.0-planned
-  description: All OPS-002–004 routes are implemented behind opt-in flags in openapi.yaml. Retained
-    schemas are design fixtures; health and incident route contracts are specified separately before
-    implementation.
+  description: All OPS-002–005 routes are implemented behind opt-in flags in openapi.yaml. Retained
+    schemas are design fixtures; future incident route contracts will be specified before implementation.
 x-implementation-status: planned
 x-max-body-bytes: 262144
 servers: []

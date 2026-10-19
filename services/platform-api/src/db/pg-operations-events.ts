@@ -1,3 +1,4 @@
+import type { Heartbeat } from '@trust/operations';
 import type {
   CredentialScope,
   EventAggregate,
@@ -34,6 +35,57 @@ export class PgEventRepo {
   readonly #eventsQ: Queryable;
   constructor(q: Queryable) {
     this.#eventsQ = q;
+  }
+  async recordHeartbeat(r: Heartbeat) {
+    await this.#eventsQ.query(
+      `INSERT INTO operations_heartbeats(org_id,application_id,environment_id,component_id,status,occurred_at,received_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+    ON CONFLICT(org_id,application_id,environment_id,component_id) DO UPDATE SET status=EXCLUDED.status,occurred_at=EXCLUDED.occurred_at,received_at=EXCLUDED.received_at,expires_at=EXCLUDED.expires_at
+    WHERE EXCLUDED.occurred_at>operations_heartbeats.occurred_at OR (EXCLUDED.occurred_at=operations_heartbeats.occurred_at AND
+    CASE EXCLUDED.status WHEN 'unavailable' THEN 3 WHEN 'degraded' THEN 2 WHEN 'unknown' THEN 1 ELSE 0 END > CASE operations_heartbeats.status WHEN 'unavailable' THEN 3 WHEN 'degraded' THEN 2 WHEN 'unknown' THEN 1 ELSE 0 END)`,
+      [...scopeParams(r), r.componentId, r.status, r.occurredAt, r.receivedAt, r.expiresAt],
+    );
+  }
+  async getHeartbeat(scope: CredentialScope, componentId: string): Promise<Heartbeat | undefined> {
+    const r = (
+      await this.#eventsQ.query(
+        'SELECT * FROM operations_heartbeats WHERE org_id=$1 AND application_id=$2 AND environment_id=$3 AND component_id=$4',
+        [...scopeParams(scope), componentId],
+      )
+    ).rows[0];
+    return r
+      ? {
+          ...scope,
+          componentId,
+          status: r.status,
+          occurredAt: new Date(r.occurred_at),
+          receivedAt: new Date(r.received_at),
+          expiresAt: new Date(r.expires_at),
+        }
+      : undefined;
+  }
+  async listHealthHistory(
+    scope: CredentialScope,
+    componentId: string,
+    from: Date,
+    to: Date,
+    now: Date,
+  ): Promise<EventAggregate[]> {
+    const start = new Date(Math.floor(+from / 3600000) * 3600000);
+    const rows = (
+      await this.#eventsQ.query(
+        'SELECT * FROM operations_event_aggregates WHERE org_id=$1 AND application_id=$2 AND environment_id=$3 AND component_id=$4 AND hour >= $5 AND hour < $6 AND expires_at > $7 ORDER BY hour,type,outcome LIMIT 1001',
+        [...scopeParams(scope), componentId, start, to, now],
+      )
+    ).rows;
+    return rows.map((r) => ({
+      ...scope,
+      componentId,
+      type: r.type,
+      outcome: r.outcome,
+      hour: new Date(r.hour),
+      count: Number(r.count),
+      expiresAt: new Date(r.expires_at),
+    }));
   }
   async findEvent(scope: CredentialScope, id: string) {
     const r = await this.#eventsQ.query(
@@ -123,7 +175,11 @@ export class PgEventRepo {
     return r.rows.map(fromEvent);
   }
   async pruneEventMetadata(orgId: string, now: Date, limit: number) {
-    for (const table of ['operations_event_counters', 'operations_event_aggregates'])
+    for (const table of [
+      'operations_event_counters',
+      'operations_event_aggregates',
+      'operations_heartbeats',
+    ])
       await this.#eventsQ.query(
         `DELETE FROM ${table} WHERE ctid IN (SELECT ctid FROM ${table} WHERE org_id=$1 AND expires_at<=$2 ORDER BY expires_at LIMIT $3 FOR UPDATE)`,
         [orgId, now, bounded(limit)],
@@ -132,7 +188,7 @@ export class PgEventRepo {
   async expiredEventOrganizations(now: Date, limit: number) {
     // Each expiry-index scan is bounded before union/deduplication.
     const r = await this.#eventsQ.query(
-      'SELECT DISTINCT org_id FROM ((SELECT org_id FROM operations_events WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2) UNION ALL (SELECT org_id FROM operations_event_counters WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2) UNION ALL (SELECT org_id FROM operations_event_aggregates WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2)) expired ORDER BY org_id LIMIT $2',
+      'SELECT DISTINCT org_id FROM ((SELECT org_id FROM operations_events WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2) UNION ALL (SELECT org_id FROM operations_event_counters WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2) UNION ALL (SELECT org_id FROM operations_event_aggregates WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2) UNION ALL (SELECT org_id FROM operations_heartbeats WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2)) expired ORDER BY org_id LIMIT $2',
       [now, bounded(limit)],
     );
     return r.rows.map((row) => String(row.org_id));

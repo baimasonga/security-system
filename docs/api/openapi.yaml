@@ -137,8 +137,7 @@ paths:
           description: Not found or not a member
     post:
       summary: Consume allowance atomically and return an idempotent accounting receipt
-      description: Receipt is not a capability or authorization to execute external
-        work. The same operation key must also deduplicate execution.
+      description: Receipt is not a capability or authorization to execute external work. The same operation key must also deduplicate execution.
       security:
         - bearer: []
       requestBody:
@@ -643,8 +642,7 @@ paths:
                 code:
                   type: string
                   pattern: ^(?:[0-9]{6}|[0-9a-f]{32})$
-                  description: Required when MFA is enabled. Authenticator code or one unused
-                    recovery code.
+                  description: Required when MFA is enabled. Authenticator code or one unused recovery code.
       responses:
         '200':
           description: Session
@@ -3358,14 +3356,142 @@ paths:
                   type: component.heartbeat
                   attributes:
                     status: healthy
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/health:
+    get:
+      operationId: getOperationsHealth
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - in: path
+          name: orgId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: environmentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scoped operational observations; gaps never imply healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsHealth'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/components/{componentId}/history:
+    get:
+      operationId: getOperationsHistory
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      description: UTC hourly receipt-time counts, at most 24 hours within the preceding 90 days. Boundary buckets may be partial relative to the requested interval; absent buckets are unknown, not successes. Narrow a truncated window.
+      parameters:
+        - in: path
+          name: orgId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: environmentId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: componentId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Scoped operational observations; gaps never imply healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsHistory'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /readyz:
+    get:
+      operationId: readiness
+      tags:
+        - Health
+      description: Fixed internal persistence readiness only; separate from process liveness and source-reported health. No arbitrary probes or public dependency details.
+      security: []
+      responses:
+        '200':
+          description: Persistence connection ready
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - status
+                properties:
+                  status:
+                    const: ready
+        '503':
+          description: Persistence not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - status
+                properties:
+                  status:
+                    const: unavailable
 components:
   securitySchemes:
     IntegrationBearer:
       type: http
       scheme: bearer
-      description:
-        Scoped ops_v1 credential; purpose events:write, source backend_report. No inventory or
-        account authority.
+      description: Scoped ops_v1 credential; purpose events:write, source backend_report. No inventory or account authority.
     bearer: { type: http, scheme: bearer, description: Opaque session token from /v1/auth/login }
   parameters:
     OpscredentialId:
@@ -5294,3 +5420,162 @@ components:
         `trust-platform/v1/device-proof\n<purpose>\n<nonce>\n<installation_id>\n<subject_id>\n<key thumbprint>`
         where `subject_id` is empty for `activate` and the activation id otherwise.
       type: string
+    OperationsHealth:
+      type: object
+      additionalProperties: false
+      required:
+        - as_of
+        - heartbeat_interval_seconds
+        - stale_after_seconds
+        - independent_probe
+        - components
+      properties:
+        as_of:
+          type: string
+          format: date-time
+        heartbeat_interval_seconds:
+          const: 60
+        stale_after_seconds:
+          const: 180
+        independent_probe:
+          const: false
+        components:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - id
+              - code
+              - state
+              - reported_status
+              - status
+              - source
+              - occurred_at
+              - received_at
+              - last_assertion
+              - dependency_ids
+              - dependencies
+            properties:
+              id:
+                type: string
+              code:
+                type: string
+              state:
+                enum:
+                  - active
+                  - disabled
+                  - archived
+              reported_status:
+                type: string
+                enum:
+                  - healthy
+                  - degraded
+                  - unavailable
+                  - unknown
+                  - stale
+              status:
+                type: string
+                enum:
+                  - healthy
+                  - degraded
+                  - unavailable
+                  - unknown
+                  - stale
+              source:
+                const: backend_report
+              occurred_at:
+                type:
+                  - string
+                  - 'null'
+                format: date-time
+              received_at:
+                type:
+                  - string
+                  - 'null'
+                format: date-time
+              last_assertion:
+                type:
+                  - string
+                  - 'null'
+                enum:
+                  - healthy
+                  - degraded
+                  - unavailable
+                  - unknown
+                  - null
+              dependency_ids:
+                type: array
+                items:
+                  type: string
+              dependencies:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - id
+                    - status
+                  properties:
+                    id:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                        - healthy
+                        - degraded
+                        - unavailable
+                        - unknown
+                        - stale
+    OperationsHistory:
+      type: object
+      additionalProperties: false
+      required:
+        - from
+        - to
+        - coverage
+        - bucket_seconds
+        - partial_boundary_buckets
+        - truncated
+        - items
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        coverage:
+          const: observations_only
+        bucket_seconds:
+          const: 3600
+        partial_boundary_buckets:
+          type: boolean
+        truncated:
+          type: boolean
+        items:
+          type: array
+          maxItems: 1000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - hour
+              - type
+              - outcome
+              - count
+              - source
+            properties:
+              hour:
+                type: string
+                format: date-time
+              type:
+                type: string
+              outcome:
+                type: string
+              count:
+                type: integer
+                minimum: 1
+              source:
+                const: backend_report

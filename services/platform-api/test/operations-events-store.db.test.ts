@@ -1,3 +1,4 @@
+import { healthStoreContract } from '../../../packages/operations/test/health-store-contract.ts';
 import {
   eventIngestionContract,
   eventRevokeRaceContract,
@@ -145,3 +146,5 @@ eventRevokeRaceContract(async () => {
     now: clock.now,
   };
 });
+
+healthStoreContract(seeded);

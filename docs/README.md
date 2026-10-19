@@ -70,3 +70,5 @@ OPS-002 inventory is implemented behind an opt-in flag: [rollout and rollback](d
 OPS-003 credential management and guarded verification: [rollout, rotation and rollback](deploy/operations-credentials.md).
 
 - [Application management dashboard](deploy/operations-dashboard.md): inventory and MFA credential controls, verification and rollout.
+
+- [Operations health and history rollout](deploy/operations-health.md) — freshness, scoped reads, readiness and independent monitoring requirements.

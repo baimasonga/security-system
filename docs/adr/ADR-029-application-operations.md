@@ -1,6 +1,6 @@
 # ADR-029: Cross-application operations and security monitoring
 
-Status: **accepted design in OPS-001; OPS-002 inventory, OPS-003 credentials and OPS-004 ingestion implemented with default-off source flags; OPS-005 onward pending**.
+Status: **accepted design in OPS-001; OPS-002 inventory, OPS-003 credentials, OPS-004 ingestion and OPS-005 health/history implemented with default-off source flags; OPS-006 onward pending**.
 Date: 19 October 2026. Trust-boundary change: **yes**.
 
 ## Context and baseline
@@ -110,3 +110,24 @@ the cap; positive overlap needs a free slot. Revocation ignores freeze/ancestor
 activity but retains membership, fresh factor and atomic-audit requirements.
 The new flag depends on inventory and MFA configuration. Source integration/event
 validation and durable receipts remain OPS-004, not established by a verifier test.
+
+## OPS-005 freshness and ordering amendment
+
+Collection may retain historical heartbeats, but current health accepts only reports
+whose occurrence is no more than 120 seconds before receipt and no later than receipt.
+Future observations remain evidence only. Order eligible reports by occurrence, not arrival;
+at equal occurrence use unavailable > degraded > unknown > healthy. An exact retry cannot
+refresh freshness. Persist the winning report in the event transaction. A newer report
+supersedes it; after 180 seconds from receipt it becomes stale, retaining its last assertion.
+No report means unknown. Lifecycle inactivity forces unknown. Dependency non-health cannot
+promote a component: unavailable propagates unavailable, other non-healthy dependencies
+make an otherwise healthy component degraded. Responses expose each dependency's status.
+
+Read-only health and hourly event history require ops:read within the same scoped
+transaction, including current-session checks. History counts assertions, never availability
+percentages; absent buckets and expired evidence are explicit gaps. Queries span at most
+24 hours, return at most 1,000 rows and signal truncation. No network probe is enabled.
+An unauthenticated /readyz checks only the fixed internal persistence connection, with a
+bounded response and no dependency/tenant details; /healthz remains process liveness.
+Independent external Warrior monitoring remains a deployment requirement, not proof from
+this dashboard. Maintenance notification suppression belongs to OPS-006.

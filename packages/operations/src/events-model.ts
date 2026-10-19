@@ -1,3 +1,4 @@
+import type { HealthRepo } from './health.ts';
 import type { CredentialScope } from './model.ts';
 export interface EventInput {
   id: string;
@@ -36,7 +37,7 @@ export interface EventAggregate extends CredentialScope {
   count: number;
   expiresAt: Date;
 }
-export interface EventRepo {
+export interface EventRepo extends HealthRepo {
   findEvent(scope: CredentialScope, id: string): Promise<OperationEvent | undefined>;
   insertEvent(row: OperationEvent): Promise<void>;
   getEventCounter(orgId: string, key: string): Promise<EventCounter | undefined>;

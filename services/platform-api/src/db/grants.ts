@@ -16,6 +16,7 @@ const ALL: Priv[] = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 
 export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   operations_credentials: RIU,
+  operations_heartbeats: ALL,
   operations_events: ['SELECT', 'INSERT', 'DELETE'],
   operations_event_counters: ALL,
   operations_event_aggregates: ALL, // immutable digests and revocable evidence; no DELETE

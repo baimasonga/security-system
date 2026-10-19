@@ -28,6 +28,7 @@ async function setup() {
   env = await makeEnv({
     config: {
       operationsInventoryEnabled: true,
+      operationsHealthEnabled: true,
       operationsCredentialsEnabled: true,
       mfaEncryptionKey: randomBytes(32).toString('hex'),
       sharing: undefined,
@@ -125,19 +126,26 @@ it('manages inventory, dependencies and fresh-MFA credentials through the real b
     'high',
   );
   await addEnv(page);
+  await page.getByRole('heading', { name: 'Reported health', exact: true }).waitFor();
+  expect(await section(page, 'Reported health').textContent()).toContain(
+    'No components to monitor',
+  );
   for (const name of ['database', 'web']) {
     const form = section(page, 'Add component');
     await form.getByLabel('Code (permanent)').fill(name);
     if (name === 'web')
       await form.getByLabel('Dependencies in this environment').selectOption({ label: 'database' });
     await form.getByRole('button', { name: 'Add component', exact: true }).click();
-    await page.getByRole('cell', { name, exact: true }).waitFor();
+    await section(page, 'Components').getByRole('cell', { name, exact: true }).waitFor();
   }
   await page
     .getByRole('row')
     .filter({ has: page.getByRole('cell', { name: 'web', exact: true }) })
     .getByRole('button', { name: 'Open' })
     .click();
+  expect(await section(page, 'Recent event history').textContent()).toContain(
+    'No retained observations',
+  );
   const component = section(page, 'Component settings');
   expect(
     await component
