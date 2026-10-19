@@ -477,14 +477,23 @@ async function renderView(view) {
             ? button(
                 'Deactivate',
                 async () => {
+                  const until = a.last_lease_expires_at
+                    ? new Date(a.last_lease_expires_at).toLocaleString()
+                    : null;
                   if (
                     !confirm(
-                      'Deactivate this device? Its existing offline lease may remain valid until expiry.',
+                      until
+                        ? `Deactivate this device and free its slot? If it is offline it can keep working until ${until}, when its current lease expires.`
+                        : 'Deactivate this device and free its slot?',
                     )
                   )
                     return;
                   await api(`${orgPath()}/activations/${a.id}/deactivate`, 'POST');
                   await navigate('Devices');
+                  notice(
+                    'Slot freed. To move the license, activate it on the new device.' +
+                      (until ? ` The old device can work offline until ${until}.` : ''),
+                  );
                 },
                 'danger',
               )
@@ -968,8 +977,70 @@ async function licenseDetail(l) {
       ),
     ),
   );
+  const seats = await seatPanel(l);
+  if (seats) content.append(seats);
   const billing = await billingPanel(l, license);
   if (billing) content.append(billing);
+}
+
+/** Named-user seats (ADR-025): shown only for seat-based licenses; admins assign and remove them. */
+async function seatPanel(l) {
+  const seats = await api(`${orgPath()}/licenses/${l.id}/seats`);
+  if (seats.limit === null) return undefined;
+  const base = `${orgPath()}/licenses/${l.id}/seats`;
+  const members = await api(`${orgPath()}/members`).catch(() => ({ items: [] }));
+  const label = (userId) => members.items.find((m) => m.user_id === userId)?.email || userId;
+  const card = panel(
+    node('h2', `Seats (${seats.used} of ${seats.limit} used)`),
+    node(
+      'p',
+      'Only people with a seat can activate this license. Removing a seat signs out their devices; an offline device keeps working until its current lease expires.',
+    ),
+    seats.items.length
+      ? table(
+          ['Person', 'Assigned', ''],
+          seats.items.map((s) => [
+            label(s.user_id),
+            new Date(s.assigned_at).toLocaleDateString(),
+            button(
+              'Remove seat',
+              async () => {
+                if (!confirm(`Remove ${label(s.user_id)}'s seat and sign out their devices?`))
+                  return;
+                const r = await api(`${base}/${s.user_id}/unassign`, 'POST', {});
+                await licenseDetail(l);
+                notice(
+                  `Seat removed; ${r.activations_deactivated} device(s) signed out.` +
+                    (r.offline_leases_valid_until
+                      ? ` Offline devices can keep working until ${new Date(r.offline_leases_valid_until).toLocaleString()}.`
+                      : ''),
+                );
+              },
+              'danger',
+            ),
+          ]),
+        )
+      : empty('No seats assigned yet.'),
+  );
+  const free = members.items.filter((m) => !seats.items.some((s) => s.user_id === m.user_id));
+  if (free.length && seats.used < seats.limit) {
+    const select = node('select');
+    select.setAttribute('aria-label', 'Person to give a seat');
+    for (const m of free) {
+      const o = node('option', m.email || m.user_id);
+      o.value = m.user_id;
+      select.append(o);
+    }
+    card.append(
+      select,
+      button('Assign seat', async () => {
+        await api(base, 'POST', { user_id: select.value });
+        await licenseDetail(l);
+        notice('Seat assigned.');
+      }),
+    );
+  }
+  return card;
 }
 async function deviceView() {
   const status = await device.summary();

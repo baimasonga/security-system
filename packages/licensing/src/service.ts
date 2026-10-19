@@ -61,7 +61,12 @@ import {
 } from './policy.ts';
 
 export type OrgPermission =
-  'license:read' | 'license:activate' | 'trial:start' | 'device:read' | 'device:deactivate';
+  | 'license:read'
+  | 'license:activate'
+  | 'license:manage_seats'
+  | 'trial:start'
+  | 'device:read'
+  | 'device:deactivate';
 
 /** Throws `not_found` for non-members and `forbidden` for members lacking the permission. */
 export type Authorizer = (
@@ -85,6 +90,8 @@ export interface LicensingDeps {
   config: LicensingConfig;
   authorize: Authorizer;
   orgExists: (orgId: string) => Promise<boolean>;
+  /** Seat assignment targets must be members of the organization (ADR-025). */
+  isMember?: (orgId: string, userId: string) => Promise<boolean>;
   evaluator?: AccessEvaluator;
 }
 
@@ -783,6 +790,85 @@ export class LicensingService {
   }
 
   /** Owners/admins may deactivate any device; members only devices they activated themselves. */
+  // ---- seats (ADR-025) --------------------------------------------------------------------------------------
+
+  async listSeats(p: UserPrincipal, orgId: string, licenseId: string) {
+    await this.#d.authorize(p, orgId, 'license:read');
+    const ctx = await this.#d.store.findLicenseContext(orgId, licenseId, 'none');
+    if (!ctx) throw new DomainError('not_found', 'license not found');
+    const items = await this.#d.store.listSeats(orgId, licenseId);
+    return {
+      limit: seatLimit(resolveEntitlements(ctx.plan, ctx.license.overrides)),
+      used: items.length,
+      items: items.map((s) => ({
+        userId: s.userId,
+        assignedBy: s.assignedBy,
+        assignedAt: s.assignedAt,
+      })),
+    };
+  }
+
+  async assignSeat(p: UserPrincipal, orgId: string, licenseId: string, userId: string) {
+    await this.#d.authorize(p, orgId, 'license:manage_seats');
+    if (!this.#d.isMember || !(await this.#d.isMember(orgId, userId)))
+      throw new DomainError('not_found', 'that person is not a member of this organization');
+    return this.#d.store.transaction(async (tx) => {
+      // Exclusive license lock: concurrent assignments cannot exceed the limit.
+      const ctx = await tx.findLicenseContext(orgId, licenseId, 'update');
+      if (!ctx) throw new DomainError('not_found', 'license not found');
+      const limit = seatLimit(resolveEntitlements(ctx.plan, ctx.license.overrides));
+      if (limit === null) throw new DomainError('conflict', 'this license is not seat-based');
+      if (ctx.license.state === 'revoked') throw new DomainError('conflict', 'license is revoked');
+      if (await tx.hasSeat(orgId, licenseId, userId))
+        throw new DomainError('conflict', 'this person already has a seat');
+      const used = (await tx.listSeats(orgId, licenseId)).length;
+      if (used >= limit)
+        throw new DomainError('seat_limit_reached', 'all seats are assigned', { limit });
+      const now = this.#d.clock.now();
+      await tx.insertSeat({ orgId, licenseId, userId, assignedBy: p.userId, assignedAt: now });
+      await tx.audit.append({
+        actor: { type: 'user', id: p.userId },
+        action: 'seat.assigned',
+        target: { type: 'license', id: licenseId },
+        orgId,
+        metadata: { user_id: userId },
+      });
+      return { userId, assignedBy: p.userId, assignedAt: now, limit, used: used + 1 };
+    });
+  }
+
+  /**
+   * Removes a seat and signs out that person's devices on the license. Devices that are offline keep their
+   * current lease until it expires: the result says until when (no instantaneous offline revocation).
+   */
+  async unassignSeat(p: UserPrincipal, orgId: string, licenseId: string, userId: string) {
+    await this.#d.authorize(p, orgId, 'license:manage_seats');
+    return this.#d.store.transaction(async (tx) => {
+      const lic = await tx.findLicenseForUpdate(orgId, licenseId); // lock order: license -> activation
+      if (!lic) throw new DomainError('not_found', 'license not found');
+      if (!(await tx.deleteSeat(orgId, licenseId, userId)))
+        throw new DomainError('not_found', 'no such seat');
+      const now = this.#d.clock.now();
+      let deactivated = 0;
+      let offlineUntil: Date | null = null;
+      for (const a of await tx.listActivationsForLicense(orgId, licenseId)) {
+        if (a.status !== 'active' || a.activatedBy !== userId) continue;
+        await tx.updateActivation({ ...a, status: 'deactivated', deactivatedAt: now });
+        deactivated++;
+        if (a.lastLeaseExp && (!offlineUntil || a.lastLeaseExp > offlineUntil))
+          offlineUntil = a.lastLeaseExp;
+      }
+      await tx.audit.append({
+        actor: { type: 'user', id: p.userId },
+        action: 'seat.unassigned',
+        target: { type: 'license', id: licenseId },
+        orgId,
+        metadata: { user_id: userId, activations_deactivated: deactivated },
+      });
+      return { userId, activationsDeactivated: deactivated, offlineLeasesValidUntil: offlineUntil };
+    });
+  }
+
   async deactivateActivation(
     p: UserPrincipal,
     orgId: string,
@@ -931,6 +1017,9 @@ export class LicensingService {
         const newDevice = device.id === candidate.id;
 
         const resolved = resolveEntitlements(ctx.plan, lic.overrides);
+        // Seat-based licenses: the activating person needs a seat (device slots are counted separately).
+        if (seatLimit(resolved) !== null && !(await tx.hasSeat(lic.orgId, lic.id, p.userId)))
+          throw new DomainError('seat_required', 'you need a seat on this license to activate it');
         const slot = await tx.findActivationSlot(lic.id, device.id);
         let act = slot.existing;
         let reissued = false;
@@ -1508,4 +1597,10 @@ export interface DeviceAuthInput {
   installationId: string;
   nonce: string;
   signature: string;
+}
+
+/** Seat limit of a resolved plan: the `seats` entitlement when it is a positive integer; null = not seat-based. */
+function seatLimit(r: ResolvedEntitlements): number | null {
+  const v = r.entitlements['seats'];
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null;
 }

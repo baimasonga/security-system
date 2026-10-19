@@ -8,6 +8,8 @@ import {
   entitlementsQuery,
   licenseParams,
   orgParams,
+  seatBody,
+  seatParams,
   trialBody,
 } from '../schemas.ts';
 
@@ -57,6 +59,28 @@ export function registerLicenseRoutes(app: FastifyInstance, c: Container): void 
     const { orgId, activationId } = parse(activationParams, req.params);
     return toWire(await c.licensing.deactivateActivation(principalOf(req), orgId, activationId));
   });
+
+  // ---- seats (ADR-025) ----
+  app.get('/v1/organizations/:orgId/licenses/:licenseId/seats', pre, async (req) => {
+    const { orgId, licenseId } = parse(licenseParams, req.params);
+    return toWire(await c.licensing.listSeats(principalOf(req), orgId, licenseId));
+  });
+  app.post('/v1/organizations/:orgId/licenses/:licenseId/seats', pre, async (req, reply) => {
+    const { orgId, licenseId } = parse(licenseParams, req.params);
+    const { user_id } = parse(seatBody, req.body);
+    await c.auth.getOrganization(principalOf(req), orgId); // 404 for non-members before revealing a freeze
+    await c.privileged.assertWritable(orgId);
+    const out = await c.licensing.assignSeat(principalOf(req), orgId, licenseId, user_id);
+    return reply.status(201).send(toWire(out));
+  });
+  app.post(
+    '/v1/organizations/:orgId/licenses/:licenseId/seats/:userId/unassign',
+    pre,
+    async (req) => {
+      const { orgId, licenseId, userId } = parse(seatParams, req.params);
+      return toWire(await c.licensing.unassignSeat(principalOf(req), orgId, licenseId, userId));
+    },
+  );
 
   app.post('/v1/organizations/:orgId/trials', pre, async (req, reply) => {
     const { orgId } = parse(orgParams, req.params);

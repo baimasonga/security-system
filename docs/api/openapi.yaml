@@ -768,6 +768,55 @@ paths:
         '200': { description: Deactivated }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /v1/organizations/{orgId}/licenses/{licenseId}/seats:
+    parameters:
+      [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
+    get:
+      summary: Seats on this license (ADR-025); limit is null for licenses that are not seat-based
+      security: [{ bearer: [] }]
+      responses:
+        {
+          '200': { description: '{ limit, used, items: [{ user_id, assigned_by, assigned_at }] }' },
+          '404': { description: Not a member },
+        }
+    post:
+      summary: Give a member a seat (admins and owners; under the license lock)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [user_id],
+                additionalProperties: false,
+                properties: { user_id: { type: string } },
+              }
+      responses:
+        {
+          '201': { description: '{ user_id, assigned_by, assigned_at, limit, used }' },
+          '403': { description: Not an admin },
+          '404': { description: Not a member, or the person is not a member },
+          '409': { description: 'Not seat-based, already assigned, or seat_limit_reached' },
+          '423': { description: Organization frozen },
+        }
+  /v1/organizations/{orgId}/licenses/{licenseId}/seats/{userId}/unassign:
+    parameters:
+      - { $ref: '#/components/parameters/OrgId' }
+      - { $ref: '#/components/parameters/LicenseId' }
+      - { name: userId, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Remove a seat and deactivate that person's devices on the license; reports how long offline leases stay valid
+      security: [{ bearer: [] }]
+      requestBody: { $ref: '#/components/requestBodies/Empty' }
+      responses:
+        {
+          '200':
+            { description: '{ user_id, activations_deactivated, offline_leases_valid_until }' },
+          '403': { description: Not an admin },
+          '404': { description: No such seat },
+        }
   /v1/organizations/{orgId}/trials:
     parameters: [{ $ref: '#/components/parameters/OrgId' }]
     post:
@@ -2858,6 +2907,8 @@ components:
               device_key_conflict,
               activation_not_found,
               trial_not_available,
+              seat_required,
+              seat_limit_reached,
               quota_exceeded,
               link_unavailable,
               password_required,

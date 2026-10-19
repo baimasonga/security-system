@@ -60,6 +60,8 @@ export const ERROR_STATUS = {
   device_key_conflict: 409,
   activation_not_found: 404,
   trial_not_available: 409,
+  seat_required: 403,
+  seat_limit_reached: 409,
   // Sharing outcomes
   quota_exceeded: 409,
   link_unavailable: 410,

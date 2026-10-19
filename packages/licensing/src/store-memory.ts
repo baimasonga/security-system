@@ -2,6 +2,7 @@ import { AuditBuffer, type AuditEventInput, type AuditLog } from '@trust/audit';
 import type {
   Activation,
   QuotaCharge,
+  Seat,
   BillingCheckout,
   BillingEventReceipt,
   Challenge,
@@ -20,6 +21,7 @@ import type {
 
 interface State {
   quotaCharges: Map<string, QuotaCharge>;
+  seats: Map<string, Seat>;
   billingCheckouts: Map<string, BillingCheckout>;
   billingEvents: Map<string, BillingEventReceipt>;
   products: Map<string, Product>;
@@ -38,6 +40,7 @@ const clone = <T>(v: T): T => structuredClone(v);
 function emptyState(): State {
   return {
     quotaCharges: new Map(),
+    seats: new Map(),
     billingCheckouts: new Map(),
     billingEvents: new Map(),
     products: new Map(),
@@ -139,6 +142,26 @@ class Repo implements LicensingRepo {
           c.period === period,
       )
       .reduce((n, c) => n + c.units, 0);
+  }
+  async insertSeat(seat: Seat) {
+    const k = `${seat.licenseId}|${seat.userId}`;
+    if (this.s.seats.has(k)) throw new Error('duplicate_seat');
+    this.s.seats.set(k, clone(seat));
+  }
+  async deleteSeat(orgId: string, licenseId: string, userId: string) {
+    const k = `${licenseId}|${userId}`;
+    if (this.s.seats.get(k)?.orgId !== orgId) return false;
+    this.s.seats.delete(k);
+    return true;
+  }
+  async listSeats(orgId: string, licenseId: string) {
+    return [...this.s.seats.values()]
+      .filter((x) => x.orgId === orgId && x.licenseId === licenseId)
+      .sort((a, b) => +a.assignedAt - +b.assignedAt || a.userId.localeCompare(b.userId))
+      .map(clone);
+  }
+  async hasSeat(orgId: string, licenseId: string, userId: string) {
+    return this.s.seats.get(`${licenseId}|${userId}`)?.orgId === orgId;
   }
   async insertQuotaCharge(c: QuotaCharge) {
     if (this.s.licenses.get(c.licenseId)?.orgId !== c.orgId)

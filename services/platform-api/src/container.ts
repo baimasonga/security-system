@@ -315,6 +315,7 @@ export async function createContainer(
       await auth.requireOrgPermission(p, orgId, permission);
     },
     orgExists: (id) => auth.orgExists(id),
+    isMember: (orgId, userId) => auth.isMember(orgId, userId),
   });
 
   const billing = config.billing

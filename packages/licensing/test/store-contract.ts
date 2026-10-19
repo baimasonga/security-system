@@ -117,6 +117,41 @@ export function licensingStoreContract(
   }
 
   describe(`LicensingStore contract: ${name}`, () => {
+    it('assigns each seat once per license, scoped to the organization, and removes it on request', async () => {
+      const f = await fixture();
+      const other = uid('usr');
+      await f.seedUser(other);
+      const l = lic(f.orgA, f.prd.id, f.pln.id, null);
+      await f.store.insertLicense(l);
+      const seat = (userId: string, at = T) => ({
+        orgId: f.orgA,
+        licenseId: l.id,
+        userId,
+        assignedBy: f.user,
+        assignedAt: at,
+      });
+      await f.store.insertSeat(seat(f.user));
+      await f.store.insertSeat(seat(other, later(5)));
+      await expect(f.store.insertSeat(seat(f.user))).rejects.toThrow();
+      expect(await f.store.listSeats(f.orgA, l.id)).toEqual([seat(f.user), seat(other, later(5))]);
+      expect(await f.store.hasSeat(f.orgA, l.id, other)).toBe(true);
+      // another organization sees nothing and removes nothing
+      expect(await f.store.listSeats(f.orgB, l.id)).toEqual([]);
+      expect(await f.store.hasSeat(f.orgB, l.id, other)).toBe(false);
+      expect(await f.store.deleteSeat(f.orgB, l.id, other)).toBe(false);
+      expect(await f.store.deleteSeat(f.orgA, l.id, other)).toBe(true);
+      expect(await f.store.deleteSeat(f.orgA, l.id, other)).toBe(false);
+      expect(await f.store.hasSeat(f.orgA, l.id, other)).toBe(false);
+      // rolled back with the transaction
+      await expect(
+        f.store.transaction(async (tx) => {
+          await tx.insertSeat(seat(other));
+          throw new Error('boom');
+        }),
+      ).rejects.toThrow('boom');
+      expect(await f.store.hasSeat(f.orgA, l.id, other)).toBe(false);
+    });
+
     it('isolates checkout intents, enforces one per license and atomically retains event receipts', async () => {
       const f = await fixture(),
         l = lic(f.orgA, f.prd.id, f.pln.id, null);

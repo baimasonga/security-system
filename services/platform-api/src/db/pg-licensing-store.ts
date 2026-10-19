@@ -4,6 +4,7 @@ import type { Clock } from '@trust/shared-types';
 import type {
   Activation,
   QuotaCharge,
+  Seat,
   BillingCheckout,
   BillingEventReceipt,
   Challenge,
@@ -340,6 +341,39 @@ class PgRepo implements LicensingRepo {
     const used = Number(r.rows[0]!.used);
     if (!Number.isSafeInteger(used)) throw new Error('quota usage out of range');
     return used;
+  }
+  async insertSeat(seat: Seat) {
+    await this.#q.query(
+      'INSERT INTO license_seats (org_id,license_id,user_id,assigned_by,assigned_at) VALUES ($1,$2,$3,$4,$5)',
+      [seat.orgId, seat.licenseId, seat.userId, seat.assignedBy, seat.assignedAt],
+    );
+  }
+  async deleteSeat(orgId: string, licenseId: string, userId: string) {
+    const r = await this.#q.query(
+      'DELETE FROM license_seats WHERE org_id=$1 AND license_id=$2 AND user_id=$3',
+      [orgId, licenseId, userId],
+    );
+    return (r.rowCount ?? 0) > 0;
+  }
+  async listSeats(orgId: string, licenseId: string) {
+    const r = await this.#q.query(
+      'SELECT org_id,license_id,user_id,assigned_by,assigned_at FROM license_seats WHERE org_id=$1 AND license_id=$2 ORDER BY assigned_at, user_id',
+      [orgId, licenseId],
+    );
+    return r.rows.map((x): Seat => ({
+      orgId: x['org_id'] as string,
+      licenseId: x['license_id'] as string,
+      userId: x['user_id'] as string,
+      assignedBy: x['assigned_by'] as string,
+      assignedAt: new Date(x['assigned_at'] as string | Date),
+    }));
+  }
+  async hasSeat(orgId: string, licenseId: string, userId: string) {
+    const r = await this.#q.query(
+      'SELECT 1 FROM license_seats WHERE org_id=$1 AND license_id=$2 AND user_id=$3',
+      [orgId, licenseId, userId],
+    );
+    return r.rows.length > 0;
   }
   async insertQuotaCharge(c: QuotaCharge) {
     try {

@@ -120,6 +120,15 @@ export interface LicenseContext {
   subscription: Subscription | undefined;
 }
 
+/** A named-user seat on a seat-based license (ADR-025). Seats and device slots are different resources. */
+export interface Seat {
+  orgId: string;
+  licenseId: string;
+  userId: string;
+  assignedBy: string;
+  assignedAt: Date;
+}
+
 export interface QuotaCharge {
   id: string;
   orgId: string;
@@ -183,6 +192,13 @@ export interface LicensingRepo {
     period: string,
   ): Promise<number>;
   insertQuotaCharge(charge: QuotaCharge): Promise<void>;
+  /** Fails when the user already holds a seat on the license. */
+  insertSeat(s: Seat): Promise<void>;
+  /** False when there was no such seat in that organization. */
+  deleteSeat(orgId: string, licenseId: string, userId: string): Promise<boolean>;
+  /** Oldest assignment first. */
+  listSeats(orgId: string, licenseId: string): Promise<Seat[]>;
+  hasSeat(orgId: string, licenseId: string, userId: string): Promise<boolean>;
   insertProduct(p: Product): Promise<void>;
   findProductById(id: string): Promise<Product | undefined>;
   findProductByCode(code: string): Promise<Product | undefined>;

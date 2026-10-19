@@ -264,3 +264,7 @@ export const passkeyLoginFinishBody = z
   })
   .strict();
 export const passkeyParams = z.object({ credentialId: b64url(1400) }).strict();
+
+// ---- seats (ADR-025) ----
+export const seatBody = z.object({ user_id: id }).strict();
+export const seatParams = z.object({ orgId: id, licenseId: id, userId: id }).strict();

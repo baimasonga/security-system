@@ -30,6 +30,7 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   subscriptions: RIU,
   licenses: RIU,
   quota_charges: RI,
+  license_seats: ALL, // admins unassign seats
   billing_checkouts: RIU,
   billing_events: RI, // immutable accounting receipts; no rewrite or deletion by the app
   trial_claims: RI,

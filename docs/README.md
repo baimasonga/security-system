@@ -41,6 +41,7 @@ Current browser and identity work:
 
 - [ADR-015 — Browser portal](adr/ADR-015-browser-portal.md)
 - [ADR-016 — Email verification and password recovery](adr/ADR-016-identity-recovery.md)
+- [ADR-025 — Named-user seats and offline transfer](adr/ADR-025-seats-and-offline-transfer.md)
 - [ADR-024 — Capability tokens for processing services](adr/ADR-024-capability-tokens.md)
 - [ADR-023 — Passkeys (WebAuthn)](adr/ADR-023-passkeys.md) · [threat model](threat-models/04-passkeys.md)
 - [ADR-022 — Privileged operations: dual control, JIT grants, freeze, break-glass](adr/ADR-022-privileged-operations.md) · [threat model](threat-models/03-privileged-operations.md)
