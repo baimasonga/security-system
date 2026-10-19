@@ -61,8 +61,9 @@ Ingestion is observational only. Implement revocation as the explicit freeze exc
 
 Lifecycle: `active → disabled → active`, or either → `archived` (terminal). DELETE is soft archive, audited,
 and accepts expected version/reason. No code/ID reuse. Archived/disabled ancestors block new credentials,
-events and rules even if descendants are active; archive/disable effectively invalidates their credentials
-and reactivation never resurrects revoked credentials. Existing history remains readable until retention
+events and rules even if descendants are active. Disable temporarily suspends use of descendant credentials;
+reactivation permits only still-unexpired, unrevoked credentials. Archive permanently blocks use through that
+ancestor; it is terminal. Neither lifecycle transition can resurrect revoked credentials. Existing history remains readable until retention
 expires. Components have kind `service|database|storage|worker|scanner|desktop|provider`; environments have
 kind `development|staging|production`. Dependencies are an inventory graph, never URLs to execute.
 Lists use opaque last-ID cursors scoped to the organization/parent, ordered ID ascending, limit 1–100;

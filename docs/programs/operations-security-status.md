@@ -42,7 +42,7 @@ alert destinations, independent monitoring and restore exercises remain later ro
 ## OPS-001 implementation entry
 
 - **Task/state:** OPS-001 complete as design/schema work; runtime monitoring remains pending.
-- **Commit/PR:** publication pending on `codex/operations-contracts`; record the PR link here before final merge.
+- **Commit/PR:** [PR #16](https://github.com/baimasonga/security-system/pull/16), initial implementation commit `d806be9`; this PR also records the final publication evidence.
 - **Behavior/contracts:** reconciled current source, accepted ADR-029 and threat model; specified separate RBAC,
   immutable inventory/ownership, one-time 256-bit scoped bearer secrets, fresh-code credential management,
   bounded rotation/revoke races, strict versioned events, committed atomic acknowledgements, scoped canonical
@@ -52,8 +52,7 @@ alert destinations, independent monitoring and restore exercises remain later ro
   deliberate schema mutations cover event scope fields, attribute allow-list, enum privacy, batch cap, numeric
   bounds, metadata secret separation, rotation overlap and required management inputs. These checks validate
   the planned schemas only; they do not establish runtime authentication/atomicity/PII logging behavior.
-- **Verification:** managed Linux workspace, Node 24.19.0 and npm 11.9.0. Full `npm run check` must pass before
-  publication; final observed result is recorded with the PR. PG/load checks are not applicable to this design-only
+- **Verification:** managed Linux workspace, Node 24.19.0 and npm 11.9.0. Full `npm run check` passed (770 tests passed, 3 skipped); `npm audit --audit-level=high` reported zero vulnerabilities. Eight deliberate schema mutations were caught. GitHub CI results are linked from the PR. PG/load checks are not applicable to this design-only
   task: no store, transaction or retention implementation changed. The existing live OpenAPI drift test remains active.
 - **Configuration applied:** none; no production credentials or real alert destinations used.
 - **Known gaps:** all OPS-002–008 runtime controls, source outbox, health history, incident delivery and live
