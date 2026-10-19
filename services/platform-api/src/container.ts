@@ -1,3 +1,5 @@
+import { InventoryService, InMemoryInventoryStore, CredentialService } from '@trust/operations';
+import { PgInventoryStore } from './db/pg-operations-store.ts';
 import { BillingService } from './billing.ts';
 import {
   PaddleCheckoutProvider,
@@ -84,6 +86,8 @@ export interface Container {
   clock: Clock;
   audit: AuditLog;
   auth: AuthService;
+  operations: InventoryService;
+  operationsCredentials: CredentialService;
   licensing: LicensingService;
   billing: BillingService | undefined;
   /** File sharing and short links (ADR-021); undefined when not configured. */
@@ -470,6 +474,44 @@ export async function createContainer(
     },
   });
 
+  const operationsStore = pool
+    ? new PgInventoryStore(pool, clock, { auditShards: shards })
+    : new InMemoryInventoryStore({ audit });
+  const operations = new InventoryService({
+    store: operationsStore,
+    clock,
+    authorize: async (p, orgId, permission) => {
+      await auth.requireOrgPermission(p, orgId, permission);
+    },
+    assertWritable: (orgId) => privileged.assertWritable(orgId),
+    activeMember: async (orgId, userId) =>
+      !!(await authStore.findMembership(orgId, userId)) &&
+      (await authStore.findUserById(userId))?.status === 'active',
+    activeProduct: async (productId) =>
+      (await licensingStore.findProductById(productId))?.status === 'active',
+  });
+
+  const operationsCredentials = new CredentialService({
+    store: operationsStore,
+    clock,
+    enabled: () => config.operationsCredentialsEnabled && config.operationsInventoryEnabled,
+    authorize: async (p, orgId, permission) => {
+      await auth.requireOrgPermission(p, orgId, permission);
+    },
+    assertWritable: (orgId) => privileged.assertWritable(orgId),
+    stepUp: (p, code) => auth.stepUp(p, code),
+    sessionActive: async (p, now) => {
+      const s = await authStore.findSessionById(p.sessionId);
+      return (
+        !!s &&
+        s.userId === p.userId &&
+        !s.revokedAt &&
+        s.expiresAt > now &&
+        (await authStore.findUserById(p.userId))?.status === 'active'
+      );
+    },
+  });
+
   const rateBackend: RateBackend | undefined =
     pool && config.rateLimitStore === 'postgres'
       ? new ResilientRateBackend(new PgRateBackend(pool), new MemoryRateBackend(), {
@@ -484,6 +526,8 @@ export async function createContainer(
     clock,
     audit,
     auth,
+    operations,
+    operationsCredentials,
     licensing,
     billing,
     sharing,

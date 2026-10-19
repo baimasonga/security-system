@@ -4,8 +4,8 @@ Date: 19 October 2026. Product direction: Bai Bureh Warrior should monitor and h
 protect all of the owner's applications and systems. Rokela Business Admin is the
 first integration reported by the owner; Rokela PDF is the second candidate.
 
-This document records a roadmap, not a claim that its proposed APIs, credentials,
-monitoring jobs or incident workflows already exist. The accepted OPS-001 design is recorded
+This document records the roadmap. OPS-002 inventory and OPS-003 credentials are implemented behind opt-in flags;
+ingestion, monitoring jobs and incident workflows remain planned. The accepted OPS-001 design is recorded
 in ADR-029 and the [operations contract](../api/operations-contract.md); runtime implementation remains pending. Implementation progress belongs in
 [the status file](operations-security-status.md).
 
@@ -74,7 +74,8 @@ remediation permissions must remain distinct.
 ## Delivery tasks
 
 Dependencies are mandatory; finish a vertical slice with negative-path tests before
-starting the next. Proposed names below are concepts, not existing endpoint contracts.
+starting the next. Consult the status file for implementation evidence and the live
+OpenAPI for shipped inventory routes; the other tasks remain design targets.
 
 | Task                                             | Depends on       | Deliverable and completion criteria                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

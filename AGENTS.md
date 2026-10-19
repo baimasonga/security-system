@@ -12,8 +12,8 @@ For cross-application monitoring work, read these in order:
    task dependencies and acceptance criteria.
 2. [Progress and handoff](docs/programs/operations-security-status.md): current task,
    evidence, blockers and the next action. Do not treat planned features as implemented.
-3. [Proposed ADR-029](docs/adr/ADR-029-application-operations.md) and the
-   [draft threat model](docs/threat-models/06-application-monitoring.md).
+3. [ADR-029](docs/adr/ADR-029-application-operations.md) and the
+   [threat model](docs/threat-models/06-application-monitoring.md).
 4. [Rokela PDF integration brief](docs/integrations/rokela-pdf.md) when working on the
    second application integration.
 

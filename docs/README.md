@@ -62,5 +62,9 @@ Current browser and identity work:
 
 Portal, operator console, catalog and software-device demo are implemented. Email recovery requires optional Resend configuration. Authenticator MFA, passkeys and privileged operations (dual control, JIT grants, freeze, break-glass) are implemented. Advanced billing, hardware attestation, workspace and the remaining items in the feature program are still tracked as remaining work, not completed features.
 
-Operations implementation targets (OPS-001; not live endpoints): [contract](api/operations-contract.md),
+Operations design and implementation: [contract](api/operations-contract.md),
 [planned OpenAPI](api/operations-planned.openapi.yaml), [safe examples](api/operations-safe-examples.json).
+
+OPS-002 inventory is implemented behind an opt-in flag: [rollout and rollback](deploy/operations-inventory.md).
+
+OPS-003 credential management and guarded verification: [rollout, rotation and rollback](deploy/operations-credentials.md).

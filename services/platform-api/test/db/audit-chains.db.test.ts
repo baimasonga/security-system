@@ -308,7 +308,7 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
       await db?.end();
       await admin?.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
       await admin?.end();
-    });
+    }, 60_000); // Database removal can wait for a checkpoint; match the shared PG harness.
 
     it('legacy events keep verifying, are never extended, and new events use their own chains', async () => {
       const old = mkdtempSync(join(tmpdir(), 'mig-old-'));
@@ -355,6 +355,8 @@ describe.skipIf(!url)('partitioned audit chains on PostgreSQL (ADR-008)', () => 
         '0014_capability_challenges',
         '0015_license_seats',
         '0016_device_trust',
+        '0017_operations_inventory',
+        '0018_operations_credentials',
       ]);
       const head = (
         await db.query("SELECT head_seq, head_hash FROM audit_chains WHERE chain_id='legacy'")
