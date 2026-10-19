@@ -10,8 +10,8 @@ verification supplies a guarded transaction primitive, not an event collector.
 No events/health/incidents runtime or live Rokela PDF connection is implemented.
 OPS-002 and OPS-003 were merged together in PR #24 (`919dff77`); PR #23 was
 closed as superseded. Both operations flags are enabled on the existing Warrior
-Railway production service. This enables backend management APIs, not a fleet UI
-or application event ingestion. See the production rollout evidence below.
+Railway production service. This enabled backend management APIs; dashboard wiring is now implemented on the
+working branch described below. Application event ingestion remains unimplemented. See the production rollout evidence below.
 
 | Task    | State                                 | Verification/evidence                                                                                                                        |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,6 +54,42 @@ or application event ingestion. See the production rollout evidence below.
 - Rollback: disable credentials first, then inventory if required; keep migrations,
   stored digests and audit history. Do not replace the MFA key or licensing secrets.
 
+## Dashboard wiring — implementation and continuation checkpoint
+
+User requested usable dashboard controls for the implemented APIs, followed by the
+remaining monitoring program, with a durable handoff for the next agent. Work branch: `feat/operations-dashboard`, based on
+production merge `919dff77` plus the production evidence commit `8b44184` (PR #25).
+Do not mistake this working branch for a production deployment.
+
+- Added `web/operations.mjs` and Applications navigation: applications, environments,
+  components/dependencies, ownership/Product/criticality editing, versioned lifecycle
+  changes, retained-record lookup and credential issue/rotate/revoke with fresh MFA.
+- Scope is captured per visit. Navigation/workspace/session changes invalidate async
+  results; credential factors are cleared before requests, secrets use one-time modal
+  presentation and are cleared on close/navigation/pagehide. Backend authorization and
+  APIs are unchanged. Disabled/archived parent credential revocation stays available.
+- Added Playwright Core as a development dependency, a separate `portal` Vitest project,
+  `npm run test:portal`, and a CI browser job. Local browser uses
+  `CHROMIUM_PATH=/usr/bin/chromium npm run test:portal`; CI installs Chromium using
+  `npx playwright-core install --with-deps chromium`. No provider credentials needed.
+- Four real browser/API flows pass locally: inventory/dependencies, MFA credentials,
+  disabled/archived emergency revoke, pagination/retained lookup, delayed secret scope,
+  member refusal, replay refusal, unavailable rollout and mobile overflow. Three
+  deliberate mutations were caught by assertions: retained MFA input, a late secret
+  displayed across workspace switch, and secret persistence in localStorage.
+- PostgreSQL owner/app-role operations regression: 30 tests passed. Final exact-source
+  `npm run check` passed with 801 tests and 3 skips; the four browser workflows
+  also passed after all modal/loading refinements. `npm audit --audit-level=high`
+  reported zero vulnerabilities. Local runtime:
+  Node 24.19.0/npm 11.9.0, Chromium; CI uses Node 22 and managed Chromium.
+- Rollout/user guide: [operations-dashboard.md](../deploy/operations-dashboard.md).
+  GitHub continuation checkpoint is also recorded in PR #25
+  (comment 6277627115). Do not treat that provisional comment as deployment evidence.
+- Before resuming: inspect git status and this entry, confirm final browser/check results, run `npm run check` and applicable regression checks, publish a PR containing
+  this checkpoint, then observe CI and deployment. Record exact evidence, not intent.
+- Next backend task remains OPS-004 below. No ingestion, health, incidents, live app
+  credentials, provider onboarding or external witness was implemented by this UI work.
+
 ## Next action: OPS-004
 
 Implement durable event ingestion using the accepted strict version-1 schemas and
@@ -67,8 +103,9 @@ callback must be retry-safe and have no external side effects. Add real HTTP col
 race/DB failure/conflict/PII tests, memory/PG contracts, app-role grants, mutation and
 contention/retention evidence. Do not infer ingestion readiness from credential tests.
 
-Reconcile/merge prerequisite PRs through normal review/CI first. Local work needs no
-production token, external account, provider or real alert destination.
+OPS-002/003 prerequisites are already merged and enabled. Finish publishing the
+dashboard slice above through normal CI first, then start OPS-004 from that baseline.
+Local ingestion work needs no production token, external account or real alert destination.
 
 ## OPS-003 implementation entry
 

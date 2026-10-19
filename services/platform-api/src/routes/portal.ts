@@ -14,6 +14,7 @@ export function registerPortalRoutes(
   const checkoutJs = readFileSync(new URL('../web/checkout.mjs', import.meta.url), 'utf8');
   const device = readFileSync(new URL('../web/device.mjs', import.meta.url), 'utf8');
   const icon = readFileSync(new URL('../web/rokela-icon.png', import.meta.url));
+  const operations = readFileSync(new URL('../web/operations.mjs', import.meta.url), 'utf8');
   const files = readFileSync(new URL('../web/files.mjs', import.meta.url), 'utf8');
   const shareHtml = readFileSync(new URL('../web/share.html', import.meta.url), 'utf8');
   const shareJs = readFileSync(new URL('../web/share.mjs', import.meta.url), 'utf8');
@@ -31,6 +32,7 @@ export function registerPortalRoutes(
     ['/portal.mjs', 'text/javascript; charset=utf-8', js],
     ['/device.mjs', 'text/javascript; charset=utf-8', device],
     ['/rokela-icon.png', 'image/png', icon],
+    ['/operations.mjs', 'text/javascript; charset=utf-8', operations],
     ['/files.mjs', 'text/javascript; charset=utf-8', files],
     ['/uploader.mjs', 'text/javascript; charset=utf-8', uploaderJs],
     ['/public.mjs', 'text/javascript; charset=utf-8', publicJs],
@@ -52,7 +54,15 @@ export function registerPortalRoutes(
       if (
         paymentHost &&
         host === paymentHost &&
-        ['/', '/portal.mjs', '/device.mjs', '/files.mjs', '/s/:token', '/r/:token'].includes(url)
+        [
+          '/',
+          '/portal.mjs',
+          '/device.mjs',
+          '/operations.mjs',
+          '/files.mjs',
+          '/s/:token',
+          '/r/:token',
+        ].includes(url)
       )
         return reply.status(404).send({ code: 'not_found', message: 'not found' });
       return reply.type(type).send(body);
