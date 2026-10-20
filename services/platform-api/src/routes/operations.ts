@@ -159,6 +159,7 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
     registerHealthRoutes(scoped, c);
     registerIncidentRoutes(scoped, c);
     registerAutomationRoutes(scoped, c);
+    registerPostureRoutes(scoped, c);
   });
 }
 function registerInventoryRoutes(app: FastifyInstance, c: Container) {
@@ -660,6 +661,49 @@ function registerAutomationRoutes(app: FastifyInstance, c: Container) {
         principalOf(req),
         safeParse(scopeParams, req.params),
       ),
+    );
+  });
+}
+
+function registerPostureRoutes(app: FastifyInstance, c: Container) {
+  const path = base + '/:applicationId/environments/:environmentId/security';
+  const params = z
+    .object({ orgId: id('org'), applicationId: id('opa'), environmentId: id('ope') })
+    .strict();
+  const pre = {
+    logLevel: 'silent' as const,
+    preHandler: [
+      authenticated(c),
+      async () => {
+        if (!c.config.operationsPostureEnabled) throw new DomainError('not_found', 'not found');
+      },
+    ],
+  };
+  app.get(path, pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    return toWire(await c.operationsPosture.read(principalOf(req), safeParse(params, req.params)));
+  });
+  for (const type of ['scans', 'recovery'] as const)
+    app.post(path + '/' + type, { ...pre, bodyLimit: 131072 }, async (req, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      safeParse(z.object({}).strict(), req.query);
+      const scope = safeParse(params, req.params);
+      const result =
+        type === 'scans'
+          ? await c.operationsPosture.importScan(principalOf(req), scope, req.body)
+          : await c.operationsPosture.recordRecovery(principalOf(req), scope, req.body);
+      return reply.code(result.created ? 201 : 200).send(toWire(result));
+    });
+  app.patch(path + '/findings/:findingId', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    const { findingId, ...scope } = safeParse(
+      params.extend({ findingId: z.string().regex(/^osf_[a-f0-9]{24}$/) }),
+      req.params,
+    );
+    return toWire(
+      await c.operationsPosture.configureFinding(principalOf(req), scope, findingId, req.body),
     );
   });
 }

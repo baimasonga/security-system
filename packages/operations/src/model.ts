@@ -1,3 +1,4 @@
+import type { PostureRepo } from './posture-model.ts';
 import type { AutomationRepo } from './automation-model.ts';
 import type { EventRepo } from './events-model.ts';
 import type { IncidentRepo } from './incidents.ts';
@@ -65,7 +66,7 @@ export interface CredentialListOptions {
   activeAt?: Date;
 }
 /** All mutation work, including audit, must run inside a serialized organization transaction. */
-export interface InventoryRepo extends EventRepo, IncidentRepo, AutomationRepo {
+export interface InventoryRepo extends EventRepo, IncidentRepo, AutomationRepo, PostureRepo {
   findCredential(id: string): Promise<CredentialRecord | undefined>;
   listCredentials(
     scope: CredentialScope,
@@ -92,7 +93,11 @@ export interface InventoryAuthority {
     p: UserPrincipal,
     orgId: string,
     permission:
-      'ops:read' | 'ops:manage_inventory' | 'ops:manage_credentials' | 'ops:manage_incidents',
+      | 'ops:read'
+      | 'ops:manage_inventory'
+      | 'ops:manage_credentials'
+      | 'ops:manage_incidents'
+      | 'ops:manage_security',
   ): Promise<void>;
   assertWritable(orgId: string): Promise<void>;
   sessionActive?(p: UserPrincipal, now: Date): Promise<boolean>;

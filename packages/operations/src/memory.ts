@@ -2,7 +2,7 @@ import type { AlertRule, AlertNotification } from './automation-model.ts';
 import type { Heartbeat } from './health.ts';
 import type { Incident } from './incidents.ts';
 import type { OperationEvent } from './events-model.ts';
-import { MemoryEventRepo } from './events-memory.ts';
+import { MemoryPostureRepo } from './posture-memory.ts';
 import { AuditBuffer, type AuditLog, type AuditEventInput } from '@trust/audit';
 import type {
   CredentialRecord,
@@ -16,7 +16,7 @@ import type {
   InventoryType,
 } from './model.ts';
 
-class Repo extends MemoryEventRepo implements InventoryRepo {
+class Repo extends MemoryPostureRepo implements InventoryRepo {
   rules = new Map<string, AlertRule>();
   notifications = new Map<string, AlertNotification>();
   async listAlertRules(scope: CredentialScope) {
@@ -423,6 +423,8 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
     const run = async () => {
       // Work against an isolated snapshot: readers cannot see uncommitted rows.
       const repo = new Repo();
+      repo.securityEvidence = structuredClone(this.securityEvidence);
+      repo.securityFindings = structuredClone(this.securityFindings);
       repo.rows = structuredClone(this.rows);
       repo.credentials = structuredClone(this.credentials);
       repo.events = structuredClone(this.events);
@@ -438,6 +440,8 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       const events = buffer.drain();
       if (this.#audit) await this.#audit.appendMany(events);
       else this.committedAudit.push(...events);
+      this.securityEvidence = repo.securityEvidence;
+      this.securityFindings = repo.securityFindings;
       this.rows = repo.rows;
       this.credentials = repo.credentials;
       this.events = repo.events;

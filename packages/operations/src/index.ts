@@ -8,3 +8,6 @@ export * from './health.ts';
 export * from './incidents.ts';
 export * from './automation-model.ts';
 export * from './automation.ts';
+
+export * from './posture-model.ts';
+export * from './posture.ts';

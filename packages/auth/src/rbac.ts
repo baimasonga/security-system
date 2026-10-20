@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   'ops:manage_inventory',
   'ops:manage_credentials',
   'ops:manage_incidents',
+  'ops:manage_security',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -46,6 +47,7 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
     'ops:manage_inventory',
     'ops:manage_credentials',
     'ops:manage_incidents',
+    'ops:manage_security',
   ],
   owner: [
     'org:read',
@@ -63,11 +65,13 @@ const GRANTS: Record<OrgRole, readonly Permission[]> = {
     'ops:manage_inventory',
     'ops:manage_credentials',
     'ops:manage_incidents',
+    'ops:manage_security',
   ],
 };
 
 /** Plain-language meaning of each permission, shown in the security center (ADR-027). */
 export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
+  'ops:manage_security': 'Import security/recovery reports and triage findings',
   'ops:manage_incidents': 'Open, assign, acknowledge and resolve operational incidents',
   'ops:manage_credentials':
     'Issue, rotate and revoke application integration credentials with fresh MFA',

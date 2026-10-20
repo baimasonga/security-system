@@ -32,6 +32,7 @@ async function setup() {
       operationsHealthEnabled: true,
       operationsIngestionEnabled: true,
       operationsAutomationEnabled: true,
+      operationsPostureEnabled: true,
       operationsCredentialsEnabled: true,
       mfaEncryptionKey: randomBytes(32).toString('hex'),
       sharing: undefined,
@@ -517,4 +518,63 @@ it('does not replace the current page after a late automatic rule creation respo
   expect(await page.getByRole('heading', { name: 'Automatic alerts', exact: true }).count()).toBe(
     0,
   );
+});
+
+it('imports security findings, assigns a responder and records explicitly reported restore evidence', async () => {
+  const { page, owner } = await setup();
+  await registerApp(page, 'posture-dashboard');
+  await addEnv(page);
+  const add = section(page, 'Add component');
+  await add.getByLabel('Code (permanent)').fill('database');
+  await add.getByRole('button', { name: 'Add component', exact: true }).click();
+  await section(page, 'Components').getByRole('cell', { name: 'database', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Security & recovery', exact: true }).click();
+  await page.getByRole('heading', { name: 'Security & recovery', exact: true }).waitFor();
+  const scans = section(page, 'Imported scan reports');
+  await scans.locator('summary', { hasText: 'Import a normalized GitHub scan' }).click();
+  const component = await scans.getByLabel('Scan component').inputValue();
+  const input = {
+    component_id: component,
+    source: 'github_dependabot',
+    revision: 'a'.repeat(40),
+    run_id: '123',
+    completed_at: env.clock.now().toISOString(),
+    outcome: 'completed',
+    findings: [
+      { fingerprint: 'b'.repeat(64), severity: 'critical', advisory_id: 'CVE-2026-12345' },
+    ],
+    reason: 'initial_setup',
+  };
+  await scans.getByLabel('Normalized scan JSON').setInputFiles({
+    name: 'safe-scan.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(input)),
+  });
+  await scans.getByRole('button', { name: 'Import scan', exact: true }).click();
+  const findings = section(page, 'Security findings');
+  await findings.getByRole('cell', { name: 'CVE-2026-12345', exact: true }).waitFor();
+  await findings.locator('summary', { hasText: 'Edit finding' }).click();
+  await findings.getByLabel('Finding responder').selectOption(owner.userId);
+  await findings.getByLabel('Finding state').selectOption('acknowledged');
+  await findings.getByRole('button', { name: 'Save finding', exact: true }).click();
+  await findings.getByRole('cell', { name: 'acknowledged', exact: true }).waitFor();
+  const recovery = section(page, 'Recovery evidence');
+  await recovery.locator('summary', { hasText: 'Record a recovery report' }).click();
+  await recovery.getByLabel('Recovery type').selectOption('restore');
+  await recovery
+    .getByLabel('Started at (UTC)')
+    .fill(new Date(+env.clock.now() - 60000).toISOString());
+  await recovery.getByLabel('Completed at (UTC)').fill(env.clock.now().toISOString());
+  await recovery
+    .getByLabel('Recovered data timestamp (UTC)')
+    .fill(new Date(+env.clock.now() - 120000).toISOString());
+  for (const label of ['integrity check', 'application check', 'audit check'])
+    await recovery.getByLabel(label, { exact: true }).selectOption('passed');
+  await recovery.getByLabel('Evidence artifact SHA-256').fill('c'.repeat(64));
+  await recovery.getByRole('button', { name: 'Record report', exact: true }).click();
+  await recovery.getByRole('cell', { name: 'restore / succeeded', exact: true }).waitFor();
+  await recovery.getByRole('cell', { name: 'Reported targets met', exact: true }).waitFor();
+  expect(await recovery.getByText(/not been independently verified/).count()).toBe(1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
 });

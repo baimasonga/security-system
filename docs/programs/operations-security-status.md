@@ -18,16 +18,16 @@ OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLE
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
 Manual triage and the automatic failure/incident/recovery lifecycle are production accepted with synthetic sources. The Rokela PDF source adapter is locally verified and published; its real production binding remains pending. Ingestion is enabled in production; no live PDF source acceptance is claimed.
 
-| Task    | State                                          | Verification/evidence                                                                                                                          |
-| ------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPS-001 | Contract complete; local verification          | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
-| OPS-002 | Production API/dashboard enabled               | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
-| OPS-003 | Production API/dashboard enabled               | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
-| OPS-004 | Production enabled; source acceptance pending  | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
-| OPS-005 | Production enabled; source acceptance pending  | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Production lifecycle and UI verified           | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
-| OPS-007 | Adapter locally verified; live binding pending | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
-| OPS-008 | Ready; not started                             | Existing recovery runbook is not restore evidence.                                                                                             |
+| Task    | State                                            | Verification/evidence                                                                                                                          |
+| ------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPS-001 | Contract complete; local verification            | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
+| OPS-002 | Production API/dashboard enabled                 | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
+| OPS-003 | Production API/dashboard enabled                 | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
+| OPS-004 | Production enabled; source acceptance pending    | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
+| OPS-005 | Production enabled; source acceptance pending    | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
+| OPS-006 | Production lifecycle and UI verified             | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
+| OPS-007 | Adapter locally verified; live binding pending   | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
+| OPS-008 | Implementation verified locally; rollout pending | Existing recovery runbook is not restore evidence.                                                                                             |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -1047,3 +1047,57 @@ both passed, including PostgreSQL, browser and Windows checks.
   supply PDF-project Railway access through its secure field and issue the actual
   environment-scoped integration credential through fresh MFA. Do not use the
   synthetic acceptance account/credential for production PDF.
+
+### OPS-008 first slice — security findings and recovery evidence, 20 October
+
+- Uncommitted implementation adds separately opt-in `OPERATIONS_POSTURE_ENABLED`
+  and owner/admin `ops:manage_security`. Applications → environment → Security &
+  recovery imports strict normalized GitHub Dependabot/secret-scanning reports,
+  prioritizes finding snapshots, assigns same-org responders, tracks administrator
+  acknowledgement/resolution/risk acceptance and records backup/restore/rollback
+  reports. Every write is scoped, versioned where mutable and audited atomically.
+- All imports are explicitly unverified `admin_report` evidence. No report/digest
+  grants independent verification. Failed/missing checks cannot support a reported
+  restore pass; backup records cannot imply restore. RPO/RTO derive from ordered
+  report times. Reads preserve monotonic freshness, bounded/truncated lists and
+  immutable history. Raw secrets, paths, URLs, source context and arbitrary labels
+  are refused; the local GitHub export normalizer projects only reviewed metadata.
+- Migration 0024 adds immutable evidence and guarded finding snapshots, strict
+  ancestor keys and least-privilege grants without DELETE. Caps fail closed at
+  100 scan/100 recovery reports and 2,000 finding snapshots per environment. This
+  slice does not silently prune history or automatically resolve older findings.
+- Local evidence: **895 source tests passed, 3 skipped**; **16 Chromium workflows**;
+  **16 security mutations killed**, including SQL immutability and finding identity.
+  Initial targeted PostgreSQL acceptance passed 22 checks; a broader rerun exposed
+  a freeze response mismatch (503 versus generic refusal), corrected to match the
+  existing inventory workflow. Full corrected PG regression is still running.
+- Real HTTP/fsync-on PostgreSQL contention with pool two: 60 concurrent requests
+  produced exactly one scan, one finding, one recovery report, one successful edit
+  and 19 optimistic conflicts; all exact audit counts and audit chain verified.
+  **1071 ms** is a correctness result, not a capacity claim.
+- A real isolated logical backup/restore exercise passed 24 migrations, restored
+  application/finding data and audit checks, and excluded a source user committed
+  after the exported snapshot. Tiny-fixture restore/check elapsed **659 ms**;
+  artifact digest `4813d8beb7e1634cb33857e9562617c133f8f5c85a26eb6173eadd18bd7d34ce`.
+  This is not production backup, PITR, object-storage or release recovery evidence.
+  A reproducible loopback-only exercise is in `tools/restore-drill-local.ts`.
+- PDF public `/` and `/api/v1/health` both returned HTTP 200 after network publication.
+  `ROKELA_PDF_RAILWAY_TOKEN` remains unavailable, so actual PDF deployment binding
+  remains blocked. No provider alert, real email or private document was sent.
+- Remaining gates: finish corrected PG/source checks, publish source, deploy the
+  flag/migration and run synthetic live posture acceptance. Automatic authenticated
+  provider fetching, independent monitoring/witnessing, production restore/incident
+  drills and desktop installation/update acceptance remain separate work.
+
+- Corrected full PostgreSQL regression completed cleanly: **725 passed** across
+  72 files in **468.23 seconds**, including both owner and least-privilege roles.
+  Final source check including the reproducible restore tool passed **895 tests,
+  3 skipped**. The checked-in isolated drill reran successfully (**683 ms** for
+  restore/application/audit checks); no production recovery claim is made.
+- During this slice the owner reported Rokela PDF signup emails using Supabase's
+  default sender and an intermittent signup-limit message. Source review confirmed
+  Supabase Auth handles confirmations separately from Cloudflare transfer mail.
+  The live public config identified the Supabase project without exposing keys.
+  Safe signup error guidance and provider-configuration documentation were tested
+  separately in the PDF repository (**214 passed, 2 skipped**). No live Supabase
+  sender, rate limit, confirmation requirement or real-recipient delivery changed.

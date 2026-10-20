@@ -1,6 +1,6 @@
 # ADR-029: Cross-application operations and security monitoring
 
-Status: **accepted design in OPS-001; OPS-002 inventory, OPS-003 credentials, OPS-004 ingestion and OPS-005 health/history implemented with default-off source flags; OPS-006 onward pending**.
+Status: **accepted; inventory, credentials, ingestion, health and incident workflows implemented. OPS-008 administrator evidence/triage is implemented behind its separate default-off posture flag; live acceptance belongs in the handoff**.
 Date: 19 October 2026. Trust-boundary change: **yes**.
 
 ## Context and baseline
@@ -166,3 +166,13 @@ notifications target the rule creator's portal inbox, with active membership che
 at delivery/read. An injectable, fenced outbox port proves outage/retry behavior
 without contacting real recipients. External provider bindings remain a separate,
 verified destination rollout, not an implicit use of identity email credentials.
+
+### OPS-008 imported security and recovery evidence
+
+Implement the [posture contract](../api/operations-posture.md) as scoped, separately
+gated administrator reports and finding triage. Immutable snapshots and explicit
+`admin_report` provenance prevent a supplied scan/backup assertion from becoming
+independent verification. No arbitrary text, URLs, raw secret results or export
+files enter storage. Recovery targets and elapsed/data-loss intervals are separate
+from result/check assertions. Preserve the organization lock, atomic audit and
+transaction-bound authority; no new infrastructure or licensing authority.

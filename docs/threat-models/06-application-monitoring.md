@@ -1,6 +1,6 @@
 # Application monitoring threat model
 
-Status: **accepted design for OPS-001; OPS-002 inventory and OPS-003 credential controls implemented; event/health controls remain pending**.
+Status: **accepted; inventory, credential, event, health and incident controls implemented. OPS-008 adds separately gated administrator evidence and finding triage; verification/rollout evidence belongs in the handoff**.
 19 October 2026. Normative limits/protocol: [operations contract](../api/operations-contract.md).
 Scope: inventory, integrations, ingestion, health history, alerts and incidents; read-only first milestone.
 
@@ -116,3 +116,15 @@ fixed user IDs, never addresses supplied by evidence. Claim fences prevent a lat
 worker from acknowledging a newer attempt; retry deadlines/caps bound outages.
 Tests must cover wrong scope/role, freeze, audit rollback, duplicate evaluations,
 maintenance, missing/stale recovery, retry fences and retention scope.
+
+### OPS-008 posture boundary
+
+Treat all imported scan/recovery results as unverified `admin_report` assertions.
+Strict schemas exclude raw secret material, source context, filenames and URLs;
+digests identify artifacts without fetching or verifying them. Server-derived scope,
+immutable source snapshots, bounded quotas, active same-org assignees, monotonic
+assessment time and atomic audit contain spoofing, overwrites, flooding and stale
+confidence. A backup pass cannot count as a restore; successful restore assertions
+require ordered timestamps and explicit integrity/application/audit check assertions.
+Test authorization at both boundaries, archived/frozen scopes, changed retries,
+audit failure, missing/failed checks, unknown fields, future evidence and stale data.

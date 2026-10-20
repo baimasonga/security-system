@@ -3968,6 +3968,208 @@ paths:
           $ref: '#/components/responses/Problem'
         '503':
           $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/security:
+    get:
+      operationId: readOperationsSecurityPosture
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - &a1
+          name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^org_[a-f0-9]{24}$
+        - &a2
+          name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^opa_[a-f0-9]{24}$
+        - &a3
+          name: environmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^ope_[a-f0-9]{24}$
+      responses:
+        '200':
+          description: Scoped unverified posture evidence
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPostureView'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/security/scans:
+    post:
+      operationId: importOperationsScan
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsPostureScanInput'
+      responses:
+        '200':
+          description: Scoped unverified posture evidence
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPostureReceipt'
+        '201':
+          description: Committed audited report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPostureReceipt'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/security/recovery:
+    post:
+      operationId: recordOperationsRecovery
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsPostureRecoveryInput'
+      responses:
+        '200':
+          description: Scoped unverified posture evidence
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPostureReceipt'
+        '201':
+          description: Committed audited report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPostureReceipt'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/security/findings/{findingId}:
+    patch:
+      operationId: triageOperationsFinding
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+        - name: findingId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^osf_[a-f0-9]{24}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsPostureFindingInput'
+      responses:
+        '200':
+          description: Scoped unverified posture evidence
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPostureFinding'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     IntegrationBearer:
@@ -4656,6 +4858,376 @@ components:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
   schemas:
+    OperationsPostureScanInput:
+      type: object
+      additionalProperties: false
+      required:
+        - component_id
+        - source
+        - revision
+        - run_id
+        - completed_at
+        - outcome
+        - findings
+        - reason
+      properties:
+        component_id: &a1
+          type: string
+          pattern: ^opm_[a-f0-9]{24}$
+        source: &a10
+          type: string
+          enum:
+            - github_dependabot
+            - github_secret_scanning
+        revision: &a11
+          type: string
+          pattern: ^[a-f0-9]{40}$
+        run_id: &a12
+          type: string
+          pattern: ^[1-9][0-9]{0,19}$
+        completed_at: &a2
+          type: string
+          format: date-time
+          description: UTC timestamp with Z suffix
+        outcome:
+          type: string
+          enum:
+            - completed
+            - failed
+        findings:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - fingerprint
+              - severity
+              - advisory_id
+            properties:
+              fingerprint: &a4
+                type: string
+                pattern: ^[a-f0-9]{64}$
+              severity: &a6
+                type: string
+                enum:
+                  - low
+                  - medium
+                  - high
+                  - critical
+              advisory_id: &a7
+                type:
+                  - string
+                  - 'null'
+                pattern: ^(CVE-[0-9]{4}-[0-9]{4,10}|GHSA-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4})$
+        reason:
+          type: string
+          enum:
+            - initial_setup
+      description: 'Unverified administrator import. Secret findings require null
+        advisory; dependency findings require a public advisory. Failed scans have
+        no findings; fingerprints are unique. Time/quota limits:
+        operations-posture.md.'
+    OperationsPostureRecoveryInput:
+      type: object
+      additionalProperties: false
+      required:
+        - component_id
+        - kind
+        - started_at
+        - completed_at
+        - recovery_point_at
+        - outcome
+        - integrity_check
+        - application_check
+        - audit_check
+        - artifact_digest
+        - target_rpo_seconds
+        - target_rto_seconds
+        - reason
+      properties:
+        component_id: *a1
+        kind:
+          type: string
+          enum:
+            - backup
+            - restore
+            - rollback
+        started_at: *a2
+        completed_at: *a2
+        recovery_point_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        outcome:
+          type: string
+          enum:
+            - succeeded
+            - failed
+        integrity_check: &a3
+          type: string
+          enum:
+            - passed
+            - failed
+            - not_run
+        application_check: *a3
+        audit_check: *a3
+        artifact_digest: *a4
+        target_rpo_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+        target_rto_seconds:
+          type: integer
+          minimum: 1
+          maximum: 604800
+        reason:
+          type: string
+          enum:
+            - initial_setup
+      description: 'Unverified administrator report. Ordered nonfuture times;
+        successful restore/rollback requires all checks passed. Restore recovery
+        point required and no later than start. Backup never proves restore. Full
+        conditional/time rules: operations-posture.md.'
+    OperationsPostureFindingInput:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+        - state
+        - assignee_user_id
+        - reason
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        state: &a8
+          type: string
+          enum:
+            - open
+            - acknowledged
+            - resolved
+            - accepted_risk
+        assignee_user_id: &a9
+          type:
+            - string
+            - 'null'
+          pattern: ^usr_[a-f0-9]{24}$
+        reason:
+          type: string
+          enum:
+            - assignment
+            - security_response
+      description: Active same-organization assignee required for resolved/accepted
+        risk. Atomic audited administrator decision, not verification of
+        remediation.
+    OperationsPostureFinding:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - org_id
+        - application_id
+        - environment_id
+        - component_id
+        - evidence_id
+        - fingerprint
+        - severity
+        - advisory_id
+        - state
+        - assignee_user_id
+        - version
+        - created_at
+        - updated_at
+      properties:
+        id: &a5
+          type: string
+        org_id: *a5
+        application_id: *a5
+        environment_id: *a5
+        component_id: *a1
+        evidence_id: *a5
+        fingerprint: *a4
+        severity: *a6
+        advisory_id: *a7
+        state: *a8
+        assignee_user_id: *a9
+        version: &a13
+          type: integer
+        created_at: *a2
+        updated_at: *a2
+    OperationsPostureScan:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - component_id
+        - kind
+        - provenance
+        - independently_verified
+        - created_at
+        - completed_at
+        - freshness
+        - outcome
+        - source
+        - revision
+        - run_id
+        - finding_count
+      properties:
+        id: *a5
+        component_id: *a1
+        kind: *a5
+        provenance: &a14
+          type: string
+          enum:
+            - admin_report
+        independently_verified: &a15
+          type: boolean
+          const: false
+        created_at: *a2
+        completed_at: *a2
+        freshness: &a16
+          type: string
+          enum:
+            - current
+            - stale
+        outcome: *a5
+        source: *a10
+        revision: *a11
+        run_id: *a12
+        finding_count: *a13
+    OperationsPostureRecovery:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - component_id
+        - kind
+        - provenance
+        - independently_verified
+        - created_at
+        - completed_at
+        - freshness
+        - outcome
+        - artifact_digest
+        - integrity_check
+        - application_check
+        - audit_check
+        - rto_seconds
+        - rpo_seconds
+        - target_rpo_seconds
+        - target_rto_seconds
+        - target_met
+      properties:
+        id: *a5
+        component_id: *a1
+        kind: *a5
+        provenance: *a14
+        independently_verified: *a15
+        created_at: *a2
+        completed_at: *a2
+        freshness: *a16
+        outcome: *a5
+        artifact_digest: *a4
+        integrity_check: *a3
+        application_check: *a3
+        audit_check: *a3
+        rto_seconds:
+          type:
+            - integer
+            - 'null'
+        rpo_seconds:
+          type:
+            - integer
+            - 'null'
+        target_rpo_seconds: *a13
+        target_rto_seconds: *a13
+        target_met:
+          type:
+            - boolean
+            - 'null'
+    OperationsPostureReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - created
+        - provenance
+        - independently_verified
+      properties:
+        id: *a5
+        created:
+          type: boolean
+        provenance:
+          type: string
+          enum:
+            - admin_report
+        independently_verified:
+          type: boolean
+          const: false
+    OperationsPostureView:
+      type: object
+      additionalProperties: false
+      required:
+        - assessed_at
+        - provenance
+        - independently_verified
+        - scans
+        - findings
+        - recovery
+      properties:
+        assessed_at: *a2
+        provenance:
+          type: string
+          enum:
+            - admin_report
+        independently_verified:
+          type: boolean
+          const: false
+        scans:
+          type: object
+          additionalProperties: false
+          required:
+            - items
+            - truncated
+          properties:
+            items:
+              type: array
+              maxItems: 25
+              items:
+                $ref: '#/components/schemas/OperationsPostureScan'
+            truncated:
+              type: boolean
+        findings:
+          type: object
+          additionalProperties: false
+          required:
+            - items
+            - truncated
+          properties:
+            items:
+              type: array
+              maxItems: 200
+              items:
+                $ref: '#/components/schemas/OperationsPostureFinding'
+            truncated:
+              type: boolean
+        recovery:
+          type: object
+          additionalProperties: false
+          required:
+            - items
+            - truncated
+          properties:
+            items:
+              type: array
+              maxItems: 25
+              items:
+                $ref: '#/components/schemas/OperationsPostureRecovery'
+            truncated:
+              type: boolean
     OperationsIncident:
       type: object
       additionalProperties: false

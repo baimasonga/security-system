@@ -1,3 +1,4 @@
+import { PostureService } from '@trust/operations';
 import {
   AutomationService,
   HealthService,
@@ -103,6 +104,7 @@ export interface Container {
   operationsEvents: EventService;
   operationsHealth: HealthService;
   operationsIncidents: IncidentService;
+  operationsPosture: PostureService;
   operationsAutomation: AutomationService;
   readiness(): Promise<boolean>;
   licensing: LicensingService;
@@ -520,6 +522,12 @@ export async function createContainer(
     store: operationsStore,
     clock,
   });
+  const operationsPosture = new PostureService({
+    store: operationsStore,
+    clock,
+    enabled: () => config.operationsPostureEnabled && config.operationsInventoryEnabled,
+    authority: operationsAuthority,
+  });
   const operationsAutomation = new AutomationService({
     store: operationsStore,
     clock,
@@ -606,6 +614,7 @@ export async function createContainer(
     operationsEvents,
     operationsHealth,
     operationsIncidents,
+    operationsPosture,
     operationsAutomation,
     readiness,
     licensing,

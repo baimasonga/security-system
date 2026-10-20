@@ -21,6 +21,7 @@ export interface PlatformConfig {
   operationsHealthEnabled: boolean;
   operationsIncidentsEnabled: boolean;
   operationsAutomationEnabled: boolean;
+  operationsPostureEnabled: boolean;
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
   identityMailEncryptionKey?: string;
@@ -281,6 +282,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     throw new Error('OPERATIONS_INVENTORY_ENABLED must be true or false');
   const opsIngestion = env['OPERATIONS_INGESTION_ENABLED'];
   const opsAutomation = env['OPERATIONS_AUTOMATION_ENABLED'];
+  const opsPosture = env['OPERATIONS_POSTURE_ENABLED'];
+  if (opsPosture !== undefined && !['true', 'false'].includes(opsPosture))
+    throw new Error('OPERATIONS_POSTURE_ENABLED must be true or false');
+  if (opsPosture === 'true' && opsInventory !== 'true')
+    throw new Error('OPERATIONS_POSTURE_ENABLED requires inventory');
   if (opsAutomation !== undefined && !['true', 'false'].includes(opsAutomation))
     throw new Error('OPERATIONS_AUTOMATION_ENABLED must be true or false');
   if (
@@ -551,6 +557,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     operationsHealthEnabled: opsHealth === 'true',
     operationsIncidentsEnabled: opsIncidents === 'true',
     operationsAutomationEnabled: opsAutomation === 'true',
+    operationsPostureEnabled: opsPosture === 'true',
     ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',
     port,

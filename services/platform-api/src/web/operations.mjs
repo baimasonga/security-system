@@ -379,6 +379,279 @@ export async function operationsView(ui) {
       );
     }
   }
+  async function posturePage(appId, envId) {
+    const path = `${base}/${enc(appId)}/environments/${enc(envId)}`;
+    const n = generation;
+    let view;
+    try {
+      view = await ui.api(`${path}/security`);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+      return [
+        ...header(
+          'Security & recovery',
+          'Security reporting is not enabled for this workspace.',
+          () => environment(appId, envId),
+        ),
+      ];
+    }
+    const [components, app, env, members] = await Promise.all([
+      list(`${path}/components`),
+      ui.api(`${base}/${enc(appId)}`),
+      ui.api(path),
+      ui.api(`${ui.orgPath()}/members`),
+    ]);
+    if (!current(n)) return [];
+    const reload = () => posturePage(appId, envId);
+    const writable =
+      ['owner', 'admin'].includes(ui.role) && app.state === 'active' && env.state === 'active';
+    const label = (id) => components.find((c) => c.id === id)?.code || id;
+    const assignees = [
+      ['', 'Unassigned'],
+      ...members.items.map((m) => [m.user_id, m.email || m.user_id]),
+    ];
+    const componentOptions = components
+      .filter((c) => c.state === 'active')
+      .map((c) => [c.id, c.code]);
+    const scans = panel(
+      node('h2', 'Imported scan reports'),
+      node(
+        'p',
+        'Administrator reports. Source authenticity has not been independently verified. A completed scan is not a guarantee of security.',
+      ),
+    );
+    scans.append(
+      view.scans.items.length
+        ? table(
+            ['Component', 'Source / run', 'Result', 'Findings', 'Completed', 'Freshness'],
+            view.scans.items.map((r) => [
+              label(r.component_id),
+              `${r.source} / ${r.run_id}`,
+              r.outcome,
+              r.finding_count,
+              when(r.completed_at),
+              r.freshness,
+            ]),
+          )
+        : empty('No scan reports imported.'),
+    );
+    if (view.scans.truncated) scans.append(node('p', 'Only the latest 25 scan reports are shown.'));
+    if (writable && componentOptions.length) {
+      const details = node('details');
+      details.append(node('summary', 'Import a normalized GitHub scan'));
+      const select = node('select');
+      select.setAttribute('aria-label', 'Scan component');
+      for (const [value, text] of componentOptions) {
+        const option = node('option', text);
+        option.value = value;
+        select.append(option);
+      }
+      const file = node('input');
+      file.type = 'file';
+      file.accept = '.json,application/json';
+      file.setAttribute('aria-label', 'Normalized scan JSON');
+      details.append(
+        node(
+          'p',
+          'Use tools/normalize-security-export.ts to remove secret values, paths and provider payloads before selecting a JSON file.',
+        ),
+        select,
+        file,
+        button('Import scan', async () => {
+          const selected = file.files?.[0];
+          if (!selected || selected.size > 131072)
+            throw new Error('Select a normalized JSON file no larger than 128 KiB.');
+          let input;
+          try {
+            input = JSON.parse(await selected.text());
+          } catch {
+            throw new Error('The selected file is not valid normalized JSON.');
+          }
+          file.value = '';
+          if (!current(n)) return;
+          await ui.api(`${path}/security/scans`, 'POST', {
+            ...input,
+            component_id: select.value,
+            reason: 'initial_setup',
+          });
+          if (current(n)) await show(reload);
+        }),
+      );
+      scans.append(details);
+    }
+    const findings = panel(
+      node('h2', 'Security findings'),
+      node(
+        'p',
+        'Critical and unresolved findings appear first. Resolution and accepted risk record an administrator decision; they do not verify a fix. Each scan retains its own finding snapshots.',
+      ),
+    );
+    findings.append(
+      view.findings.items.length
+        ? table(
+            ['Component', 'Severity', 'Advisory / fingerprint', 'State', 'Responder', 'Actions'],
+            view.findings.items.map((r) => {
+              const edit = node('details');
+              edit.append(node('summary', 'Edit finding'));
+              const editable =
+                writable && components.some((c) => c.id === r.component_id && c.state === 'active');
+              if (editable)
+                edit.append(
+                  form(
+                    [
+                      {
+                        name: 'state',
+                        label: 'Finding state',
+                        value: r.state,
+                        options: choices(['open', 'acknowledged', 'resolved', 'accepted_risk']),
+                      },
+                      {
+                        name: 'assignee_user_id',
+                        label: 'Finding responder',
+                        value: r.assignee_user_id || '',
+                        options: assignees,
+                        optional: true,
+                      },
+                    ],
+                    'Save finding',
+                    async (data, visit) => {
+                      await ui.api(`${path}/security/findings/${enc(r.id)}`, 'PATCH', {
+                        ...data,
+                        assignee_user_id: data.assignee_user_id || null,
+                        expected_version: r.version,
+                        reason: 'security_response',
+                      });
+                      if (current(visit)) await show(reload);
+                    },
+                  ),
+                );
+              return [
+                label(r.component_id),
+                r.severity,
+                r.advisory_id || r.fingerprint.slice(0, 12),
+                r.state,
+                members.items.find((m) => m.user_id === r.assignee_user_id)?.email ||
+                  r.assignee_user_id ||
+                  'Unassigned',
+                editable ? edit : 'Read only',
+              ];
+            }),
+          )
+        : empty('No findings imported.'),
+    );
+    if (view.findings.truncated)
+      findings.append(node('p', 'Only the first 200 prioritized findings are shown.'));
+    const recovery = panel(
+      node('h2', 'Recovery evidence'),
+      node(
+        'p',
+        'Reported backups, restores and rollbacks are distinct. These records have not been independently verified; importing a backup never proves a successful restore.',
+      ),
+    );
+    recovery.append(
+      view.recovery.items.length
+        ? table(
+            [
+              'Component',
+              'Type / result',
+              'Checks',
+              'Reported RPO / RTO',
+              'Targets',
+              'Completed / freshness',
+            ],
+            view.recovery.items.map((r) => [
+              label(r.component_id),
+              `${r.kind} / ${r.outcome}`,
+              `Integrity: ${r.integrity_check}; application: ${r.application_check}; audit: ${r.audit_check}`,
+              `${r.rpo_seconds ?? '—'}s / ${r.rto_seconds ?? '—'}s`,
+              r.target_met === null
+                ? 'Not assessed'
+                : r.target_met
+                  ? 'Reported targets met'
+                  : 'Targets not met',
+              `${when(r.completed_at)} / ${r.freshness}`,
+            ]),
+          )
+        : empty('No recovery reports recorded.'),
+    );
+    if (view.recovery.truncated)
+      recovery.append(node('p', 'Only the latest 25 recovery reports are shown.'));
+    if (writable && componentOptions.length) {
+      const details = node('details');
+      details.append(
+        node('summary', 'Record a recovery report'),
+        form(
+          [
+            { name: 'component_id', label: 'Recovery component', options: componentOptions },
+            {
+              name: 'kind',
+              label: 'Recovery type',
+              options: choices(['backup', 'restore', 'rollback']),
+            },
+            {
+              name: 'outcome',
+              label: 'Reported outcome',
+              options: choices(['succeeded', 'failed']),
+            },
+            {
+              name: 'started_at',
+              label: 'Started at (UTC)',
+              value: '',
+            },
+            { name: 'completed_at', label: 'Completed at (UTC)' },
+            { name: 'recovery_point_at', label: 'Recovered data timestamp (UTC)', optional: true },
+            ...['integrity_check', 'application_check', 'audit_check'].map((name) => ({
+              name,
+              label: name.replaceAll('_', ' '),
+              options: choices(['not_run', 'passed', 'failed']),
+            })),
+            {
+              name: 'artifact_digest',
+              label: 'Evidence artifact SHA-256',
+              pattern: '[a-f0-9]{64}',
+              max: 64,
+            },
+            {
+              name: 'target_rpo_seconds',
+              label: 'Target data loss in seconds',
+              type: 'number',
+              value: '300',
+              max: 604800,
+            },
+            {
+              name: 'target_rto_seconds',
+              label: 'Target recovery time in seconds',
+              type: 'number',
+              value: '7200',
+              min: 1,
+              max: 604800,
+            },
+          ],
+          'Record report',
+          async (data, visit) => {
+            await ui.api(`${path}/security/recovery`, 'POST', {
+              ...data,
+              recovery_point_at: data.recovery_point_at || null,
+              reason: 'initial_setup',
+            });
+            if (current(visit)) await show(reload);
+          },
+        ),
+      );
+      recovery.append(details);
+    }
+    return [
+      ...header(
+        'Security & recovery',
+        `${app.code} / ${env.code} · assessed ${when(view.assessed_at)}`,
+        () => environment(appId, envId),
+      ),
+      button('Refresh evidence', refresh(reload)),
+      scans,
+      findings,
+      recovery,
+    ];
+  }
   async function environment(appId, id) {
     const appPath = `${base}/${enc(appId)}`;
     const path = `${appPath}/environments/${enc(id)}`;
@@ -406,6 +679,10 @@ export async function operationsView(ui) {
         parent,
       ),
       button('Refresh', refresh(reload)),
+      button(
+        'Security & recovery',
+        refresh(() => posturePage(appId, id)),
+      ),
       await healthPanel(path),
       await incidentsPanel(path, components, writable, reload),
       await automationPanel(

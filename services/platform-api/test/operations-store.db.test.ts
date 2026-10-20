@@ -1,3 +1,4 @@
+import { postureStoreContract } from '../../../packages/operations/test/posture-store-contract.ts';
 import { expect, it } from 'vitest';
 import { PgInventoryStore } from '../src/db/pg-operations-store.ts';
 import {
@@ -23,6 +24,7 @@ async function seeded() {
   return { pool, row, store: new PgInventoryStore(pool, clock) };
 }
 inventoryStoreContract(async () => (await seeded()).store);
+postureStoreContract(async () => (await seeded()).store);
 it('database enforces ancestor foreign keys and app role cannot delete tombstones', async () => {
   const { pool, row, store } = await seeded();
   await store.transaction(row.orgId, (tx) => tx.insert('application', row));
@@ -106,4 +108,47 @@ it('transaction authority checks actual membership, active ownership and freeze 
   await expect(
     store.transaction(row.orgId, (tx) => tx.authority!.assertWritable(row.orgId)),
   ).rejects.toMatchObject({ code: 'forbidden' });
+});
+
+it('security evidence is immutable, finding snapshots cannot be rewritten and app-role deletion is refused', async () => {
+  const { pool, row, store } = await seeded();
+  await store.transaction(row.orgId, async (tx) => {
+    await tx.insert('application', row);
+    await tx.insert('environment', {
+      ...row,
+      id: 'ope_' + '2'.repeat(24),
+      applicationId: row.id,
+      kind: 'staging',
+    });
+    await tx.insert('component', {
+      ...row,
+      id: 'opm_' + '3'.repeat(24),
+      applicationId: row.id,
+      environmentId: 'ope_' + '2'.repeat(24),
+      kind: 'database',
+      dependencyIds: [],
+    });
+    await tx.insertSecurityEvidence({
+      id: 'ose_' + '4'.repeat(24),
+      orgId: row.orgId,
+      applicationId: row.id,
+      environmentId: 'ope_' + '2'.repeat(24),
+      componentId: 'opm_' + '3'.repeat(24),
+      kind: 'scan',
+      digest: 'a'.repeat(64),
+      body: {},
+      createdByUserId: row.ownerUserId,
+      createdAt: row.createdAt,
+    });
+  });
+  await expect(
+    pool.query('UPDATE operations_security_evidence SET body=$1', [
+      { independently_verified: true },
+    ]),
+  ).rejects.toThrow();
+  await expect(pool.query('DELETE FROM operations_security_evidence')).rejects.toThrow();
+  if (appRoleMode())
+    await expect(pool.query('TRUNCATE operations_security_evidence CASCADE')).rejects.toThrow(
+      /permission denied/,
+    );
 });

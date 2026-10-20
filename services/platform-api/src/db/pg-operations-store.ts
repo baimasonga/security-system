@@ -1,4 +1,4 @@
-import { PgAutomationRepo } from './pg-operations-automation.ts';
+import { PgPostureRepo } from './pg-operations-posture.ts';
 import { roleAllows } from '@trust/auth';
 import { DomainError, type OrgRole } from '@trust/shared-types';
 import { AuditBuffer } from '@trust/audit';
@@ -139,7 +139,7 @@ function incidentFrom(r: Record<string, unknown>): Incident {
   row.version = Number(row.version);
   return row as unknown as Incident;
 }
-class Repo extends PgAutomationRepo implements InventoryRepo {
+class Repo extends PgPostureRepo implements InventoryRepo {
   readonly #q: Queryable;
   constructor(q: Queryable) {
     super(q);
