@@ -162,9 +162,18 @@ describe('passkeys', () => {
     await register(a);
     expect((await loginWith(a)).status).toBe(200); // 11
     expect((await loginWith(a)).status).toBe(200); // 12
+    // Delivery is deliberately asynchronous, as it is with the PostgreSQL sink.
+    const signal = env.c.telemetry.signal.bind(env.c.telemetry);
+    env.c.telemetry.signal = async (...args) => {
+      if (args[0] === 'passkey_counter_regression')
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      return signal(...args);
+    };
     const clone = await loginWith(a, { counter: 12 });
     expect(clone.status).toBe(401);
-    expect((await env.signals()).map((s) => s.kind)).toContain('passkey_counter_regression');
+    await expect
+      .poll(async () => (await env.signals()).map((s) => s.kind), { timeout: 5000 })
+      .toContain('passkey_counter_regression');
     expect(await actions()).toContain('identity.passkey_counter_regression');
     expect((await loginWith(a)).status).toBe(200); // the genuine authenticator continues (13)
   });

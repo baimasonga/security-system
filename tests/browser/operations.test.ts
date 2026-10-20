@@ -113,6 +113,11 @@ async function addEnv(page: Page) {
 }
 it('manages inventory, dependencies and fresh-MFA credentials through the real browser/API, clears secrets and preserves emergency revocation', async () => {
   const { page, next } = await setup();
+  // Model a slow component fetch; selection assertions must await rendering.
+  await page.route(/\/components\/opm_[a-f0-9]{24}$/, async (route) => {
+    if (route.request().method() === 'GET') await new Promise((resolve) => setTimeout(resolve, 50));
+    await route.continue();
+  });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await registerApp(page, 'portal-trial');
@@ -143,16 +148,20 @@ it('manages inventory, dependencies and fresh-MFA credentials through the real b
     .filter({ has: page.getByRole('cell', { name: 'web', exact: true }) })
     .getByRole('button', { name: 'Open' })
     .click();
+  const component = section(page, 'Component settings');
+  await expect
+    .poll(
+      () =>
+        component
+          .getByLabel('Dependencies in this environment')
+          .locator('option:checked')
+          .allTextContents(),
+      { timeout: 10000 },
+    )
+    .toEqual(['database']);
   expect(await section(page, 'Recent event history').textContent()).toContain(
     'No retained observations',
   );
-  const component = section(page, 'Component settings');
-  expect(
-    await component
-      .getByLabel('Dependencies in this environment')
-      .locator('option:checked')
-      .allTextContents(),
-  ).toEqual(['database']);
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   const issue = section(page, 'Integration credentials');
   await issue.getByLabel('Fresh authenticator code').fill(next());
