@@ -567,10 +567,33 @@ both passed, including PostgreSQL, browser and Windows checks.
 - Remaining activation gates: verify private S3 operations/CORS and scanner clean/
   malware handling before claiming Files & links functional. The cloud environment
   draft adds the exact S3 endpoint for that test; publication is pending. Health
-  remains off until migration 0021 is deployed and verified. Billing needs actual
+  activation is recorded below. Billing needs actual
   Paddle provider configuration; external audit witnessing needs an independent
   witness. Dual-control enforcement needs known enrolled approvers. OPS-006/007/008
   remain implementation work, not features that can be enabled with a flag.
 - Next: publish this verified source, confirm migration/grants/readiness, enable
   health, complete private sharing acceptance, then start the first ready OPS-006
   task. Do not treat enabled routes as proof of authenticated live integration.
+
+### Production health activation evidence
+
+- Published [`af29522`](https://github.com/baimasonga/security-system/commit/af29522)
+  to the existing default branch and `codex/feature-activation` after the final full
+  check passed (848 tests, 3 skipped). No other checkout's unfinished work was pushed.
+- Source deployment `1b4e2ade-4b51-4bd3-b36f-0ab37c04c9fc` reached SUCCESS.
+  Deployment logs confirmed migration 0021; the configured pre-deploy command runs
+  migrations, grants and database-profile verification before startup. Public
+  `/readyz` and `/healthz` both returned 200 before activation.
+- Set `OPERATIONS_HEALTH_ENABLED=true`. Configuration deployment
+  `4fa6cea7-06a1-459c-9163-87cd073e90e1` reached SUCCESS. Production settings now
+  enable inventory, credentials, ingestion and health independently. Public auth
+  options report passkeys configured. These checks establish deployed configuration
+  and readiness, not authenticated heartbeat/health acceptance or a live Rokela
+  integration. Applications → environment exposes reported health when signed in.
+- Private storage remains pending connection acceptance: the cloud runtime's current
+  enforced policy does not yet include the saved S3 endpoint addition. A synthetic
+  multipart/private-access/CORS/cleanup check has been prepared outside the checkout
+  and has not run; no production sharing setting has been enabled prematurely.
+  Publish the environment draft's endpoint addition and remove its unnecessary
+  `RAILWAY_API_TOKEN` requirement; do not supply another token. Then resume sharing
+  configuration and clean/malware acceptance. No new paid resources are needed.
