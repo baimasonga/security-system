@@ -17,6 +17,7 @@ export interface Heartbeat extends CredentialScope {
   expiresAt: Date;
 }
 export interface HealthRepo {
+  observeHealthTime(orgId: string, now: Date): Promise<Date>;
   recordHeartbeat(row: Heartbeat): Promise<void>;
   getHeartbeat(scope: CredentialScope, componentId: string): Promise<Heartbeat | undefined>;
   listHealthHistory(
@@ -71,7 +72,7 @@ export class HealthService {
   }
   async snapshot(p: UserPrincipal, scope: CredentialScope) {
     return this.#read(p, scope, async (tx) => {
-      const now = this.#d.clock.now();
+      const now = await tx.observeHealthTime(scope.orgId, this.#d.clock.now());
       const a = (await tx.find('application', scope.orgId, scope.applicationId))!;
       const e = (await tx.find('environment', scope.orgId, scope.environmentId))!;
       const components = await tx.list('component', scope);
@@ -79,7 +80,15 @@ export class HealthService {
         components.map(async (c) => {
           const report = await tx.getHeartbeat(scope, c.id);
           const eligible =
-            report && report.expiresAt > now && report.receivedAt <= now && report.occurredAt <= now
+            report &&
+            report.expiresAt > now &&
+            report.receivedAt <= now &&
+            report.occurredAt <= now &&
+            [a, e, c].every((resource) =>
+              resource.version === 1
+                ? report.occurredAt >= resource.updatedAt
+                : report.occurredAt > resource.updatedAt,
+            )
               ? report
               : undefined;
           const active = a.state === 'active' && e.state === 'active' && c.state === 'active';

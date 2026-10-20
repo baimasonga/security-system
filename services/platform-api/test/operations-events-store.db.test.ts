@@ -3,7 +3,7 @@ import {
   eventIngestionContract,
   eventRevokeRaceContract,
 } from '../../../packages/operations/test/event-ingestion-contract.ts';
-import { CredentialService, EventService } from '@trust/operations';
+import { CredentialService, EventService, HealthService } from '@trust/operations';
 import { sha256Hex } from '@trust/crypto';
 import { expect, it } from 'vitest';
 import { createSchemaPool, appRoleMode } from '../../../tests/support/pg.ts';
@@ -148,3 +148,46 @@ eventRevokeRaceContract(async () => {
 });
 
 healthStoreContract(seeded);
+it('keeps stale health across PG-backed service reconstruction and refuses clock rewrites', async () => {
+  const f = await seeded();
+  let now = clock.now();
+  const principal = {
+    kind: 'user' as const,
+    userId: f.app.ownerUserId,
+    sessionId: 'test-session',
+    platformRole: 'none' as const,
+  };
+  const service = () =>
+    new HealthService({
+      store: f.store,
+      clock: { now: () => now },
+      enabled: () => true,
+      authorize: async () => {},
+    });
+  await f.store.transaction(f.scope.orgId, (tx) =>
+    tx.recordHeartbeat({
+      ...f.scope,
+      componentId: f.componentId,
+      status: 'healthy',
+      occurredAt: now,
+      receivedAt: now,
+      expiresAt: new Date(+now + 86400000),
+    }),
+  );
+  expect((await service().snapshot(principal, f.scope)).components[0]?.status).toBe('healthy');
+  now = new Date(+now + 180000);
+  expect((await service().snapshot(principal, f.scope)).components[0]?.status).toBe('stale');
+  now = new Date(+now - 120000);
+  expect((await service().snapshot(principal, f.scope)).components[0]?.status).toBe('stale');
+  await expect(
+    f.pool.query('UPDATE operations_accounts SET health_observed_at=$2 WHERE org_id=$1', [
+      f.scope.orgId,
+      now,
+    ]),
+  ).rejects.toThrow(/cannot regress/);
+  await expect(
+    f.pool.query('UPDATE operations_accounts SET health_observed_at=NULL WHERE org_id=$1', [
+      f.scope.orgId,
+    ]),
+  ).rejects.toThrow(/cannot regress/);
+});

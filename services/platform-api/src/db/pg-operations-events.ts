@@ -36,6 +36,15 @@ export class PgEventRepo {
   constructor(q: Queryable) {
     this.#eventsQ = q;
   }
+  async observeHealthTime(orgId: string, now: Date) {
+    if (!Number.isFinite(+now)) throw new Error('invalid_health_clock');
+    const result = await this.#eventsQ.query(
+      'UPDATE operations_accounts SET health_observed_at=GREATEST(health_observed_at,$2::timestamptz) WHERE org_id=$1 RETURNING health_observed_at',
+      [orgId, now],
+    );
+    if (!result.rows[0]) throw new Error('health_clock_scope');
+    return new Date(result.rows[0].health_observed_at);
+  }
   async recordHeartbeat(r: Heartbeat) {
     await this.#eventsQ.query(
       `INSERT INTO operations_heartbeats(org_id,application_id,environment_id,component_id,status,occurred_at,received_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)

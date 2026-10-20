@@ -123,6 +123,19 @@ No report means unknown. Lifecycle inactivity forces unknown. Dependency non-hea
 promote a component: unavailable propagates unavailable, other non-healthy dependencies
 make an otherwise healthy component degraded. Responses expose each dependency's status.
 
+Activation freshness hardening: assessment time uses a transactionally persisted
+per-organization server-time high-water mark in `operations_accounts`. Client occurrence
+timestamps never advance it. A wall-clock rollback or process restart cannot revive an
+already stale assertion. A forward clock jump keeps assessment conservative until the
+clock recovers; correct UTC and independent monitoring remain required. The database
+rejects reducing or clearing an established watermark.
+
+A winning report must also postdate each updated application/environment/component.
+Version-one creation permits equal millisecond timestamps; after any inventory update,
+occurrence must be strictly later than that row's `updated_at`, including same-millisecond
+disable/re-enable. Metadata updates conservatively require fresh evidence too. Historical
+evidence remains unchanged; reactivation never invents a recovery assertion.
+
 Read-only health and hourly event history require ops:read within the same scoped
 transaction, including current-session checks. History counts assertions, never availability
 percentages; absent buckets and expired evidence are explicit gaps. Queries span at most

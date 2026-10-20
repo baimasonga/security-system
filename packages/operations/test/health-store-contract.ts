@@ -4,6 +4,29 @@ import type { Heartbeat } from '../src/health.ts';
 export function healthStoreContract(
   make: () => Promise<{ store: InventoryStore; scope: CredentialScope; componentId: string }>,
 ) {
+  it('persists a monotonic health assessment clock and rolls it back with its transaction', async () => {
+    const { store, scope } = await make();
+    const now = new Date('2026-10-19T00:00:00Z');
+    const observed = new Date(+now + 180000);
+    expect(
+      await store.transaction(scope.orgId, (tx) => tx.observeHealthTime(scope.orgId, now)),
+    ).toEqual(now);
+    expect(
+      await store.transaction(scope.orgId, (tx) => tx.observeHealthTime(scope.orgId, observed)),
+    ).toEqual(observed);
+    expect(
+      await store.transaction(scope.orgId, (tx) => tx.observeHealthTime(scope.orgId, now)),
+    ).toEqual(observed);
+    await expect(
+      store.transaction(scope.orgId, async (tx) => {
+        await tx.observeHealthTime(scope.orgId, new Date(+observed + 86400000));
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    expect(
+      await store.transaction(scope.orgId, (tx) => tx.observeHealthTime(scope.orgId, now)),
+    ).toEqual(observed);
+  });
   it('persists occurrence ordering, conservative ties, scope and transactional rollback', async () => {
     const { store, scope, componentId } = await make();
     const now = new Date('2026-10-19T00:00:00Z');

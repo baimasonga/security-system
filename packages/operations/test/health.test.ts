@@ -9,6 +9,52 @@ const principal = {
   platformRole: 'none' as const,
 };
 healthStoreContract(eventFixture);
+it('does not revive stale health after clock rollback or service reconstruction', async () => {
+  const f = await setup();
+  await f.send('healthy');
+  f.advance(180000);
+  expect((await f.get()).components[0]?.status).toBe('stale');
+  f.advance(-120000);
+  const restarted = new HealthService({
+    store: f.store,
+    clock: { now: f.now },
+    enabled: () => true,
+    authorize: async () => {},
+  });
+  expect((await restarted.snapshot(principal, f.scope)).components[0]?.status).toBe('stale');
+});
+it('requires a new post-update observation after reactivating any inventory ancestor', async () => {
+  for (const type of ['application', 'environment', 'component'] as const) {
+    const f = await setup();
+    await f.send('healthy');
+    f.advance(1000);
+    const id =
+      type === 'application'
+        ? f.scope.applicationId
+        : type === 'environment'
+          ? f.scope.environmentId
+          : f.componentId;
+    await f.store.transaction(f.scope.orgId, async (tx) => {
+      const old = (await tx.find(type, f.scope.orgId, id))!;
+      await tx.update(
+        type,
+        { ...old, state: 'disabled', version: old.version + 1, updatedAt: f.now() },
+        old.version,
+      );
+      await tx.update(
+        type,
+        { ...old, state: 'active', version: old.version + 2, updatedAt: f.now() },
+        old.version + 1,
+      );
+    });
+    expect((await f.get()).components[0]?.status).toBe('unknown');
+    await f.send('healthy');
+    expect((await f.get()).components[0]?.status).toBe('unknown');
+    f.advance(1);
+    await f.send('healthy');
+    expect((await f.get()).components[0]?.status).toBe('healthy');
+  }
+});
 async function setup() {
   const f = await eventFixture();
   const key = await f.issue();
@@ -102,6 +148,7 @@ it('propagates dependency failures without hiding missing own evidence, and inac
     await tx.insert('component', { ...c, id: dependency, code: 'storage', dependencyIds: [] });
     await tx.update('component', { ...c, dependencyIds: [dependency], version: 2 }, 1);
   });
+  f.advance(1);
   await f.send('healthy');
   let snapshot = await f.get();
   expect(snapshot.components.find((r) => r.id === f.componentId)?.status).toBe('degraded');

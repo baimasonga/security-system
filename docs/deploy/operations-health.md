@@ -7,6 +7,14 @@ commercial access is changed. Set `OPERATIONS_HEALTH_ENABLED=true` together with
 source. Ingestion retains its independent rollout gate; do not enable production
 collection or issue production credentials as part of this read rollout.
 
+Also apply `0021_operations_health_clock.sql` before the activation hardening release.
+It adds one bounded server-time watermark to each existing organization lock row; current
+app-role UPDATE grants cover the added column. Lowering or clearing an established
+watermark is rejected by the database. Health reads assess against the latest observed
+server time, so clock rollback cannot turn stale into healthy, including after restart.
+Fix host time before relying on health after a forward clock jump; do not lower the
+watermark to manufacture recovery.
+
 Applications → environment now shows **Reported health**. Component detail shows
 **Recent event history**. Refresh explicitly to fetch current evidence. With the health
 flag disabled the panel explains that reporting is not enabled. Outages show unavailable
@@ -27,6 +35,12 @@ makes an active dependent unavailable; other missing/stale/degraded dependencies
 an otherwise healthy dependent to degraded. Each response includes the own report and each
 dependency's state. Recovery requires a later eligible observation. Backend assertions can
 be fabricated by a stolen valid credential; these are not independent probes.
+
+After an application, environment or component update, a new heartbeat occurrence must
+be strictly later than its update timestamp. Initial version-one creation allows equality.
+This also prevents an old healthy report from reappearing after disable/re-enable, even
+when the lifecycle updates share a millisecond. Metadata updates can conservatively show
+unknown until the next heartbeat; this does not remove history or block business activity.
 
 Existing pre-migration heartbeats are not backfilled into current state. Until the next
 eligible heartbeat arrives, current health is unknown. Latest-report metadata expires with

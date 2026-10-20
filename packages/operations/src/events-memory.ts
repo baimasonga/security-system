@@ -4,6 +4,14 @@ import type { EventAggregate, EventCounter, OperationEvent } from './events-mode
 const key = (scope: CredentialScope, id: string) =>
   JSON.stringify([scope.orgId, scope.applicationId, scope.environmentId, id]);
 export class MemoryEventRepo {
+  healthClocks = new Map<string, Date>();
+  async observeHealthTime(orgId: string, now: Date) {
+    if (!Number.isFinite(+now)) throw new Error('invalid_health_clock');
+    const old = this.healthClocks.get(orgId);
+    const observed = old && old > now ? old : now;
+    this.healthClocks.set(orgId, new Date(observed));
+    return new Date(observed);
+  }
   heartbeats = new Map<string, Heartbeat>();
   async recordHeartbeat(row: Heartbeat) {
     if (

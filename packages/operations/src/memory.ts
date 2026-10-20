@@ -164,6 +164,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       repo.eventCounters = structuredClone(this.eventCounters);
       repo.eventAggregates = structuredClone(this.eventAggregates);
       repo.heartbeats = structuredClone(this.heartbeats);
+      repo.healthClocks = structuredClone(this.healthClocks);
       const buffer = new AuditBuffer();
       const out = await fn(Object.assign(repo, { audit: buffer }));
       const events = buffer.drain();
@@ -175,6 +176,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       this.eventCounters = repo.eventCounters;
       this.eventAggregates = repo.eventAggregates;
       this.heartbeats = repo.heartbeats;
+      this.healthClocks = repo.healthClocks;
       return out;
     };
     const result = this.#tail.then(run, run);

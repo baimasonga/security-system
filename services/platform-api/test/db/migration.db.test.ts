@@ -68,6 +68,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0018_operations_credentials',
       '0019_operations_events',
       '0020_operations_health',
+      '0021_operations_health_clock',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
@@ -93,6 +94,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         '0018_operations_credentials',
         '0019_operations_events',
         '0020_operations_health',
+        '0021_operations_health_clock',
       ],
     });
   });

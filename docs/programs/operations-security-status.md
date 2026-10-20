@@ -1,6 +1,6 @@
 # Operations/security implementation status and agent handoff
 
-Updated: 19 October 2026.
+Updated: 20 October 2026.
 
 ## Current state
 
@@ -16,7 +16,7 @@ Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
 Credential verification remains a guarded transaction primitive, not a collector.
 OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLED`
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
-Incidents and a live Rokela PDF monitoring integration remain pending. No ingestion production setting was changed.
+Incidents and a live Rokela PDF monitoring integration remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
 
 | Task    | State                                 | Verification/evidence                                                                                                                          |
 | ------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -528,3 +528,49 @@ both passed, including PostgreSQL, browser and Windows checks.
   `9e5999c4c10df6029614f8d41def2c179c117e7d6eabb71296b35fe6b1feb16c`).
   This establishes delivery of the corrected assets; account mutations were tested
   locally with synthetic fixtures, not against a real production account/provider.
+
+## Feature activation and health freshness hardening — 20 October 2026
+
+- User authorized production activation and separately approved private storage and
+  a private malware scanner. Existing licensing, MFA and signing keys are preserved.
+  Passkey RP configuration and durable ingestion are enabled; public auth options
+  now report passkeys configured. API deployment
+  `e16290c9-f31d-4c02-a1d6-d4a74795155f` reached SUCCESS; readiness returned 200.
+  No real mail, payment, source credential or production device mutation was used.
+- Closed the two OPS-005 review findings before enabling health: snapshots persist
+  a per-organization monotonic observed time so a backward clock change cannot
+  revive an expired heartbeat, including across service reconstruction. A heartbeat
+  must follow the application, environment and component's current inventory epoch;
+  disabling/re-enabling a parent cannot revive its old report. Updated rows require
+  a strictly later timestamp; an equal timestamp remains conservatively unknown.
+- Migration 0021 adds the finite timestamp and database regression guard. The
+  existing account UPDATE grant applies; no new application privilege is required.
+  Transaction snapshots clone/commit the memory watermark. ADR-029 and deployment
+  guidance describe persistence, lifecycle semantics and forward-clock limitations.
+- Verification: the new regressions failed before implementation. Full
+  `npm run check` passed **848 tests, 3 skipped**; PostgreSQL owner/app-role suites
+  passed **686 tests in 65 files**; Chromium passed **9 workflows**. Eight deliberate
+  freshness-control mutations were killed by assertions in a disposable source copy.
+  Real HTTP/PostgreSQL pool-2 load correctness passed: 1101 stored, 19 duplicates,
+  1 conflict, 2 quota refusals; retention 1000/101/0, 678216 bytes released, zero
+  remaining raw events, aggregates 1101→0 and verified audit chain. Twenty concurrent
+  health reads and the 180-second stale transition passed (2840 ms scenario).
+  This is correctness evidence, not a production capacity benchmark.
+- Local evidence: `/tmp/activation-health-{red,unit,pg-targeted,check,pg-full,browser,load,mutations}.log`.
+  Source is on `codex/feature-activation`, based on `0adb67a`; publication and live
+  migration/health acceptance are recorded separately after deployment.
+- Private ClamAV service reached SUCCESS and loaded its signature database; it has
+  no public service domain. The approved private bucket was deployed from the two
+  staged creation/region changes. Existing project authentication can read its
+  connection settings; an additional Railway API token is unnecessary. No storage
+  credentials or private access URLs are retained here.
+- Remaining activation gates: verify private S3 operations/CORS and scanner clean/
+  malware handling before claiming Files & links functional. The cloud environment
+  draft adds the exact S3 endpoint for that test; publication is pending. Health
+  remains off until migration 0021 is deployed and verified. Billing needs actual
+  Paddle provider configuration; external audit witnessing needs an independent
+  witness. Dual-control enforcement needs known enrolled approvers. OPS-006/007/008
+  remain implementation work, not features that can be enabled with a flag.
+- Next: publish this verified source, confirm migration/grants/readiness, enable
+  health, complete private sharing acceptance, then start the first ready OPS-006
+  task. Do not treat enabled routes as proof of authenticated live integration.
