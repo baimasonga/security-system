@@ -30,6 +30,49 @@ const code = () => ({
 });
 const when = (value) => (value ? new Date(value).toLocaleString() : '—');
 
+// Summaries describe only the bounded evidence returned by the existing scoped API.
+export function summarizePosture(view) {
+  if (!view)
+    return {
+      available: false,
+      rank: 2,
+      findingText: 'Unknown',
+      scanText: 'Reporting unavailable',
+      restoreText: 'Unknown',
+      partial: true,
+    };
+  const latest = (items) =>
+    items.reduce(
+      (a, b) => (!a || new Date(b.completed_at) > new Date(a.completed_at) ? b : a),
+      null,
+    );
+  const scan = latest(view.scans.items);
+  const restore = latest(view.recovery.items.filter((r) => r.kind === 'restore'));
+  const open = view.findings.items.filter((f) => ['open', 'acknowledged'].includes(f.state));
+  const critical = open.filter((f) => f.severity === 'critical').length;
+  const high = open.filter((f) => f.severity === 'high').length;
+  const rank = critical
+    ? 0
+    : high
+      ? 1
+      : scan?.outcome === 'failed' || restore?.outcome === 'failed'
+        ? 2
+        : !scan || !restore || scan.freshness !== 'current' || restore.freshness !== 'current'
+          ? 3
+          : open.length
+            ? 4
+            : 5;
+  const describe = (r) => `${r.outcome} · ${r.freshness} · ${when(r.completed_at)}`;
+  return {
+    available: true,
+    rank,
+    findingText: `${open.length} shown · ${critical} critical · ${high} high${view.findings.truncated ? ' · more findings not shown' : ''}`,
+    scanText: scan ? describe(scan) : 'No scan report shown',
+    restoreText: restore ? describe(restore) : 'No restore report shown',
+    partial: view.scans.truncated || view.findings.truncated || view.recovery.truncated,
+  };
+}
+
 export async function operationsView(ui) {
   const { node, panel, button, title, table, empty, fieldsForm } = ui;
   const base = `${ui.orgPath()}/operations/applications`;
@@ -184,6 +227,7 @@ export async function operationsView(ui) {
         'Applications',
         'Register your systems and their components. Inventory does not imply active monitoring.',
       ),
+      button('Review security overview', refresh(securityOverview)),
       panel(node('h2', 'Your applications'), rows),
       lookup('opa', application),
       panel(
@@ -192,6 +236,125 @@ export async function operationsView(ui) {
           await ui.api(base, 'POST', { ...data, product_id: data.product_id || null });
           await show(applications);
         }),
+      ),
+    ];
+  }
+  async function securityOverview() {
+    const n = generation;
+    const apps = await ui.api(`${base}?limit=10`);
+    if (!current(n)) return [];
+    const appItems = apps.items.slice(0, 10);
+    let partial = Boolean(apps.next_cursor) || apps.items.length > 10;
+    const scopes = [];
+    // Bounded batches preserve responsiveness and stop new reads after navigation.
+    for (let offset = 0; offset < appItems.length; offset += 4) {
+      if (!current(n)) return [];
+      const batch = appItems.slice(offset, offset + 4);
+      const pages = await Promise.all(
+        batch.map((a) => ui.api(`${base}/${enc(a.id)}/environments?limit=5`)),
+      );
+      if (!current(n)) return [];
+      for (let i = 0; i < batch.length; i++) {
+        partial ||= Boolean(pages[i].next_cursor) || pages[i].items.length > 5;
+        for (const e of pages[i].items.slice(0, 5)) scopes.push({ app: batch[i], env: e });
+      }
+    }
+    const reports = [];
+    for (let offset = 0; offset < scopes.length; offset += 4) {
+      if (!current(n)) return [];
+      const batch = scopes.slice(offset, offset + 4);
+      const views = await Promise.all(
+        batch.map(async (scope) => {
+          try {
+            return await ui.api(
+              `${base}/${enc(scope.app.id)}/environments/${enc(scope.env.id)}/security`,
+            );
+          } catch (error) {
+            if ([401, 403].includes(error.status)) throw error;
+            return null;
+          }
+        }),
+      );
+      if (!current(n)) return [];
+      for (let i = 0; i < batch.length; i++) {
+        const summary = summarizePosture(views[i]);
+        partial ||= summary.partial;
+        reports.push({ ...batch[i], ...summary });
+      }
+    }
+    reports.sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        a.app.code.localeCompare(b.app.code) ||
+        a.env.code.localeCompare(b.env.code),
+    );
+    const rows = reports.map((r) => {
+      const label = `${r.app.code} / ${r.env.code}`;
+      const action = button(
+        r.available ? 'Review' : 'Open environment',
+        refresh(() =>
+          r.available ? posturePage(r.app.id, r.env.id) : environment(r.app.id, r.env.id),
+        ),
+      );
+      action.setAttribute('aria-label', `${r.available ? 'Review' : 'Open'} ${label}`);
+      return [
+        label,
+        `${r.app.state} / ${r.env.state}`,
+        r.findingText,
+        r.scanText,
+        r.restoreText,
+        action,
+      ];
+    });
+    const coverageDetails = node('details');
+    coverageDetails.append(
+      node('summary', 'Coverage and evidence limits'),
+      node(
+        'p',
+        'At most 10 applications and 5 environments per application are included. Reports may omit components; this is not a security or recovery guarantee.',
+      ),
+      node(
+        'p',
+        'Open finding counts are shown snapshots, which can repeat across imports. Latest shown reports use completion time within the bounded returned history.',
+      ),
+    );
+    return [
+      ...header(
+        'Security overview',
+        'Reported evidence only. No scan, finding decision or restore report is independently verified.',
+        applications,
+      ),
+      button('Refresh overview', refresh(securityOverview)),
+      panel(
+        node('h2', 'Coverage'),
+        node('p', `${appItems.length} applications and ${scopes.length} environments reviewed.`),
+        ...(partial
+          ? [
+              node(
+                'p',
+                'Coverage is partial: inventory, evidence or report availability is incomplete. Open individual applications for further records.',
+              ),
+            ]
+          : []),
+        coverageDetails,
+      ),
+      panel(
+        node('h2', 'Environment reports'),
+        rows.length
+          ? table(
+              [
+                'Application / environment',
+                'Inventory state',
+                'Open finding snapshots',
+                'Latest shown scan',
+                'Latest shown restore',
+                '',
+              ],
+              rows,
+            )
+          : empty(
+              'No environments in the reviewed inventory. Add an environment to begin reporting.',
+            ),
       ),
     ];
   }

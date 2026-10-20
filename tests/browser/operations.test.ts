@@ -1,6 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { randomBytes } from 'node:crypto';
+import { join } from 'node:path';
 import { makeEnv, PW, type Env } from '../../services/platform-api/test/harness.ts';
 import { totpCode } from '../../packages/auth/src/mfa.ts';
 
@@ -100,7 +101,8 @@ async function registerApp(page: Page, name: string) {
   await s.getByLabel('Code (permanent)').fill(name);
   await s.getByRole('button', { name: 'Register application', exact: true }).click();
   const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name, exact: true }) });
-  await row.getByRole('button', { name: 'Open', exact: true }).click();
+  // This action changes SPA content, not the document URL; explicitly await its destination below.
+  await row.getByRole('button', { name: 'Open', exact: true }).click({ noWaitAfter: true });
   await page.getByRole('heading', { name: 'Environments', exact: true }).waitFor();
 }
 async function addEnv(page: Page) {
@@ -577,4 +579,204 @@ it('imports security findings, assigns a responder and records explicitly report
   expect(await recovery.getByText(/not been independently verified/).count()).toBe(1);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+});
+
+async function overviewInventory(
+  owner: { token: string; orgId: string; userId: string },
+  code: string,
+  environmentCount = 1,
+) {
+  const base = `/v1/organizations/${owner.orgId}/operations/applications`;
+  const app = await env.call('POST', base, {
+    token: owner.token,
+    body: {
+      code,
+      owner_user_id: owner.userId,
+      criticality: 'high',
+      product_id: null,
+      reason: 'initial_setup',
+    },
+  });
+  expect(app.status).toBe(201);
+  const scopes: { appId: string; envId: string; path: string }[] = [];
+  for (let i = 0; i < environmentCount; i++) {
+    const e = await env.call('POST', `${base}/${app.body.id}/environments`, {
+      token: owner.token,
+      body: { code: `production-${i}`, kind: 'production', reason: 'initial_setup' },
+    });
+    expect(e.status).toBe(201);
+    scopes.push({
+      appId: app.body.id,
+      envId: e.body.id,
+      path: `${base}/${app.body.id}/environments/${e.body.id}`,
+    });
+  }
+  return { appId: app.body.id as string, scopes };
+}
+
+it('security overview prioritizes open critical findings and opens their real scoped triage controls', async () => {
+  const { page, owner } = await setup();
+  const critical = await overviewInventory(owner, 'z-critical-service');
+  await overviewInventory(owner, 'missing-reports');
+  const path = critical.scopes[0]!.path;
+  const component = await env.call('POST', `${path}/components`, {
+    token: owner.token,
+    body: { code: 'api', kind: 'service', dependency_ids: [], reason: 'initial_setup' },
+  });
+  expect(component.status).toBe(201);
+  expect(
+    (
+      await env.call('POST', `${path}/security/scans`, {
+        token: owner.token,
+        body: {
+          component_id: component.body.id,
+          source: 'github_dependabot',
+          revision: 'a'.repeat(40),
+          run_id: '123',
+          completed_at: env.clock.now().toISOString(),
+          outcome: 'completed',
+          findings: [
+            { fingerprint: 'b'.repeat(64), severity: 'critical', advisory_id: 'CVE-2026-12345' },
+          ],
+          reason: 'initial_setup',
+        },
+      })
+    ).status,
+  ).toBe(201);
+  await page.getByRole('button', { name: 'Review security overview', exact: true }).click();
+  await page.getByRole('heading', { name: 'Security overview', exact: true }).waitFor();
+  const reports = section(page, 'Environment reports');
+  expect(await reports.getByRole('row').nth(1).textContent()).toContain(
+    'z-critical-service / production-0',
+  );
+  expect(await reports.getByText('1 shown · 1 critical · 0 high', { exact: true }).count()).toBe(1);
+  expect(await reports.getByText('No scan report shown', { exact: true }).count()).toBe(1);
+  expect(await reports.getByText('No restore report shown', { exact: true }).count()).toBe(2);
+  if (process.env['PORTAL_ARTIFACTS'])
+    await page.screenshot({
+      path: join(process.env['PORTAL_ARTIFACTS'], 'security-overview-desktop.png'),
+      fullPage: true,
+    });
+  await page.setViewportSize({ width: 390, height: 844 });
+  if (process.env['PORTAL_ARTIFACTS'])
+    await page.screenshot({
+      path: join(process.env['PORTAL_ARTIFACTS'], 'security-overview-mobile.png'),
+      fullPage: true,
+    });
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+  await reports
+    .getByRole('button', { name: 'Review z-critical-service / production-0', exact: true })
+    .click();
+  await page.getByRole('heading', { name: 'Security & recovery', exact: true }).waitFor();
+  await section(page, 'Security findings').getByText('CVE-2026-12345', { exact: true }).waitFor();
+});
+
+it('security overview keeps unavailable reporting unknown and never substitutes an empty successful read', async () => {
+  const { page, owner } = await setup();
+  await overviewInventory(owner, 'unavailable-service');
+  await page.route('**/security', (route) =>
+    route.fulfill({ status: 503, json: { code: 'unavailable', message: 'request rejected' } }),
+  );
+  await page.getByRole('button', { name: 'Review security overview', exact: true }).click();
+  await page.getByRole('heading', { name: 'Security overview', exact: true }).waitFor();
+  const reports = section(page, 'Environment reports');
+  expect(await reports.getByText('Reporting unavailable', { exact: true }).count()).toBe(1);
+  expect(await reports.getByText('Unknown', { exact: true }).count()).toBe(2);
+  expect(await reports.getByText(/^0 shown/).count()).toBe(0);
+  expect(await section(page, 'Coverage').textContent()).toContain('Coverage is partial');
+  await reports
+    .getByRole('button', { name: 'Open unavailable-service / production-0', exact: true })
+    .click();
+  await page.getByRole('heading', { name: 'Integration credentials', exact: true }).waitFor();
+});
+
+it('security overview bounds inventory reads and explicitly marks further applications and environments as partial', async () => {
+  const { page, owner } = await setup();
+  const base = `/v1/organizations/${owner.orgId}/operations/applications`;
+  for (let i = 0; i < 11; i++) {
+    await overviewInventory(owner, `coverage-${i}`, 0);
+    env.clock.advance(1);
+  }
+  const apps = await env.call('GET', `${base}?limit=100`, { token: owner.token });
+  const appId = apps.body.items[0].id;
+  for (let i = 0; i < 6; i++)
+    expect(
+      (
+        await env.call('POST', `${base}/${appId}/environments`, {
+          token: owner.token,
+          body: { code: `production-${i}`, kind: 'production', reason: 'initial_setup' },
+        })
+      ).status,
+    ).toBe(201);
+  // Simulate an over-wide upstream response: the browser still applies its own read budgets.
+  await page.route(`**/operations/applications?limit=10`, (route) =>
+    route.fulfill({ json: apps.body }),
+  );
+  const environments = await env.call('GET', `${base}/${appId}/environments?limit=100`, {
+    token: owner.token,
+  });
+  await page.route(`**/${appId}/environments?limit=5`, (route) =>
+    route.fulfill({ json: environments.body }),
+  );
+  let postureReads = 0,
+    environmentReads = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/security')) postureReads++;
+    if (request.url().includes('/environments?limit=5')) environmentReads++;
+  });
+  await page.getByRole('button', { name: 'Review security overview', exact: true }).click();
+  await page.getByRole('heading', { name: 'Security overview', exact: true }).waitFor();
+  expect(postureReads).toBe(5);
+  expect(environmentReads).toBe(10);
+  expect(await section(page, 'Coverage').textContent()).toContain(
+    '10 applications and 5 environments reviewed',
+  );
+  expect(await section(page, 'Coverage').textContent()).toContain('Coverage is partial');
+});
+
+it('security overview stops new batches and suppresses late evidence after workspace navigation', async () => {
+  const { page, owner } = await setup();
+  await overviewInventory(owner, 'late-overview', 5);
+  let arrived!: () => void, release!: () => void;
+  const ready = new Promise<void>((r) => {
+    arrived = r;
+  });
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  let reads = 0;
+  await page.route('**/security', async (route) => {
+    const result = await route.fetch();
+    if (++reads === 4) arrived();
+    await gate;
+    await route.fulfill({ response: result });
+  });
+  await page.getByRole('button', { name: 'Review security overview', exact: true }).click();
+  await ready;
+  await page.getByRole('button', { name: 'Licenses', exact: true }).click();
+  await page.getByRole('heading', { name: 'Licenses', exact: true }).waitFor();
+  const responses = page.waitForResponse((r) => r.url().endsWith('/security'));
+  release();
+  await responses;
+  await page.evaluate('new Promise(resolve => setTimeout(resolve, 100))');
+  expect(reads).toBe(4);
+  expect(await page.getByRole('heading', { name: 'Security overview', exact: true }).count()).toBe(
+    0,
+  );
+});
+
+it('security overview refuses authorization failures without rendering a partial cached view', async () => {
+  const { page, owner } = await setup();
+  await overviewInventory(owner, 'authorization-overview');
+  await page.route('**/security', (route) =>
+    route.fulfill({ status: 403, json: { code: 'forbidden', message: 'request rejected' } }),
+  );
+  await page.getByRole('button', { name: 'Review security overview', exact: true }).click();
+  await page.getByText('Could not load this view.', { exact: true }).waitFor();
+  expect(await page.getByRole('heading', { name: 'Security overview', exact: true }).count()).toBe(
+    0,
+  );
+  expect(
+    await page.getByRole('heading', { name: 'Environment reports', exact: true }).count(),
+  ).toBe(0);
 });

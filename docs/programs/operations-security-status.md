@@ -18,16 +18,16 @@ OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLE
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
 Manual triage and the automatic failure/incident/recovery lifecycle are production accepted with synthetic sources. The Rokela PDF source adapter is locally verified and published; its real production binding remains pending. Ingestion is enabled in production; no live PDF source acceptance is claimed.
 
-| Task    | State                                          | Verification/evidence                                                                                                                          |
-| ------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPS-001 | Contract complete; local verification          | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
-| OPS-002 | Production API/dashboard enabled               | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
-| OPS-003 | Production API/dashboard enabled               | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
-| OPS-004 | Production enabled; source acceptance pending  | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
-| OPS-005 | Production enabled; source acceptance pending  | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Production lifecycle and UI verified           | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
-| OPS-007 | Adapter locally verified; live binding pending | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
-| OPS-008 | Source verified; Railway deployment blocked    | Existing recovery runbook is not restore evidence.                                                                                             |
+| Task    | State                                           | Verification/evidence                                                                                                                          |
+| ------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPS-001 | Contract complete; local verification           | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
+| OPS-002 | Production API/dashboard enabled                | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
+| OPS-003 | Production API/dashboard enabled                | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
+| OPS-004 | Production enabled; source acceptance pending   | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
+| OPS-005 | Production enabled; source acceptance pending   | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
+| OPS-006 | Production lifecycle and UI verified            | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
+| OPS-007 | Adapter locally verified; live binding pending  | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
+| OPS-008 | Source/API/UI verified; Railway rollout blocked | Scoped scan/recovery imports and triage, bounded read-only GitHub collection and organization overview; evidence remains unverified.           |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -1160,3 +1160,74 @@ both passed, including PostgreSQL, browser and Windows checks.
   emitting partial JSON. TypeScript and the final full source check passed (**914 tests, 3 skipped**).
   Publication is the remaining gate for this slice. No server route, database schema, transaction,
   licensing policy or commercial entitlement changed.
+
+### Organization security overview — implementation and local verification
+
+- Collector source `74dc28c` was committed and pushed atomically to the working
+  and default branches after the 914-test source pass. CodeQL `39486054879` passed;
+  CI `39486054908` is still running. PDF email CI `39483874808` passed on rerun,
+  including its full browser workflow and real converter job. The first browser
+  failure was not reproduced locally; no claim of its exact cause is made.
+- Applications now has a read-only Security overview with direct scoped triage
+  navigation. It prioritizes shown open critical/high snapshots, failed evidence,
+  missing/stale reports and unavailable data. No report is called independently
+  verified; zero shown snapshots and backup success never imply security/restore.
+- Reads are capped defensively at ten applications and five environments each,
+  in batches of four. Lists and unavailable reads disclose partial coverage.
+  Session/authorization failures abort; navigation stops new batches and suppresses
+  late responses. No server endpoint, authorization grant, database operation or
+  commercial policy is added or changed.
+- Six evidence-summary checks and five new real Chromium/API workflows passed.
+  Ten deliberate mutations were killed, including scope/navigation gating,
+  authorization refusal, truncation, stale evidence, restore separation and budgets.
+  A mobile assertion initially used an exact cell accessible name, which includes
+  a responsive column label; checking the actual advisory text corrected the test.
+  Mobile layout had no horizontal overflow. Final full source/browser regressions
+  and publication are the remaining gate. Full dependency audit: zero vulnerabilities.
+
+### Final continuation checkpoint — 20 October 2026
+
+- The read-only collector's exact source `74dc28c` passed full GitHub CI
+  `39486054908`: PostgreSQL, browser, Windows, source quality and dependency/secret
+  scanning all passed. CodeQL `39486054879` passed. This is completed remote
+  evidence, unlike the older cancelled posture-source run.
+- Final compact overview source passed `npm run check`: **920 passed, 3 skipped**.
+  The final complete Chromium run passed **21 workflows** in **72.55 seconds**.
+  Six pure evidence checks and ten killed mutations cover the new semantics and
+  boundaries; full dependency audit found zero vulnerabilities. No API/schema,
+  transaction, permission or licensing policy changed in the overview slice.
+- Actual desktop/mobile screenshots were reviewed. Coverage details are collapsed
+  while partial-coverage warnings remain visible. Row actions are short and have
+  unique accessible environment labels. The 390-pixel view has no horizontal
+  overflow. Local fixture previews are under
+  `/workspace/scratch/warrior-security-overview/` (not production evidence).
+- One complete rerun timed out after an existing SPA click had completed, while
+  Playwright awaited document navigation. That helper now skips the generic
+  navigation wait and keeps its explicit destination-heading wait. The isolated
+  late-secret regression and the final complete 21-workflow run passed; no
+  security assertion or timeout budget was removed or loosened.
+- Railway again refused the authorized verified-source deployment with the same
+  temporary-pause response. Do not claim that source publication updates the live
+  UI or that the staged posture flag has deployed. The latest source still needs
+  normal deployment/predeploy and synthetic live acceptance when Railway permits.
+- Email source `234c3fb` is complete and CI-green, including browser/converter
+  acceptance. Its hook still needs a matching Supabase-generated signing secret
+  in the PDF Railway service plus hook enablement. No provider setting, real
+  recipient, production file/export, payment, licensing key or MFA policy changed.
+
+Next actions, with existing implementation authority retained:
+
+1. Deploy the current default branch when Railway allows it. Verify the served
+   `operations.mjs` bytes, `/healthz`, `/readyz`, migration 0024 and grants; then run
+   the synthetic posture acceptance helper. Fixture restore reports are not actual
+   production restore exercises. Retain the old service and all evidence on rollback.
+2. Configure the PDF email hook through secure Railway/Supabase administration;
+   finish controlled-address delivery and confirmation/recovery acceptance only
+   when that external access and an authorized test recipient are available.
+3. Bind the real PDF monitoring source with a genuine owner/admin fresh-MFA scoped
+   credential and PDF-project deployment access. Never substitute a synthetic
+   fixture credential or database/provider bypass for this authorization boundary.
+4. Keep independent monitoring/witness deployment, production backup/restore drills,
+   external notification providers and physical Windows release acceptance as
+   separate unverified rollout gates. Initial operations work does not establish
+   those results or complete deferred billing/federation/hardware milestones.

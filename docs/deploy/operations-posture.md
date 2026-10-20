@@ -66,3 +66,16 @@ It prints only bounded metrics and the dump digest, and removes both test databa
 The dump remains in process memory. No production URL, credential, export or backup
 is used. Timing describes a tiny local fixture, not production RPO/RTO, failover,
 WAL/PITR coverage, provider backups, encrypted storage or object-file restoration.
+
+## Organization security overview
+
+Open Applications → Review security overview. The read-only overview prioritizes
+shown open critical/high finding snapshots, unavailable/failed reporting, and
+missing/stale reports. Each row opens its scoped Security & recovery controls or
+environment. Refresh explicitly to collect a new bounded snapshot.
+
+Coverage is limited to ten applications and five environments per application,
+with four reads in flight. Partial inventory, truncated evidence and unavailable
+reporting are explicit. Counts describe shown finding snapshots, not unique
+vulnerabilities or whole-organization safety. Backup and rollback reports never
+count as a restore exercise. All evidence retains administrator-report provenance.

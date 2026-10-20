@@ -53,3 +53,20 @@ outputs only the reviewed schema and never sends credentials to Warrior. Its out
 is still unverified import evidence. Automatic provider authentication, independent
 monitoring/witnessing, production backup/restore drills and physical desktop release
 acceptance remain separate work and must not be inferred from this interface.
+
+## Organization security overview
+
+The Applications portal composes an on-demand read-only overview from existing scoped
+inventory and posture routes. It reviews at most ten applications and five environments
+per application, with four concurrent reads at most. It does not add a privileged
+aggregate endpoint or change authorization, freshness or provenance. Session/workspace
+navigation invalidates the view and stops subsequent request batches. Unauthorized
+reads abort; unavailable reports remain unknown and never become zero findings.
+
+Prioritize visible open/acknowledged critical/high finding snapshots, failed evidence,
+and stale/missing reports. Counts are shown snapshots, not deduplicated vulnerabilities.
+Explicitly identify partial inventory coverage and truncated evidence; “latest shown”
+is chosen by completion time within returned lists and is not an exhaustive history.
+A backup or rollback is never rendered as a restore. Every row links to its actual
+scoped environment or Security & recovery controls. The overview makes no independent
+security, availability, recovery or whole-organization health claim.

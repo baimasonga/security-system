@@ -138,3 +138,12 @@ stdout write. Denial, pagination and malformed payloads cannot imply a completed
 clean scan. Never surface provider errors, raw bodies, token values or repository
 source context. Verifying a commit and authenticating a local fetch do not attest
 scan execution or elevate the later import beyond `admin_report`.
+
+### Browser organization attention view
+
+Reuse scoped server-authorized reads with bounded fan-out. Check current visit and
+workspace before each batch and before rendering. Never let late responses reopen
+an old workspace. Refuse auth failures rather than showing cached data; render other
+read failures as unavailable. Label inventory/evidence truncation and snapshot counts.
+No absent report, successful backup or zero visible finding count implies a verified
+restore or complete security coverage. Navigation goes only to API-returned scoped IDs.

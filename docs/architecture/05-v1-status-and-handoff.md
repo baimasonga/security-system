@@ -1,5 +1,10 @@
 # 05 — V1 First-Slice Status and Handoff
 
+Historical first-slice snapshot. For current implementation status use
+[the feature program](08-feature-program.md) and the
+[operations handoff](../programs/operations-security-status.md); later milestones
+have superseded several “not done” statements below.
+
 Date: 2026-10-08 (updated after the PostgreSQL adapter slice) · Branch: `claude/sleepy-carson-l0if1k`
 
 ## 1. What is built and verified
