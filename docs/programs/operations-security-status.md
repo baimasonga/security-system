@@ -439,6 +439,7 @@ both passed, including PostgreSQL, browser and Windows checks.
   with AssertionError; the fixed tests pass. No production delivery/authentication
   behavior, dependency persistence, test retry count or required assertion changed.
 - Verification: passkey unit **10 passed**, PostgreSQL owner/app-role **20 passed**,
-  browser **4 passed**. Full application checks are recorded with publication.
-- Branch: `codex/ci-async-assertions`, based on merged `0f35a30`; PR reference follows
-  publication. OPS-006 remains the next feature task.
+  browser **4 passed**, full `npm run check` **845 passed, 3 skipped**.
+- Publication: implementation `1fd6ba6`, [PR #30](https://github.com/baimasonga/security-system/pull/30),
+  branch `codex/ci-async-assertions`, based on merged `0f35a30`. Remote verification
+  is recorded on the PR. OPS-006 remains the next feature task.
