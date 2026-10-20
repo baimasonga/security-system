@@ -1231,3 +1231,9 @@ Next actions, with existing implementation authority retained:
    external notification providers and physical Windows release acceptance as
    separate unverified rollout gates. Initial operations work does not establish
    those results or complete deferred billing/federation/hardware milestones.
+
+- Organization overview implementation committed as `11cd23a`. Final read-only
+  public checks returned HTTP 200 from `/healthz` and `/readyz`; the served
+  `operations.mjs` digest still differs from the new source, confirming that the
+  published UI must not be represented as deployed. The current checkpoint changes
+  documentation only; the verified application and tests are unchanged.
