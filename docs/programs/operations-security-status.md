@@ -1128,3 +1128,35 @@ both passed, including PostgreSQL, browser and Windows checks.
   running at handoff (local full PG already passed 725). CodeQL `39475473558`
   passed. PDF signup-guidance CI `39475312241` passed both source and converter
   jobs. A later deployment retry again returned Railway's temporary-pause refusal.
+
+### Continuation — email handoff and GitHub collector, 20 October
+
+- User authorized continuing Warrior implementation after the email work without
+  further routine approvals. PDF source `234c3fb` adds a signed Cloudflare Supabase
+  Send Email Hook with the actual logo, colors and ownership details. Local check
+  passed 231 tests (2 skipped), production build and desktop/mobile email renders
+  passed, and unsigned compiled-route requests were refused. No live email was
+  sent. PDF Railway access remains unavailable and Supabase administrative access
+  is absent, so the hook is not activated. Its CI source, app-role and production
+  build checks passed; the browser job failed, but the full browser workflow then
+  passed against a new isolated local database. The failed CI job was rerun; final
+  remote status remains to be checked.
+- Previous Warrior CI `39475473694` ultimately reports cancelled, not successful.
+  Local full posture PostgreSQL verification (725 passed) remains the completed
+  evidence; do not upgrade the cancelled remote run to a full CI pass.
+- Another authorized deployment attempt still returned Railway's temporary-pause
+  refusal. Active deployment remains `bc8360f4-80e9-4151-9ef4-7997e6023451` on old
+  source `fc51e49`. The posture flag is staged; new source is not production verified.
+- The next OPS-008 slice adds an operator-local read-only GitHub collector. It
+  validates a repository commit and collects the current complete open-alert
+  inventory, projects safe normalized fields and never sends its GitHub credential
+  to Warrior. Fixed HTTPS API origin, redirect refusal, shared timeout, streamed
+  limits and fail-closed provider/pagination/schema behavior are covered. Reports
+  retain `admin_report` provenance; commit lookup is not proof of scanner execution
+  on that revision. No scheduled server polling or independent attestation is added.
+- Focused collector/normalizer verification passed 21 tests; all seven deliberate
+  security mutations were killed. A real local rejecting-proxy smoke test confirmed
+  the executable honored proxy settings without making a remote API request or
+  emitting partial JSON. TypeScript and the final full source check passed (**914 tests, 3 skipped**).
+  Publication is the remaining gate for this slice. No server route, database schema, transaction,
+  licensing policy or commercial entitlement changed.

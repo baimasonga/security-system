@@ -14,6 +14,12 @@ exports. A successful backup cannot create a restore record.
 
 ## GitHub imports
 
+For authenticated read-only collection without raw exports, use the
+[bounded GitHub collector](github-security-collector.md). It verifies the repository
+commit, collects current open alerts and produces the existing normalized report.
+Imports remain unverified administrator evidence. The manual pipeline below remains
+available for previously captured trusted exports.
+
 Use your existing authenticated GitHub CLI in a trusted local shell. The normalizer
 consumes JSON from standard input and writes only the reviewed metadata schema.
 For example, use a protected local pipeline (substitute the actual component ID,
@@ -38,9 +44,10 @@ no GitHub credential is stored by Warrior.
 
 Import normalized JSON through the UI. Scan runs retain independent snapshots;
 new scans never auto-resolve existing remediation decisions. Lists are bounded and
-show truncation; environment caps fail closed. This first slice does not fetch or
-cryptographically authenticate provider results, execute remediation, inspect backup
-contents or independently attest a restore. External monitoring/witnessing and
+show truncation; environment caps fail closed. The server does not fetch or cryptographically authenticate provider results. The
+operator-local collector authenticates its read-only fetch without elevating import
+provenance. Neither workflow executes remediation, inspects backup
+contents or independently attests a restore. External monitoring/witnessing and
 production restore drills still require their separate rollout.
 
 ## Isolated restore mechanics exercise

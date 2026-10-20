@@ -176,3 +176,14 @@ independent verification. No arbitrary text, URLs, raw secret results or export
 files enter storage. Recovery targets and elapsed/data-loss intervals are separate
 from result/check assertions. Preserve the organization lock, atomic audit and
 transaction-bound authority; no new infrastructure or licensing authority.
+
+### OPS-008 operator-local provider collection
+
+A bounded read-only GitHub collector may authenticate directly from the trusted
+operator workstation using a dedicated repository-scoped read token. Fixed HTTPS
+origin, redirect refusal, proxy/CA preservation, streamed byte/time/finding budgets
+and fail-closed pagination are required. It verifies the supplied repository commit
+but labels the result as a current alert-inventory snapshot; it must not claim a
+scan execution on that commit or independently verified provenance. Only the
+existing normalized report schema leaves the collector. Server-held GitHub tokens,
+scheduled polling and provider-attested imports remain separate reviewed changes.

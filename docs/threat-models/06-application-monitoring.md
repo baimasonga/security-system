@@ -128,3 +128,13 @@ confidence. A backup pass cannot count as a restore; successful restore assertio
 require ordered timestamps and explicit integrity/application/audit check assertions.
 Test authorization at both boundaries, archived/frozen scopes, changed retries,
 audit failure, missing/failed checks, unknown fields, future evidence and stale data.
+
+### Local GitHub collector
+
+Treat the provider response as potentially secret-bearing and malicious. Allow only
+reviewed GitHub paths on a fixed HTTPS origin, refuse redirects and arbitrary links,
+preserve TLS/proxy settings, bound bytes/time/count, and project metadata before any
+stdout write. Denial, pagination and malformed payloads cannot imply a completed or
+clean scan. Never surface provider errors, raw bodies, token values or repository
+source context. Verifying a commit and authenticating a local fetch do not attest
+scan execution or elevate the later import beyond `admin_report`.
