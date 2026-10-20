@@ -597,3 +597,45 @@ both passed, including PostgreSQL, browser and Windows checks.
   Publish the environment draft's endpoint addition and remove its unnecessary
   `RAILWAY_API_TOKEN` requirement; do not supply another token. Then resume sharing
   configuration and clean/malware acceptance. No new paid resources are needed.
+
+## Railway private storage compatibility — 20 October 2026
+
+- After the user published endpoint access, a real synthetic multipart upload
+  reached the approved bucket but completion returned InvalidPart. The provider's
+  ListParts response encodes ETag quotes as numeric XML entities; the adapter
+  decoded only named entities and then filtered the opaque value, corrupting it.
+  Fixed one-pass entity decoding and escaped completion XML without changing
+  the ETag value. Added decimal/hexadecimal regression and XML-injection checks.
+- The recommended provider addressing is virtual-host. Added bucket-qualified
+  endpoint support, preserving path-style behavior for existing endpoints and
+  checking a similar-prefix hostname does not select virtual-host addressing.
+  Both presigned and server requests keep their configured host; redirects remain
+  forbidden. No credentials, share URLs, database changes or new resources are
+  introduced by this source correction.
+- TDD: two ETag regressions and the virtual-host regression failed before their
+  fixes. All eight S3 adapter tests pass. Three deliberate mutations (numeric
+  decoder removal, XML escape removal, virtual-host bypass) were killed by
+  assertions; source was restored after each.
+- Live shared-endpoint acceptance: multipart create/upload/list/complete/read
+  passed with the ETag fix, anonymous object access was denied, and synthetic
+  objects/multipart uploads were removed. The exact portal-only CORS policy was
+  stored and read back successfully, but actual shared-endpoint upload/preflight
+  responses returned wildcard CORS. This does not establish browser-origin
+  acceptance. No production sharing setting was enabled on that evidence.
+- Saved one additional exact bucket-host network destination for the provider's
+  recommended endpoint. Publication and virtual-host CORS acceptance are pending.
+  Existing Railway project authentication suffices; no additional token is needed.
+- Next: verify the recommended endpoint after publication, deploy this correction,
+  then wire approved storage/private ClamAV settings and test clean/rejected-file
+  behavior. Record full check/PostgreSQL results below before source publication.
+
+- Verification completed before publication: full `npm run check` passed **852
+  tests, 3 skipped**; targeted sharing/security PostgreSQL suites passed **54 tests
+  in 4 files**, covering owner and least-privilege app roles. The first PG attempt
+  failed because the disposable local database was stopped; after restarting the
+  existing container the suites passed. No production database was used.
+  Logs: `/tmp/sharing-etag-red.log`, `/tmp/sharing-virtual-host-red.log`,
+  `/tmp/sharing-compat-check.log`, `/tmp/sharing-compat-pg.log`. The source correction
+  changes object-store wire compatibility only; no transaction, retention, quota,
+  locking or schema behavior changed, so a new database load scenario is not
+  applicable. Production upload quarantine/scanner acceptance remains pending.

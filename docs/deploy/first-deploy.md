@@ -112,6 +112,11 @@ Sharing is **off in production** until configured. Apply migration `0011_file_sh
 - `SHARING_STORAGE=s3`, `SHARING_S3_ENDPOINT` (e.g. `https://<account>.r2.cloudflarestorage.com`), `SHARING_S3_REGION`
   (`auto` for R2), `SHARING_S3_BUCKET`, `SHARING_S3_ACCESS_KEY_ID`, `SHARING_S3_SECRET_ACCESS_KEY` (secrets; a
   bucket-scoped token with object read/write only).
+  For providers recommending virtual-host addressing, set the endpoint to
+  `https://<bucket>.<provider-host>`: an endpoint hostname beginning with the exact
+  configured bucket followed by a dot omits the bucket from request paths. Other
+  endpoints retain path-style addressing. Use the provider's recommended endpoint
+  and verify its actual CORS responses, not just the stored CORS configuration.
 - `SHARING_SECRET` (≥ 32 random characters, distinct from other keys; changing it changes every share URL).
 - `SHARING_PUBLIC_ORIGIN` (or `PUBLIC_ORIGIN`), optional `SHARING_SHORT_ORIGIN` for a short-link host.
 - `CLAMD_HOST`/`CLAMD_PORT` for a private ClamAV daemon (StreamMaxLength ≥ the largest plan file size), or

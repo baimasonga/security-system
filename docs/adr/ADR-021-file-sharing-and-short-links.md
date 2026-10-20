@@ -77,3 +77,12 @@ between two fenced transactions, and notification email is a queued job.
   (architecture/10 §6). Custom-domain TLS termination is an edge/operator step; the platform verifies ownership by
   DNS TXT and routes verified hosts to their own namespace.
 - The S3 adapter is verified against the AWS SigV4 example and a protocol fake, not yet a live bucket.
+- Activation compatibility correction (20 October 2026): provider ETags are opaque
+  values. Decode named/decimal/hexadecimal XML entities once, remove only the outer
+  quotes, and XML-escape the unchanged value on multipart completion. Never filter
+  ETags to a presumed hash alphabet. Bucket-qualified endpoint hostnames use
+  virtual-host paths; other configured endpoints retain path-style paths. Both
+  signing and server-side requests use the same configured host and addressing.
+  Redirects remain forbidden; private object authorization and quarantine remain
+  unchanged. Live multipart read/write and anonymous-access denial passed against
+  Railway storage; browser-origin acceptance remains a separate deployment gate.

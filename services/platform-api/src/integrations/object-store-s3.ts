@@ -12,8 +12,8 @@ import {
 // node:crypto (no SDK). The bucket is private; browsers reach it only through short-lived presigned URLs, and the
 // bucket's own origin is the isolated content origin. Requests go only to the operator-configured endpoint.
 //
-// Verified against the AWS SigV4 presigned-URL example (test/object-store-s3.test.ts) and a protocol fake. It has NOT
-// been exercised against a live bucket in this repository; do that before production use (docs/deploy).
+// Verified against the AWS SigV4 example, a protocol fake and synthetic live multipart/private-access checks.
+// Provider endpoint/CORS and quarantine acceptance remain deployment-specific checks (docs/deploy).
 
 export interface S3Config {
   endpoint: string; // e.g. https://<account>.r2.cloudflarestorage.com
@@ -61,9 +61,10 @@ export class SigV4 {
       .join('&');
   }
 
-  /** Path-style URL path for a key (each segment encoded, slashes kept). */
+  /** Bucket-qualified endpoints use virtual-host addressing; others retain path addressing. */
   path(key: string) {
-    return `/${enc(this.#c.bucket)}/${key.split('/').map(enc).join('/')}`;
+    const virtualHost = new URL(this.#c.endpoint).hostname.startsWith(`${this.#c.bucket}.`);
+    return `${virtualHost ? '' : `/${enc(this.#c.bucket)}`}/${key.split('/').map(enc).join('/')}`;
   }
 
   /** Presigned URL (query authentication). `headers` are additional signed headers the client must send. */
@@ -147,12 +148,27 @@ function tag(xml: string, name: string): string | undefined {
   return end < 0 ? undefined : xml.slice(start + open.length, end);
 }
 const unxml = (s: string) =>
+  s.replace(/&(quot|lt|gt|apos|amp|#x[0-9a-f]+|#[0-9]+);/gi, (entity, value: string) => {
+    const named: Record<string, string> = { quot: '"', lt: '<', gt: '>', apos: "'", amp: '&' };
+    if (!value.startsWith('#')) return named[value] ?? entity;
+    const hex = value[1]?.toLowerCase() === 'x';
+    const point = Number.parseInt(value.slice(hex ? 2 : 1), hex ? 16 : 10);
+    return point === 9 ||
+      point === 10 ||
+      point === 13 ||
+      (point >= 0x20 && point <= 0xd7ff) ||
+      (point >= 0xe000 && point <= 0xfffd) ||
+      (point >= 0x10000 && point <= 0x10ffff)
+      ? String.fromCodePoint(point)
+      : entity;
+  });
+const escapeXml = (s: string) =>
   s
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 
 export class S3ObjectStore implements ObjectStore {
   readonly kind = 's3';
@@ -248,7 +264,7 @@ export class S3ObjectStore implements ObjectStore {
         const p = m[1]!;
         out.push({
           partNumber: Number(tag(p, 'PartNumber')),
-          etag: unxml(tag(p, 'ETag') ?? '').replace(/"/g, ''),
+          etag: unxml(tag(p, 'ETag') ?? '').replace(/^"|"$/g, ''),
           size: Number(tag(p, 'Size')),
         });
       }
@@ -264,7 +280,7 @@ export class S3ObjectStore implements ObjectStore {
     parts: ReadonlyArray<{ partNumber: number; etag: string }>,
   ) {
     const body = Buffer.from(
-      `<CompleteMultipartUpload>${parts.map((p) => `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>"${p.etag.replace(/[^0-9A-Za-z-]/g, '')}"</ETag></Part>`).join('')}</CompleteMultipartUpload>`,
+      `<CompleteMultipartUpload>${parts.map((p) => `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>"${escapeXml(p.etag)}"</ETag></Part>`).join('')}</CompleteMultipartUpload>`,
     );
     const xml = await (await this.#req('POST', key, { uploadId }, body)).text();
     // S3 can report a failed completion inside a 200 response.

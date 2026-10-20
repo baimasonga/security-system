@@ -67,6 +67,54 @@ describe('S3 SigV4', () => {
     );
   });
 
+  it.each([
+    ['https://examplebucket.storage.example.com', '/folder/file'],
+    ['https://examplebucket-other.storage.example.com', '/examplebucket/folder/file'],
+  ])(
+    'uses the configured endpoint %s without duplicating virtual-host buckets',
+    async (endpoint, path) => {
+      const fake: typeof fetch = async (input, init) => {
+        expect(String(input)).toBe(`${endpoint}${path}?uploads=`);
+        expect(init?.redirect).toBe('error');
+        return new Response(
+          '<InitiateMultipartUploadResult><UploadId>synthetic</UploadId></InitiateMultipartUploadResult>',
+        );
+      };
+      const store = new S3ObjectStore({ ...AWS, endpoint }, { fetch: fake });
+      const { uploadId } = await store.createMultipart('folder/file', 'text/plain');
+      const part = new URL(
+        await store.signPart('folder/file', uploadId, 1, 5, new Date(Date.now() + 60000)),
+      );
+      expect(part.origin).toBe(endpoint);
+      expect(part.pathname).toBe(path);
+      expect(part.searchParams.get('X-Amz-SignedHeaders')).toBe('content-length;host');
+    },
+  );
+
+  it.each(['&#34;', '&#x22;'])('preserves opaque provider ETags encoded with %s', async (quote) => {
+    let completed = false;
+    const fake: typeof fetch = async (_input, init) => {
+      if (init?.method === 'GET')
+        return new Response(
+          `<ListPartsResult><Part><PartNumber>1</PartNumber><ETag>${quote}opaque+/=&amp;&lt;${quote}</ETag><Size>5</Size></Part></ListPartsResult>`,
+        );
+      if (init?.method === 'POST') {
+        // The opaque value must survive exactly, with XML metacharacters escaped.
+        expect(Buffer.from(init.body as Buffer).toString()).toContain(
+          '<ETag>"opaque+/=&amp;&lt;"</ETag>',
+        );
+        completed = true;
+        return new Response('<CompleteMultipartUploadResult/>');
+      }
+      return new Response(null, { headers: { 'content-length': '5' } });
+    };
+    const store = new S3ObjectStore(AWS, { fetch: fake });
+    const parts = await store.listParts('synthetic', 'upload');
+    expect(parts).toEqual([{ partNumber: 1, etag: 'opaque+/=&<', size: 5 }]);
+    expect(await store.completeMultipart('synthetic', 'upload', parts)).toEqual({ size: 5 });
+    expect(completed).toBe(true);
+  });
+
   it('speaks the multipart protocol to the configured endpoint only', async () => {
     const calls: Array<{ method: string; url: string; auth: string | null; body: string }> = [];
     const objects = new Map<string, Buffer>();
