@@ -5,7 +5,7 @@ This is a security-critical trust platform. Prefer boring, auditable code. Corre
 Cross-application monitoring work starts at [AGENTS.md](AGENTS.md), then the
 [operations/security program](docs/programs/operations-security.md) and its
 [current handoff](docs/programs/operations-security-status.md). Inventory, credential management, durable ingestion and health/history reads are implemented
-behind separate source flags; incident workflows remain planned. Keep evidence/status current.
+behind separate source flags; manual incident triage has a separate flag. Automatic alert rules and notifications remain planned. Keep evidence/status current.
 
 ## Commands
 

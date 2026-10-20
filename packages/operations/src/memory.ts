@@ -1,4 +1,5 @@
 import type { Heartbeat } from './health.ts';
+import type { Incident } from './incidents.ts';
 import type { OperationEvent } from './events-model.ts';
 import { MemoryEventRepo } from './events-memory.ts';
 import { AuditBuffer, type AuditLog, type AuditEventInput } from '@trust/audit';
@@ -15,6 +16,74 @@ import type {
 } from './model.ts';
 
 class Repo extends MemoryEventRepo implements InventoryRepo {
+  incidents = new Map<string, Incident>();
+  async findIncident(orgId: string, id: string) {
+    const row = this.incidents.get(id);
+    return row?.orgId === orgId ? structuredClone(row) : undefined;
+  }
+  async listIncidents(scope: CredentialScope, options: { limit: number; after?: string }) {
+    return [...this.incidents.values()]
+      .filter(
+        (r) =>
+          r.orgId === scope.orgId &&
+          r.applicationId === scope.applicationId &&
+          r.environmentId === scope.environmentId &&
+          (!options.after || r.id > options.after),
+      )
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+      .slice(0, options.limit)
+      .map((r) => structuredClone(r));
+  }
+  async insertIncident(row: Incident) {
+    const c = await this.find('component', row.orgId, row.componentId);
+    if (
+      !c ||
+      c.applicationId !== row.applicationId ||
+      c.environmentId !== row.environmentId ||
+      this.incidents.has(row.id) ||
+      row.version !== 1 ||
+      row.state !== 'open' ||
+      row.acknowledgedAt ||
+      row.resolvedAt
+    )
+      throw new Error('incident_invalid');
+    if (
+      [...this.incidents.values()].some(
+        (r) => r.orgId === row.orgId && r.componentId === row.componentId && r.state !== 'resolved',
+      )
+    )
+      throw new Error('incident_conflict');
+    this.incidents.set(row.id, structuredClone(row));
+  }
+  async updateIncident(row: Incident, expectedVersion: number) {
+    const old = await this.findIncident(row.orgId, row.id);
+    if (
+      !old ||
+      old.version !== expectedVersion ||
+      row.version !== old.version + 1 ||
+      old.state === 'resolved' ||
+      row.updatedAt < old.updatedAt ||
+      (old.state === 'acknowledged' && row.state === 'open') ||
+      (old.acknowledgedAt && +old.acknowledgedAt !== +(row.acknowledgedAt ?? 0)) ||
+      (row.state === 'acknowledged' && !row.acknowledgedAt) ||
+      (row.state === 'open' && row.acknowledgedAt) ||
+      (row.state === 'resolved') !== !!row.resolvedAt
+    )
+      throw new Error('incident_invalid');
+    for (const key of [
+      'orgId',
+      'applicationId',
+      'environmentId',
+      'componentId',
+      'source',
+      'severity',
+      'createdByUserId',
+      'createdAt',
+    ] as const)
+      if (key === 'createdAt' ? +row.createdAt !== +old.createdAt : row[key] !== old[key])
+        throw new Error('incident_immutable');
+    this.incidents.set(row.id, structuredClone(row));
+  }
   override async recordHeartbeat(row: Heartbeat) {
     const c = await this.find('component', row.orgId, row.componentId);
     if (!c || c.applicationId !== row.applicationId || c.environmentId !== row.environmentId)
@@ -165,6 +234,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       repo.eventAggregates = structuredClone(this.eventAggregates);
       repo.heartbeats = structuredClone(this.heartbeats);
       repo.healthClocks = structuredClone(this.healthClocks);
+      repo.incidents = structuredClone(this.incidents);
       const buffer = new AuditBuffer();
       const out = await fn(Object.assign(repo, { audit: buffer }));
       const events = buffer.drain();
@@ -177,6 +247,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       this.eventAggregates = repo.eventAggregates;
       this.heartbeats = repo.heartbeats;
       this.healthClocks = repo.healthClocks;
+      this.incidents = repo.incidents;
       return out;
     };
     const result = this.#tail.then(run, run);

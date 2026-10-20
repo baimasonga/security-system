@@ -144,3 +144,15 @@ An unauthenticated /readyz checks only the fixed internal persistence connection
 bounded response and no dependency/tenant details; /healthz remains process liveness.
 Independent external Warrior monitoring remains a deployment requirement, not proof from
 this dashboard. Maintenance notification suppression belongs to OPS-006.
+
+### OPS-006 manual incident triage slice
+
+Add a separately gated, tenant-scoped manual incident workflow using the existing
+organization transaction lock and audit writer. See the operations contract for
+its strict API, state machine, deduplication and 1000-record environment cap. Manual
+triage is explicitly human evidence; it is never mislabeled as a backend or probe
+observation. No rule evaluator, external notification or remediation is included.
+A partial unique index prevents multiple active manual incidents per component;
+terminal-state, immutable-scope and revision guards protect the database adapter.
+Retained records cannot be deleted by the application role. Automated alerting and
+bounded pruning require their own completed acceptance before OPS-006 is done.

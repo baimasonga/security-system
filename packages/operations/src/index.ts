@@ -5,3 +5,4 @@ export * from './credentials.ts';
 export * from './events-model.ts';
 export * from './events.ts';
 export * from './health.ts';
+export * from './incidents.ts';

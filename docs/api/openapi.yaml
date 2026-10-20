@@ -3454,6 +3454,284 @@ paths:
           $ref: '#/components/responses/Problem'
         '503':
           $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/incidents:
+    get:
+      operationId: listOperationsIncidents
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - &a1
+          in: path
+          name: orgId
+          required: true
+          schema:
+            type: string
+        - &a2
+          in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+        - &a3
+          in: path
+          name: environmentId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: after
+          schema:
+            type: string
+            pattern: ^opi_[a-f0-9]{24}$
+      responses:
+        '200':
+          description: Scoped manual incident workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsIncidentPage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: openOperationsIncident
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsIncidentOpen'
+      responses:
+        '200':
+          description: Scoped manual incident workflow
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - incident
+                  - created
+                properties:
+                  incident:
+                    $ref: '#/components/schemas/OperationsIncident'
+                  created:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/incidents/{incidentId}/acknowledge:
+    post:
+      operationId: acknowledgeOperationsIncident
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+        - in: path
+          name: incidentId
+          required: true
+          schema:
+            type: string
+            pattern: ^opi_[a-f0-9]{24}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - expected_version
+                - reason
+              properties:
+                expected_version:
+                  type: integer
+                  minimum: 1
+                reason:
+                  type: string
+                  enum:
+                    - incident_ack
+      responses:
+        '200':
+          description: Scoped manual incident workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsIncident'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/incidents/{incidentId}/resolve:
+    post:
+      operationId: resolveOperationsIncident
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+        - in: path
+          name: incidentId
+          required: true
+          schema:
+            type: string
+            pattern: ^opi_[a-f0-9]{24}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - expected_version
+                - reason
+              properties:
+                expected_version:
+                  type: integer
+                  minimum: 1
+                reason:
+                  type: string
+                  enum:
+                    - incident_resolution
+      responses:
+        '200':
+          description: Scoped manual incident workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsIncident'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/incidents/{incidentId}/assign:
+    post:
+      operationId: assignOperationsIncident
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *a1
+        - *a2
+        - *a3
+        - in: path
+          name: incidentId
+          required: true
+          schema:
+            type: string
+            pattern: ^opi_[a-f0-9]{24}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - expected_version
+                - reason
+                - assignee_user_id
+              properties:
+                expected_version:
+                  type: integer
+                  minimum: 1
+                reason:
+                  type: string
+                  enum:
+                    - assignment
+                assignee_user_id:
+                  type: string
+                  nullable: true
+                  pattern: ^usr_[a-f0-9]{24}$
+      responses:
+        '200':
+          description: Scoped manual incident workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsIncident'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
   /readyz:
     get:
       operationId: readiness
@@ -4174,6 +4452,100 @@ components:
       description: Error
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
   schemas:
+    OperationsIncident:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - org_id
+        - application_id
+        - environment_id
+        - component_id
+        - source
+        - severity
+        - state
+        - assignee_user_id
+        - created_by_user_id
+        - version
+        - created_at
+        - updated_at
+        - acknowledged_at
+        - resolved_at
+      properties:
+        id:
+          type: string
+          pattern: ^opi_[a-f0-9]{24}$
+        org_id: &a1
+          type: string
+        application_id: *a1
+        environment_id: *a1
+        component_id: *a1
+        source:
+          type: string
+          enum:
+            - manual_triage
+        severity: &a3
+          type: string
+          enum:
+            - informational
+            - warning
+            - critical
+        state:
+          type: string
+          enum:
+            - open
+            - acknowledged
+            - resolved
+        assignee_user_id:
+          type: string
+          nullable: true
+        created_by_user_id: *a1
+        version:
+          type: integer
+          minimum: 1
+        created_at: &a2
+          type: string
+          format: date-time
+        updated_at: *a2
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+    OperationsIncidentOpen:
+      type: object
+      additionalProperties: false
+      required:
+        - component_id
+        - severity
+        - reason
+      properties:
+        component_id:
+          type: string
+          pattern: ^opm_[a-f0-9]{24}$
+        severity: *a3
+        reason:
+          type: string
+          enum:
+            - security_response
+    OperationsIncidentPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - next_after
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/OperationsIncident'
+        next_after:
+          type: string
+          nullable: true
     CollectorEventAcknowledgement:
       type: object
       additionalProperties: false

@@ -137,6 +137,7 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
     registerCredentialRoutes(scoped, c);
     registerEventRoutes(scoped, c);
     registerHealthRoutes(scoped, c);
+    registerIncidentRoutes(scoped, c);
   });
 }
 function registerInventoryRoutes(app: FastifyInstance, c: Container) {
@@ -427,4 +428,108 @@ function registerHealthRoutes(app: FastifyInstance, c: Container) {
     const from = q.from ? new Date(q.from) : new Date(+to - 86400000);
     return toWire(await c.operationsHealth.history(principalOf(req), scope, componentId, from, to));
   });
+}
+
+function registerIncidentRoutes(app: FastifyInstance, c: Container) {
+  const path = base + '/:applicationId/environments/:environmentId/incidents';
+  const scopeParams = z
+    .object({ orgId: id('org'), applicationId: id('opa'), environmentId: id('ope') })
+    .strict();
+  const incidentId = z.string().regex(/^opi_[a-f0-9]{24}$/);
+  const pre = {
+    logLevel: 'silent' as const,
+    preHandler: [
+      authenticated(c),
+      async () => {
+        if (!c.config.operationsInventoryEnabled || !c.config.operationsIncidentsEnabled)
+          throw new DomainError('not_found', 'not found');
+      },
+    ],
+  };
+  app.get(path, pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const q = safeParse(
+      z
+        .object({
+          limit: z.coerce.number().int().min(1).max(100).default(50),
+          after: incidentId.optional(),
+        })
+        .strict(),
+      req.query,
+    );
+    return toWire(
+      await c.operationsIncidents.list(principalOf(req), safeParse(scopeParams, req.params), q),
+    );
+  });
+  app.post(path, pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    const b = safeParse(
+      z
+        .object({
+          component_id: id('opm'),
+          severity: z.enum(['informational', 'warning', 'critical']),
+          reason: z.literal('security_response'),
+        })
+        .strict(),
+      req.body,
+    );
+    return toWire(
+      await c.operationsIncidents.open(principalOf(req), safeParse(scopeParams, req.params), {
+        componentId: b.component_id,
+        severity: b.severity,
+        reason: b.reason,
+      }),
+    );
+  });
+  for (const action of ['acknowledge', 'resolve', 'assign'] as const)
+    app.post(`${path}/:incidentId/${action}`, pre, async (req, reply) => {
+      reply.header('Cache-Control', 'no-store');
+      safeParse(z.object({}).strict(), req.query);
+      const { incidentId: incident, ...scope } = safeParse(
+        scopeParams.extend({ incidentId }).strict(),
+        req.params,
+      );
+      const expected = { expected_version: z.number().int().min(1) };
+      let result;
+      if (action === 'assign') {
+        const b = safeParse(
+          z
+            .object({
+              ...expected,
+              reason: z.literal('assignment'),
+              assignee_user_id: id('usr').nullable(),
+            })
+            .strict(),
+          req.body,
+        );
+        result = await c.operationsIncidents.act(principalOf(req), scope, incident, {
+          action,
+          expectedVersion: b.expected_version,
+          reason: b.reason,
+          assigneeUserId: b.assignee_user_id,
+        });
+      } else if (action === 'acknowledge') {
+        const b = safeParse(
+          z.object({ ...expected, reason: z.literal('incident_ack') }).strict(),
+          req.body,
+        );
+        result = await c.operationsIncidents.act(principalOf(req), scope, incident, {
+          action,
+          expectedVersion: b.expected_version,
+          reason: b.reason,
+        });
+      } else {
+        const b = safeParse(
+          z.object({ ...expected, reason: z.literal('incident_resolution') }).strict(),
+          req.body,
+        );
+        result = await c.operationsIncidents.act(principalOf(req), scope, incident, {
+          action,
+          expectedVersion: b.expected_version,
+          reason: b.reason,
+        });
+      }
+      return toWire(result);
+    });
 }

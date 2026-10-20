@@ -16,7 +16,7 @@ Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
 Credential verification remains a guarded transaction primitive, not a collector.
 OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLED`
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
-Incidents and a live Rokela PDF monitoring integration remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
+Manual incident triage is implemented in the OPS-006 first slice below; automatic alerts and a live Rokela PDF monitoring integration remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
 
 | Task    | State                                 | Verification/evidence                                                                                                                          |
 | ------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,7 +25,7 @@ Incidents and a live Rokela PDF monitoring integration remain pending. Ingestion
 | OPS-003 | Production API/dashboard enabled      | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
 | OPS-004 | Implemented; local verification       | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
 | OPS-005 | Implemented; local verification       | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Not started; depends on OPS-004/005   | Incident/notification design only.                                                                                                             |
+| OPS-006 | Manual triage slice; in progress      | Audited open/assign/acknowledge/resolve and dashboard controls; rules/outbox remain pending.                                                   |
 | OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                     |
 | OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                             |
 
@@ -682,3 +682,71 @@ both passed, including PostgreSQL, browser and Windows checks.
   approvers and authenticated operations-source integration retain their earlier
   acceptance limits. Next implementation task remains OPS-006; OPS-007/008 are
   pending and must not be described as activated features.
+
+## OPS-006 first vertical slice — manual incident triage, 20 October 2026
+
+- Based on deployed `330842b`, implemented a separately gated human incident
+  workflow: open for an active component, assign/unassign an active same-org
+  responder, acknowledge and resolve. Source is always `manual_triage`, not a
+  backend assertion or independent probe. Owners/admins get the explicit
+  `ops:manage_incidents` permission; members and integration keys do not.
+- Memory/PostgreSQL adapters share an incident contract. Migration 0022 adds
+  ancestor foreign keys, single-active manual incident index, finite timestamps,
+  immutable creation/scope/severity, monotonic versions and terminal resolution.
+  App-role grants are SELECT/INSERT/UPDATE; no delete/truncate. Serialized org
+  transactions recheck authorization/session/freeze, validate assignment, and
+  commit state plus mandatory reason audit together. Audit failure rolls back.
+- Strict live OpenAPI and routes expose bounded list/open/assign/acknowledge/resolve
+  operations. Scope errors are 404; stale edits 409; unknown/private fields rejected.
+  A 1000-retained-record environment cap refuses another open without deleting
+  evidence. No automatic retention/pruning claim is made. Ancestor deactivation
+  prevents new incidents but allows responders to close existing work.
+- Applications → environment now contains an actionable Incidents panel with open,
+  assignment, acknowledgement and resolution forms, current versions and paginated
+  rows. Late responses after navigation cannot reopen an abandoned workspace.
+  Stale-edit messaging does not demand an MFA factor for incident actions.
+- Contract/ADR/threat model and `docs/deploy/operations-incidents.md` describe the
+  slice, rollout and rollback. Source `OPERATIONS_INCIDENTS_ENABLED` defaults false
+  and requires inventory; no new secret/provider or paid resource is required.
+- Local browser acceptance passed **11 workflows** including the new incident
+  lifecycle and late-response regression. Targeted owner/app-role PostgreSQL
+  verification passed **42 tests in 5 files**. The first database attempt started
+  before PostgreSQL was ready; after startup the suites passed.
+- Real HTTP, fsync-on disposable PostgreSQL, pool 2 contention correctness passed:
+  20 opens → one creation; 20 competing acknowledgements → one success and 19 stale
+  refusals; 20 concurrent reads succeeded; resolution followed by a new manual open
+  retained exactly two rows and four incident audit events, with verified audit
+  chain. Initial duration 936 ms; this is not a capacity benchmark.
+- Evidence: `/tmp/incidents-red.log`, `/tmp/incidents-unit.log`,
+  `/tmp/incidents-pg-targeted.log`, `/tmp/incidents-browser-final.log`,
+  `/tmp/incidents-load.log`, `/tmp/incidents-mutations.log`,
+  `/tmp/incidents-pg-full.log` and `/tmp/incidents-check-final.log`. Full-suite and
+  mutation outcomes, source publication and live activation are recorded below
+  after completion; the presence of these paths alone is not passing evidence.
+- OPS-006 remains incomplete: typed automatic rules/evaluation windows, maintenance
+  suppression, fenced notification outbox/retries/visible failures, incident pruning
+  and delivery-outage acceptance remain. No real alerts were sent. Next: implement
+  automatic rule evaluation against durable evidence with fake notification
+  recipients before enabling delivery or starting the OPS-007 incident integration.
+
+### Local verification completed
+
+- Full `npm run check`: **859 passed, 3 skipped**. Full PostgreSQL owner/app-role
+  suite: **694 passed in 67 files**, 385.75 seconds. Expected child-process occupied-
+  port failures appeared in the negative load-server probes; the suite passed.
+  Final incident PG/audit-payload rerun: **28 passed in 4 files**.
+- Chromium: **11 passed**, including open/assign/acknowledge/resolve and the delayed
+  mutation/navigation regression. **20 mutations killed by assertions**, including
+  authorization/session/freeze, omitted audit intent, wrong assignee membership,
+  version/terminal guards, inactive ancestry, duplicate opens, quota, backward clock,
+  memory transaction clone/commit, member privilege escalation, PostgreSQL scope,
+  terminal guard/unique index, and late browser responses. All disposable source
+  mutations were restored and their copy removed. An initially surviving omitted-
+  audit mutation exposed a test gap; added explicit successful-transition audit
+  assertions before the complete passing mutation run.
+- Assignment audit records preserve previous/new responder IDs and state; the final
+  targeted unit/API run passed **7 tests**, and final PG verification passed above.
+  No secret, private link, customer event payload or file content is in these records.
+- Publication baseline: `330842b`; implementation branch
+  `codex/manual-incident-triage`. Production rollout/acceptance is recorded separately
+  after migration, grants and source deployment complete.

@@ -94,3 +94,12 @@ before scope lookup and again on the transaction connection. Counts are historic
 with gaps and truncation, not availability measurements. Public readiness returns only a
 bounded fixed-connection persistence result; raw diagnostics and arbitrary destinations never
 enter it. Independent Warrior monitoring and optional-provider checks remain deployment work.
+
+Manual triage slice: every read/mutation is organization scoped and checks current
+session/membership inside the serialized organization transaction; integration keys
+have no incident authority. Assignment rejects nonmembers and inactive users.
+Reasons are fixed enums, with no arbitrary text/URLs/payloads. Concurrent opens
+collapse to one active incident. Optimistic versions prevent lost responder updates;
+resolved incidents cannot reopen. Audit failures roll back state. A bounded retained
+record cap fails closed rather than dropping history. This does not establish any
+automatic rule, maintenance suppression, notification delivery or pruning control.

@@ -1,4 +1,4 @@
-import { HealthService } from '@trust/operations';
+import { HealthService, IncidentService, type InventoryAuthority } from '@trust/operations';
 import { persistenceReadiness } from './readiness.ts';
 import {
   InventoryService,
@@ -97,6 +97,7 @@ export interface Container {
   operationsCredentials: CredentialService;
   operationsEvents: EventService;
   operationsHealth: HealthService;
+  operationsIncidents: IncidentService;
   readiness(): Promise<boolean>;
   licensing: LicensingService;
   billing: BillingService | undefined;
@@ -487,9 +488,7 @@ export async function createContainer(
   const operationsStore = pool
     ? new PgInventoryStore(pool, clock, { auditShards: shards })
     : new InMemoryInventoryStore({ audit });
-  const operations = new InventoryService({
-    store: operationsStore,
-    clock,
+  const operationsAuthority: InventoryAuthority = {
     authorize: async (p, orgId, permission) => {
       await auth.requireOrgPermission(p, orgId, permission);
     },
@@ -499,6 +498,27 @@ export async function createContainer(
       (await authStore.findUserById(userId))?.status === 'active',
     activeProduct: async (productId) =>
       (await licensingStore.findProductById(productId))?.status === 'active',
+    sessionActive: async (p, now) => {
+      const s = await authStore.findSessionById(p.sessionId);
+      return (
+        !!s &&
+        s.userId === p.userId &&
+        !s.revokedAt &&
+        s.expiresAt > now &&
+        (await authStore.findUserById(p.userId))?.status === 'active'
+      );
+    },
+  };
+  const operations = new InventoryService({
+    ...operationsAuthority,
+    store: operationsStore,
+    clock,
+  });
+  const operationsIncidents = new IncidentService({
+    store: operationsStore,
+    clock,
+    enabled: () => config.operationsInventoryEnabled && config.operationsIncidentsEnabled,
+    authority: operationsAuthority,
   });
 
   const operationsCredentials = new CredentialService({
@@ -573,6 +593,7 @@ export async function createContainer(
     operationsCredentials,
     operationsEvents,
     operationsHealth,
+    operationsIncidents,
     readiness,
     licensing,
     billing,

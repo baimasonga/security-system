@@ -16,6 +16,7 @@ const ALL: Priv[] = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 
 export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   operations_credentials: RIU,
+  operations_incidents: RIU,
   operations_heartbeats: ALL,
   operations_events: ['SELECT', 'INSERT', 'DELETE'],
   operations_event_counters: ALL,

@@ -74,7 +74,9 @@ export async function operationsView(ui) {
         if (current(n)) {
           if (e.status === 409)
             ui.notice(
-              'The record changed or a lifecycle/credential limit prevents this action. Refresh before retrying; use a fresh authenticator code.',
+              data.mfa_code
+                ? 'The record changed or a lifecycle/credential limit prevents this action. Refresh before retrying; use a fresh authenticator code.'
+                : 'The record changed or a limit prevents this action. Refresh before retrying.',
               true,
             );
           else if (e.status === 401 && data.mfa_code)
@@ -405,6 +407,7 @@ export async function operationsView(ui) {
       ),
       button('Refresh', refresh(reload)),
       await healthPanel(path),
+      await incidentsPanel(path, components, writable, reload),
       panel(
         node('h2', 'Components'),
         rows.length ? table(['Component', 'Kind', 'State', ''], rows) : empty('No components yet.'),
@@ -439,6 +442,134 @@ export async function operationsView(ui) {
           : empty('Reactivate the application before changing this environment.'),
       ),
     ];
+  }
+  async function incidentsPanel(path, components, openAllowed, reload) {
+    const wrap = panel(
+      node('h2', 'Incidents'),
+      node(
+        'p',
+        'Human triage records. Opening or resolving an incident does not change reported health. Automatic alerts and external notifications are not enabled by this workflow.',
+      ),
+    );
+    let page;
+    try {
+      page = await ui.api(`${path}/incidents?limit=25`);
+    } catch (e) {
+      if (e.status === 401) throw e;
+      wrap.append(
+        empty(
+          e.status === 404
+            ? 'Incident management is not enabled for this workspace.'
+            : 'Incident records are currently unavailable.',
+        ),
+      );
+      return wrap;
+    }
+    const members = (await ui.api(`${ui.orgPath()}/members`)).items;
+    const names = new Map(
+      members.map((m) => [m.user_id, m.user_id === ui.userId ? 'You' : m.email || m.user_id]),
+    );
+    const codes = new Map(components.map((c) => [c.id, c.code]));
+    const rows = [...page.items];
+    let after = page.next_after;
+    const content = node('div');
+    function manage(row) {
+      const fixedReason = (value) => ({
+        name: 'reason',
+        label: 'Reason',
+        options: choices([value]),
+      });
+      const actionForm = (action, why, label, fields = []) =>
+        form([...fields, fixedReason(why)], label, async (data, n) => {
+          await ui.api(`${path}/incidents/${enc(row.id)}/${action}`, 'POST', {
+            ...data,
+            expected_version: row.version,
+            ...(action === 'assign' ? { assignee_user_id: data.assignee_user_id || null } : {}),
+          });
+          if (current(n)) await show(reload);
+        });
+      ui.modal(
+        node('h2', 'Manage incident'),
+        panel(
+          node(
+            'p',
+            `${codes.get(row.component_id) || row.component_id} · ${row.severity} · ${row.state} · version ${row.version}`,
+          ),
+          ...(row.state === 'open'
+            ? [actionForm('acknowledge', 'incident_ack', 'Acknowledge incident')]
+            : []),
+          actionForm('assign', 'assignment', 'Assign incident', [
+            {
+              name: 'assignee_user_id',
+              label: 'Assigned responder',
+              optional: true,
+              value: row.assignee_user_id ?? '',
+              options: [
+                ['', 'Unassigned'],
+                ...members.map((m) => [m.user_id, names.get(m.user_id)]),
+              ],
+            },
+          ]),
+          actionForm('resolve', 'incident_resolution', 'Resolve incident'),
+        ),
+      );
+    }
+    const more = button('Load more incidents', async () => {
+      const n = generation;
+      const next = await ui.api(`${path}/incidents?limit=25&after=${enc(after)}`);
+      if (!current(n)) return;
+      rows.push(...next.items);
+      after = next.next_after;
+      render();
+    });
+    function render() {
+      more.hidden = !after;
+      content.replaceChildren(
+        rows.length
+          ? table(
+              ['Component', 'Severity', 'State', 'Assigned responder', 'Opened', 'Actions'],
+              rows.map((r) => [
+                codes.get(r.component_id) || r.component_id,
+                r.severity,
+                r.state,
+                r.assignee_user_id
+                  ? names.get(r.assignee_user_id) || 'Former member'
+                  : 'Unassigned',
+                when(r.created_at),
+                r.state === 'resolved' ? 'Resolved' : button('Manage incident', () => manage(r)),
+              ]),
+            )
+          : empty('No incidents recorded.'),
+        more,
+      );
+    }
+    render();
+    wrap.append(content);
+    const active = components.filter((c) => c.state === 'active');
+    if (openAllowed && active.length)
+      wrap.append(
+        form(
+          [
+            {
+              name: 'component_id',
+              label: 'Affected component',
+              options: active.map((c) => [c.id, c.code]),
+            },
+            {
+              name: 'severity',
+              label: 'Incident severity',
+              options: choices(['informational', 'warning', 'critical']),
+            },
+            { name: 'reason', label: 'Reason', options: choices(['security_response']) },
+          ],
+          'Open incident',
+          async (data, n) => {
+            await ui.api(`${path}/incidents`, 'POST', data);
+            if (current(n)) await show(reload);
+          },
+        ),
+      );
+    return wrap;
   }
   async function component(appId, envId, id) {
     const path = `${base}/${enc(appId)}/environments/${enc(envId)}/components`;

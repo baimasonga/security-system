@@ -277,3 +277,40 @@ cacheable authentication result. Verification checks current state, expected
 purpose/source/scope, and expiry/enablement before callback and commit. It never
 consults commercial subscription state. No HTTP verification/ingestion endpoint
 has been added by OPS-003.
+
+## Manual incident triage (OPS-006 first vertical slice)
+
+This slice adds human-operated incident records, not automatic alert evaluation or
+notification delivery. `OPERATIONS_INCIDENTS_ENABLED` defaults false and requires
+inventory. Reads require `ops:read`; mutations require `ops:manage_incidents`, an
+active session, current membership and no privileged freeze, rechecked within the
+organization transaction. Integration credentials cannot call these routes.
+
+Under `/v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}`:
+
+- `GET /incidents?limit=1..100&after=opi_…`: bounded identifier pagination.
+- `POST /incidents`: `{component_id,severity,reason:"security_response"}`. Severity
+  is `informational|warning|critical`; source is always `manual_triage`. Active
+  ancestors are required. Returns `{incident,created}`; repeated/concurrent opens
+  for the same component reuse its single active manual incident without changing
+  severity or producing another audit event. Maximum 1000 retained records per
+  environment; a full environment refuses another open, never deletes evidence.
+- `POST /incidents/{incidentId}/acknowledge`: `{expected_version,reason:"incident_ack"}`.
+- `POST /incidents/{incidentId}/resolve`: `{expected_version,reason:"incident_resolution"}`.
+- `POST /incidents/{incidentId}/assign`: `{expected_version,reason:"assignment",assignee_user_id}`.
+  The assignee is an active member of the same organization or null to unassign.
+
+All objects reject unknown fields. Cross-scope identifiers return 404. Stale edits,
+repeated acknowledgements and edits of resolved incidents return 409. Resolution is
+terminal; a new explicit human triage action can create a new incident. Assignment
+and ack/resolve remain possible after inventory deactivation so responders can close
+existing work. Immutable scope, creation/severity and monotonic revisions/times are
+also enforced by the store/database. Every successful change and its reason audit
+commit atomically. Acknowledgement/resolution never edits an observation, changes
+reported health, invokes a runbook, or changes commercial/device access.
+
+There are no free-text titles, event payloads, arbitrary runbook URLs, external
+recipients or notification secrets in this slice. Display component codes, source,
+severity, state, assignee and timestamps. Automatic typed rules, maintenance
+suppression, fenced notification delivery and 365-day incident pruning remain
+OPS-006 follow-up work; this slice must not be described as completed alerting.

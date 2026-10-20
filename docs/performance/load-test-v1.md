@@ -385,3 +385,16 @@ The dedicated outbox tests separately drain 30 messages with four concurrent wor
 baseline above (refresh clean to 300/s, p99 39 ms). Sharing tables are separate from the licensing hot path. The new
 upload/download paths and the per-organization sharing account lock are **not yet load tested** (open item in
 architecture/10 §7).
+
+## Manual incident contention correctness — 20 October 2026
+
+`DATABASE_URL=… node tools/loadtest/operations-incidents.ts` uses disposable,
+fsync-on PostgreSQL and real HTTP with pool size two. Observed/expected: 20 opens →
+one created incident; 20 competing acknowledgements → one success and 19 stale
+409 refusals; 20 concurrent reads → 20 correct responses; resolution followed by a
+new manual open → two retained rows (one open, one resolved), exactly four incident
+audit events and a verified audit chain. The initial run completed in 936 ms.
+
+This complements the OPS-004 pool-two event/retention correctness baseline; it
+neither repeats its ingestion workload nor establishes comparative throughput.
+No external notifications, production database or customer evidence were used.

@@ -1,3 +1,4 @@
+import { incidentStoreContract } from '../../../packages/operations/test/incident-store-contract.ts';
 import { healthStoreContract } from '../../../packages/operations/test/health-store-contract.ts';
 import {
   eventIngestionContract,
@@ -78,6 +79,7 @@ async function seeded() {
   return { pool, store, scope, app, componentId };
 }
 eventStoreContract(seeded);
+incidentStoreContract(seeded);
 it('requires ancestor-consistent event provenance and prevents app-role evidence updates', async () => {
   const { pool, store, scope, componentId } = await seeded();
   const event = {
@@ -190,4 +192,97 @@ it('keeps stale health across PG-backed service reconstruction and refuses clock
       f.scope.orgId,
     ]),
   ).rejects.toThrow(/cannot regress/);
+});
+
+it('incident storm deduplicates, guards SQL transitions and rolls back a failed audit', async () => {
+  const { pool, store, scope, componentId, app } = await seeded();
+  const { IncidentService } = await import('@trust/operations');
+  const principal = {
+    kind: 'user' as const,
+    userId: app.ownerUserId,
+    sessionId: 'test-session',
+    platformRole: 'none' as const,
+  };
+  const authority = {
+    authorize: async () => {},
+    assertWritable: async () => {},
+    sessionActive: async () => true,
+    activeMember: async () => true,
+    activeProduct: async () => true,
+  };
+  const service = new IncidentService({ store, clock, enabled: () => true, authority });
+  const opened = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      service.open(principal, scope, {
+        componentId,
+        severity: 'warning',
+        reason: 'security_response',
+      }),
+    ),
+  );
+  expect(opened.filter((r) => r.created)).toHaveLength(1);
+  const row = opened[0]!.incident;
+  const edits = await Promise.allSettled(
+    Array.from({ length: 20 }, () =>
+      service.act(principal, scope, row.id, {
+        action: 'acknowledge',
+        expectedVersion: 1,
+        reason: 'incident_ack',
+      }),
+    ),
+  );
+  expect(edits.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  expect(edits.filter((r) => r.status === 'rejected')).toHaveLength(19);
+  for (const sql of [
+    "UPDATE operations_incidents SET state='open',version=version+1 WHERE id=$1",
+    "UPDATE operations_incidents SET severity='critical',version=version+1 WHERE id=$1",
+    'UPDATE operations_incidents SET version=version+2 WHERE id=$1',
+  ])
+    await expect(pool.query(sql, [row.id])).rejects.toThrow();
+  if (appRoleMode()) {
+    await expect(
+      pool.query('DELETE FROM operations_incidents WHERE id=$1', [row.id]),
+    ).rejects.toThrow(/permission denied/);
+    await expect(pool.query('TRUNCATE operations_incidents')).rejects.toThrow(/permission denied/);
+  }
+  const failing = {
+    query: pool.query.bind(pool),
+    async connect() {
+      const client = await pool.connect(),
+        query = client.query.bind(client);
+      return new Proxy(client, {
+        get(target, key) {
+          if (key === 'query')
+            return async (sql: string, params?: unknown[]) => {
+              if (sql.includes('INSERT INTO audit_events'))
+                throw new Error('incident_audit_failure');
+              return query(sql, params);
+            };
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    },
+  };
+  const broken = new IncidentService({
+    store: new PgInventoryStore(failing, clock),
+    clock,
+    enabled: () => true,
+    authority,
+  });
+  await expect(
+    broken.act(principal, scope, row.id, {
+      action: 'resolve',
+      expectedVersion: 2,
+      reason: 'incident_resolution',
+    }),
+  ).rejects.toThrow('incident_audit_failure');
+  expect((await store.findIncident(scope.orgId, row.id))?.state).toBe('acknowledged');
+  const audits = await pool.query(
+    "SELECT action FROM audit_events WHERE action LIKE 'operations.incident.%' ORDER BY seq",
+  );
+  expect(audits.rows.map((r) => r.action)).toEqual([
+    'operations.incident.opened',
+    'operations.incident.acknowledged',
+  ]);
 });

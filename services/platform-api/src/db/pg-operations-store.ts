@@ -13,6 +13,7 @@ import type {
   InventoryStore,
   InventoryTx,
   InventoryType,
+  Incident,
 } from '@trust/operations';
 import type { Clock } from '@trust/shared-types';
 import { appendAuditInTx } from './pg-audit-log.ts';
@@ -112,11 +113,63 @@ const credentialFrom = (r: Record<string, unknown>): CredentialRecord => ({
   revokedAt: r.revoked_at ? new Date(r.revoked_at as Date) : null,
   rotatedAt: r.rotated_at ? new Date(r.rotated_at as Date) : null,
 });
+const incidentFields = [
+  'id',
+  'orgId',
+  'applicationId',
+  'environmentId',
+  'componentId',
+  'source',
+  'severity',
+  'state',
+  'assigneeUserId',
+  'createdByUserId',
+  'version',
+  'createdAt',
+  'updatedAt',
+  'acknowledgedAt',
+  'resolvedAt',
+] as const;
+function incidentFrom(r: Record<string, unknown>): Incident {
+  const row = Object.fromEntries(incidentFields.map((f) => [f, r[column(f)]]));
+  for (const f of ['createdAt', 'updatedAt', 'acknowledgedAt', 'resolvedAt'])
+    if (row[f]) row[f] = new Date(row[f] as Date);
+  row.version = Number(row.version);
+  return row as unknown as Incident;
+}
 class Repo extends PgEventRepo implements InventoryRepo {
   readonly #q: Queryable;
   constructor(q: Queryable) {
     super(q);
     this.#q = q;
+  }
+  async findIncident(orgId: string, id: string) {
+    const r = await this.#q.query('SELECT * FROM operations_incidents WHERE org_id=$1 AND id=$2', [
+      orgId,
+      id,
+    ]);
+    return r.rows[0] ? incidentFrom(r.rows[0]) : undefined;
+  }
+  async listIncidents(scope: CredentialScope, options: { limit: number; after?: string }) {
+    const r = await this.#q.query(
+      'SELECT * FROM operations_incidents WHERE org_id=$1 AND application_id=$2 AND environment_id=$3 AND ($4::text IS NULL OR id>$4) ORDER BY id LIMIT $5',
+      [scope.orgId, scope.applicationId, scope.environmentId, options.after ?? null, options.limit],
+    );
+    return r.rows.map(incidentFrom);
+  }
+  async insertIncident(row: Incident) {
+    await this.#q.query(
+      `INSERT INTO operations_incidents (${incidentFields.map(column).join(',')}) VALUES (${incidentFields.map((_, i) => '$' + (i + 1)).join(',')})`,
+      incidentFields.map((f) => row[f]),
+    );
+  }
+  async updateIncident(row: Incident, expectedVersion: number) {
+    const params = [...incidentFields.map((f) => row[f]), expectedVersion];
+    const r = await this.#q.query(
+      `UPDATE operations_incidents SET ${incidentFields.map((f, i) => `${column(f)}=$${i + 1}`).join(',')} WHERE id=$1 AND org_id=$2 AND version=$${params.length}`,
+      params,
+    );
+    if (r.rowCount !== 1) throw new Error('incident_version');
   }
   async findCredential(id: string) {
     const result = await this.#q.query('SELECT * FROM operations_credentials WHERE id=$1', [id]);

@@ -28,6 +28,7 @@ async function setup() {
   env = await makeEnv({
     config: {
       operationsInventoryEnabled: true,
+      operationsIncidentsEnabled: true,
       operationsHealthEnabled: true,
       operationsCredentialsEnabled: true,
       mfaEncryptionKey: randomBytes(32).toString('hex'),
@@ -354,4 +355,75 @@ it('shows rollout unavailability without pretending monitoring works, and reject
   expect(
     await page.getByRole('button', { name: 'Register application', exact: true }).count(),
   ).toBe(0);
+});
+
+it('opens, assigns, acknowledges and resolves a manual incident using dashboard controls', async () => {
+  const { page } = await setup();
+  await registerApp(page, 'incident-app');
+  await addEnv(page);
+  const add = section(page, 'Add component');
+  await add.getByLabel('Code (permanent)').fill('api');
+  await add.getByRole('button', { name: 'Add component', exact: true }).click();
+  const incidents = section(page, 'Incidents');
+  await incidents.getByLabel('Incident severity').selectOption('warning');
+  await incidents.getByRole('button', { name: 'Open incident', exact: true }).click();
+  await incidents.getByRole('cell', { name: 'open', exact: true }).waitFor();
+  await incidents.getByRole('button', { name: 'Manage incident', exact: true }).click();
+  let dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Assigned responder').selectOption({ label: 'You' });
+  await dialog.getByRole('button', { name: 'Assign incident', exact: true }).click();
+  await expect
+    .poll(() => incidents.getByRole('cell', { name: 'You', exact: true }).count())
+    .toBe(1);
+  await incidents.getByRole('button', { name: 'Manage incident', exact: true }).click();
+  dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Acknowledge incident', exact: true }).click();
+  await incidents.getByRole('cell', { name: 'acknowledged', exact: true }).waitFor();
+  await incidents.getByRole('button', { name: 'Manage incident', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Resolve incident', exact: true })
+    .click();
+  await incidents.getByRole('cell', { name: 'resolved', exact: true }).waitFor();
+  expect(
+    await incidents.getByRole('button', { name: 'Manage incident', exact: true }).count(),
+  ).toBe(0);
+});
+
+it('does not reopen an incident workspace when a late mutation response arrives after navigation', async () => {
+  const { page } = await setup();
+  await registerApp(page, 'late-incident');
+  await addEnv(page);
+  await section(page, 'Add component').getByLabel('Code (permanent)').fill('api');
+  await section(page, 'Add component')
+    .getByRole('button', { name: 'Add component', exact: true })
+    .click();
+  let signal!: () => void, release!: () => void;
+  const captured = new Promise<void>((r) => {
+    signal = r;
+  });
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  await page.route(/\/incidents$/, async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch();
+    signal();
+    await gate;
+    await route.fulfill({ response });
+  });
+  const finished = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().endsWith('/incidents'),
+  );
+  await section(page, 'Incidents')
+    .getByRole('button', { name: 'Open incident', exact: true })
+    .click();
+  await captured;
+  await page.getByRole('button', { name: 'Licenses', exact: true }).click();
+  await page.getByRole('heading', { name: 'Licenses', exact: true }).waitFor();
+  release();
+  await finished;
+  await page.waitForLoadState('networkidle');
+  expect(await page.getByRole('heading', { name: 'Licenses', exact: true }).count()).toBe(1);
+  expect(await page.getByRole('heading', { name: 'Incidents', exact: true }).count()).toBe(0);
 });
