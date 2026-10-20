@@ -451,6 +451,19 @@ it('creates, evaluates, mutes and disables automatic alerts through real dashboa
   await alerts.getByLabel('Condition', { exact: true }).selectOption('heartbeat');
   await alerts.getByRole('button', { name: 'Create rule', exact: true }).click();
   await alerts.getByRole('cell', { name: 'unknown', exact: true }).waitFor();
+  const mutations: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'GET') mutations.push(request.url());
+  });
+  const beforeGuide = mutations.length;
+  await alerts.getByRole('button', { name: 'Open response guide', exact: true }).click();
+  const guide = page.getByRole('dialog');
+  await guide.getByRole('heading', { name: 'Investigate component', exact: true }).waitFor();
+  expect(await guide.textContent()).toContain('Affected component: scanner');
+  expect(await guide.textContent()).toContain('Require fresh healthy observations');
+  expect(await guide.textContent()).toContain('Escalate to the application owner');
+  expect(mutations.length).toBe(beforeGuide);
+  await guide.getByRole('button', { name: 'Close', exact: true }).click();
   await alerts.getByRole('button', { name: 'Evaluate rules now', exact: true }).click();
   await page.waitForLoadState('networkidle');
   // The scheduler can evaluate after rendering without changing rule settings.

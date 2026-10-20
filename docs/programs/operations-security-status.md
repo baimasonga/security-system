@@ -1275,3 +1275,30 @@ Next: securely activate the PDF authentication-email hook when its Railway and
 Supabase administration are available; complete controlled-recipient confirmation
 and recovery acceptance. Bind PDF monitoring only with its genuine scoped MFA
 credential. Do not bypass these external-access or authorization requirements.
+
+### Actionable alert response guides — 20 October 2026
+
+- Reconciled default source `3887500`. Existing rules stored a reviewed response
+  guide enum but the dashboard offered no way to open its instructions. The next
+  independent OPS-006/008 completion slice exposes that existing choice through
+  **Automatic alerts → Open response guide**, without waiting for PDF credentials.
+- Guides cover general component investigation, scanner, converter, storage and
+  email delivery, identify the affected component, require fresh/synthetic recovery
+  checks and explain owner/provider escalation. They preserve scanner refusal,
+  customer objects and email confirmation. Provider acceptance is not inbox delivery;
+  incident resolution is not service repair and backup success is not restoration.
+- The existing modal and scoped rule reads are reused. Opening a guide causes no
+  API mutation, command execution, external navigation, provider call or message.
+  Unknown/inherited codes cannot select a guide. Server permissions, routes,
+  database schema, audit transitions and licensing policy are unchanged.
+- Twelve focused unit checks passed; four deliberate mutations were killed for
+  inherited selection and scanner/email/storage safety instructions. Full
+  `npm run check` passed: **932 passed, 3 skipped**. All **21 real Chromium
+  workflows** passed, including guide/component/recovery/escalation rendering,
+  zero guide-opening mutations and continued rule evaluation/maintenance/toggling.
+  An initial browser assertion used a Playwright matcher with Vitest; it was
+  corrected to assert the actual dialog text, then the complete suite passed.
+- No persistence or server boundary changed, so no additional PostgreSQL/load
+  scenario was introduced. Deployment acceptance remains separate from local
+  browser evidence. Next: publish the verified source, deploy its exact SHA and
+  check public health/readiness and exact served `operations.mjs` bytes.

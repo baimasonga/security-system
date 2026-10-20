@@ -67,3 +67,20 @@ inventory. Do not reset licensing, alter membership, drop history or replace sec
 services/platform-api/test/operations.test.ts
 services/platform-api/test/operations-credentials.test.ts` against a throwaway DB.
   No backend authority, schema, transaction or retention behavior changes in this UI.
+
+## Respond to an automatic alert
+
+In an application's environment, find **Automatic alerts**, then choose **Open
+response guide** on the affected rule. The guide identifies the component and
+shows the rule's reviewed scanner, converter, storage, email or general response
+instructions, recovery checks and escalation to the application owner/provider.
+Opening or closing a guide makes no API mutation. No command, URL, email or
+infrastructure change is executed. Unknown guide codes have no action.
+
+Use **Manage incident** to assign/acknowledge a responder and record resolution.
+Carry out provider actions separately through approved private administration.
+Require fresh healthy evidence and the guide's synthetic application check before
+resolving. Resolution does not repair health; maintenance only mutes notifications.
+Scanner failures must never bypass scanning, backup reports never prove restoration,
+and email troubleshooting must preserve account confirmation. Never paste secrets,
+customer documents, confirmation links or recipient addresses into incident evidence.

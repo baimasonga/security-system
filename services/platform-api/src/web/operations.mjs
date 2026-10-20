@@ -73,6 +73,68 @@ export function summarizePosture(view) {
   };
 }
 
+// Static responder instructions. Codes never become URLs, scripts or infrastructure actions.
+const responseGuides = {
+  investigate_component: {
+    title: 'Investigate component',
+    steps: [
+      'Assign a responder and acknowledge the incident using Manage incident. Check the affected component, dependencies and observation timestamps.',
+      'Compare recent deployment and configuration changes with the failure window. Inspect provider diagnostics without copying tokens, document contents or private links.',
+      'If a deployment is implicated, use the approved rollback procedure only after checking schema compatibility. Preserve evidence and customer documents.',
+    ],
+    recovery:
+      'Require fresh healthy observations and a synthetic application check before resolving. Resolving an incident does not repair the component.',
+  },
+  check_scanner: {
+    title: 'Check scanner',
+    steps: [
+      'Check private scanner connectivity, service readiness, memory pressure and signature-update status in the hosting dashboard.',
+      'Distinguish scanner unavailability from a malware detection. Preserve rejected-file evidence without opening or downloading suspected malware.',
+      'Never disable scanning or allow quarantined files through to restore availability. Escalate unavailable scanning to the service maintainer.',
+    ],
+    recovery:
+      'Require fresh healthy scanner observations, a clean synthetic file check and a controlled malware refusal check before resolving.',
+  },
+  check_converter: {
+    title: 'Check converter',
+    steps: [
+      'Check converter readiness, worker backlog, memory and timeout limits in the hosting dashboard.',
+      'Use a small synthetic document to distinguish a service failure from an unsupported input. Do not upload customer documents for diagnostics.',
+      'Compare the failure window with converter or deployment changes. Use an approved compatible rollback if necessary; preserve original files.',
+    ],
+    recovery:
+      'Require fresh healthy observations and successful synthetic conversion with an output-content check before resolving.',
+  },
+  check_storage: {
+    title: 'Check storage',
+    steps: [
+      'Check storage-provider availability, capacity and authorization failures using the approved provider dashboard.',
+      'Check the configured bucket and credential permissions without displaying keys. Do not delete or replace the existing bucket or customer objects.',
+      'Test a disposable synthetic object through the application upload and authorized download paths. Retain access controls and scanner checks.',
+    ],
+    recovery:
+      'Require fresh healthy observations and successful synthetic upload, authorized download and cleanup before resolving. Backup success does not prove restoration.',
+  },
+  check_email: {
+    title: 'Check email delivery',
+    steps: [
+      'Check provider acceptance, sending limits, sender-domain authentication and the application delivery backlog.',
+      'Check authentication-hook configuration separately from transfer notifications. Keep email confirmation enabled; never substitute an HTTP API token for an SMTP password.',
+      'Use an address controlled by the responder for an authorized delivery test. Do not copy confirmation links, codes or recipient addresses into incident evidence.',
+    ],
+    recovery:
+      'Require fresh successful delivery observations and a controlled inbox and confirmation check before resolving. Provider acceptance alone is not inbox delivery.',
+  },
+};
+export function responseGuide(code) {
+  if (typeof code !== 'string' || !Object.hasOwn(responseGuides, code)) return null;
+  return {
+    ...responseGuides[code],
+    escalation:
+      'Escalate to the application owner and the affected provider if service remains unavailable, failures recur, or recovery cannot be verified. Use approved private contact channels; never post secrets or customer data.',
+  };
+}
+
 export async function operationsView(ui) {
   const { node, panel, button, title, table, empty, fieldsForm } = ui;
   const base = `${ui.orgPath()}/operations/applications`;
@@ -889,6 +951,27 @@ export async function operationsView(ui) {
       ),
     ];
   }
+  function openResponseGuide(code, componentCode) {
+    const guide = responseGuide(code);
+    if (!guide) return;
+    const steps = node('ol');
+    for (const step of guide.steps) steps.append(node('li', step));
+    ui.modal(
+      node('h2', guide.title),
+      panel(
+        node('p', `Affected component: ${componentCode}`),
+        node(
+          'p',
+          'This guide makes no changes. Infrastructure actions require the approved provider workflow. Assign and acknowledge incidents with Manage incident.',
+        ),
+        steps,
+        node('h3', 'Verify recovery'),
+        node('p', guide.recovery),
+        node('h3', 'Escalate'),
+        node('p', guide.escalation),
+      ),
+    );
+  }
   async function automationPanel(path, components, writable, reload) {
     const card = panel(node('h2', 'Automatic alerts'));
     let rules, notifications;
@@ -921,63 +1004,72 @@ export async function operationsView(ui) {
               `${r.kind === 'heartbeat' ? 'Heartbeat' : r.event_type} · ${r.threshold} / ${r.window_seconds}s · ${r.severity}`,
               `${r.enabled ? r.observation : 'Disabled'}${r.kind === 'event_count' ? ` (${r.observed_count})` : ''}`,
               when(r.maintenance_until),
-              writable
-                ? (() => {
-                    const actions = node('div', undefined, 'actions');
-                    const change = async (enabled, until) => {
-                      const n = generation;
-                      for (let attempt = 0; attempt < 2; attempt++) {
-                        const latest = (await ui.api(`${path}/rules`)).items.find(
-                          (item) => item.id === r.id,
-                        );
-                        if (!current(n)) return;
-                        if (
-                          !latest ||
-                          latest.enabled !== r.enabled ||
-                          latest.maintenance_until !== r.maintenance_until
-                        )
-                          throw new Error(
-                            'Rule settings changed. Refresh this view and try again.',
-                          );
-                        try {
-                          await ui.api(`${path}/rules/${enc(r.id)}`, 'PATCH', {
-                            expected_version: latest.version,
-                            enabled,
-                            maintenance_until: until,
-                            reason: 'maintenance',
-                          });
-                          break;
-                        } catch (error) {
-                          if (error.status !== 409 || attempt === 1) throw error;
-                        }
-                      }
-                      if (current(n)) await show(reload);
-                    };
-                    actions.append(
-                      button(r.enabled ? 'Disable rule' : 'Enable rule', () =>
-                        change(
-                          !r.enabled,
-                          r.maintenance_until && new Date(r.maintenance_until) > new Date()
-                            ? r.maintenance_until
-                            : null,
-                        ),
+              (() => {
+                const actions = node('div', undefined, 'actions');
+                if (responseGuide(r.runbook))
+                  actions.append(
+                    button('Open response guide', () =>
+                      openResponseGuide(
+                        r.runbook,
+                        components.find((c) => c.id === r.component_id)?.code || r.component_id,
                       ),
-                      button(
-                        r.maintenance_until && new Date(r.maintenance_until) > new Date()
-                          ? 'End maintenance'
-                          : 'Mute for 1 hour',
-                        () =>
-                          change(
-                            r.enabled,
-                            r.maintenance_until && new Date(r.maintenance_until) > new Date()
-                              ? null
-                              : new Date(Date.now() + 3600000).toISOString(),
-                          ),
-                      ),
+                    ),
+                  );
+                if (!writable) {
+                  actions.append(node('span', 'Read only'));
+                  return actions;
+                }
+                const change = async (enabled, until) => {
+                  const n = generation;
+                  for (let attempt = 0; attempt < 2; attempt++) {
+                    const latest = (await ui.api(`${path}/rules`)).items.find(
+                      (item) => item.id === r.id,
                     );
-                    return actions;
-                  })()
-                : 'Read only',
+                    if (!current(n)) return;
+                    if (
+                      !latest ||
+                      latest.enabled !== r.enabled ||
+                      latest.maintenance_until !== r.maintenance_until
+                    )
+                      throw new Error('Rule settings changed. Refresh this view and try again.');
+                    try {
+                      await ui.api(`${path}/rules/${enc(r.id)}`, 'PATCH', {
+                        expected_version: latest.version,
+                        enabled,
+                        maintenance_until: until,
+                        reason: 'maintenance',
+                      });
+                      break;
+                    } catch (error) {
+                      if (error.status !== 409 || attempt === 1) throw error;
+                    }
+                  }
+                  if (current(n)) await show(reload);
+                };
+                actions.append(
+                  button(r.enabled ? 'Disable rule' : 'Enable rule', () =>
+                    change(
+                      !r.enabled,
+                      r.maintenance_until && new Date(r.maintenance_until) > new Date()
+                        ? r.maintenance_until
+                        : null,
+                    ),
+                  ),
+                  button(
+                    r.maintenance_until && new Date(r.maintenance_until) > new Date()
+                      ? 'End maintenance'
+                      : 'Mute for 1 hour',
+                    () =>
+                      change(
+                        r.enabled,
+                        r.maintenance_until && new Date(r.maintenance_until) > new Date()
+                          ? null
+                          : new Date(Date.now() + 3600000).toISOString(),
+                      ),
+                  ),
+                );
+                return actions;
+              })(),
             ]),
           )
         : empty('No automatic rules configured.'),
