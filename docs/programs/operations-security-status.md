@@ -521,3 +521,10 @@ both passed, including PostgreSQL, browser and Windows checks.
   on `codex/security-center-actions`, based on `b58b74e`. After publication, compare
   public `/portal.mjs` and `/portal.css` with this source and inspect the exact-head
   Railway status; a successful push alone does not establish the corrected UI is live.
+- Production verification completed: Railway reported success for exact source
+  `ae3bc2a1c0cbb644306a8d7607f0e2d47ea57e02`. Public `/portal.mjs` and `/portal.css`
+  both matched the tested correction byte-for-byte (SHA256
+  `632e2af9d8bfe3bc79075e27f277735231dd33c2f533999ef75c0e27136e73dc` and
+  `9e5999c4c10df6029614f8d41def2c179c117e7d6eabb71296b35fe6b1feb16c`).
+  This establishes delivery of the corrected assets; account mutations were tested
+  locally with synthetic fixtures, not against a real production account/provider.
