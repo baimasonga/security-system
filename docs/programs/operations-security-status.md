@@ -443,3 +443,39 @@ both passed, including PostgreSQL, browser and Windows checks.
 - Publication: implementation `1fd6ba6`, [PR #30](https://github.com/baimasonga/security-system/pull/30),
   branch `codex/ci-async-assertions`, based on merged `0f35a30`. Remote verification
   is recorded on the PR. OPS-006 remains the next feature task.
+
+## Security Center controls — 20 October 2026
+
+- User review found Security Center was a text-only summary. Added direct controls
+  for email verification, authenticator enrollment/disable, passkey registration/
+  removal, own-device deactivation with confirmation/offline-lease warning, refresh
+  and sign-out. Organization cards open the correct workspace; monitoring controls
+  are shown only for `ops:read` roles. Existing APIs remain the authority.
+- Reused account forms keep the Security Center context for passkey changes. Pending
+  protection responses are scoped to the initiating session/view; a late enrollment
+  response cannot expose recovery codes after navigation or sign-out. No new endpoint,
+  permission, migration, provider destination or production configuration was added.
+- Implementation guide: [Security Center controls](../deploy/security-center.md).
+  This UI work does
+  not resolve the independent health clock-rollback/reactivation review findings or
+  establish production health enablement/independent monitoring. Resolve those
+  freshness findings before treating health as a reliable OPS-006 incident input.
+- Verification: full `npm run check` passed **845 tests, 3 skipped**, including
+  format, lint/boundaries and types. Chromium passed **8 browser workflows**:
+  four existing operations flows plus real MFA enable/disable and fake email,
+  virtual WebAuthn registration/removal, own-device confirmation/deactivation and
+  workspace selection/member restrictions, and delayed recovery-code isolation.
+- The existing MFA/passkey/privacy/device-trust suites passed **52 PostgreSQL
+  tests in 8 files**, covering owner and restricted application-role behavior
+  (23.95 seconds). No database/locking/retention change requires a new load test.
+- TDD: the three action workflows first failed against the old text-only page.
+  The delayed-response regression exposed an existing recovery-code display after
+  navigation; the view/session guard fixes it. Deliberately removing that guard
+  in `/tmp/security-center-mutation` failed with AssertionError; the original source
+  remained unchanged. Browser and database work used local synthetic fixtures only.
+- Evidence: `/tmp/security-center-check.log`, `/tmp/security-center-browser-final.log`,
+  `/tmp/security-center-pg.log`, `/tmp/security-center-red-permitted.log`,
+  `/tmp/security-center-late-red.log` and `/tmp/security-center-mutation.log`.
+  Runtime: Node 24.19.0/npm 11.9.0/system Chromium. The cloud sandbox required
+  loopback permission for local test servers; the permitted runs completed above.
+  Production deployment and authenticated live acceptance remain unverified.

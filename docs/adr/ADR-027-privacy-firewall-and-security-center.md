@@ -31,6 +31,14 @@ every permission it grants (`PERMISSION_DESCRIPTIONS` next to the RBAC table), t
 posture and attestation status (ADR-026) and how long each works offline, the data categories the platform keeps
 with purpose and retention (`DATA_CATEGORIES`, kept in code so it changes with the code), and recommendations.
 
+The portal also exposes the existing account actions here: request a verification email,
+enroll/disable an authenticator, register/remove passkeys and sign out. Own active devices
+can be deactivated after confirmation, with an explicit warning that existing offline leases
+remain valid until expiry. Organization cards link to that organization's member management
+and, for `ops:read` roles, application monitoring. These controls reuse existing authorized,
+audited APIs and deployment configuration; no new permission, credential, mutation endpoint or
+automatic remediation is introduced. Unconfigured protection methods explain their availability.
+
 ## Consequences
 
 - Detectors are heuristics: they over-refuse rather than under-refuse, and the allow-list is the primary control.

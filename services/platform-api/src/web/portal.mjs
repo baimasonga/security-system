@@ -730,13 +730,22 @@ async function renderView(view) {
   return [];
 }
 async function securityCenterView() {
+  const version = state.version;
+  const token = state.token;
+  const current = () => state.version === version && state.token === token;
   const sc = await api('/v1/security-center');
   const yes = (v) => (v ? 'Yes' : 'No');
+  const openWorkspace = async (orgId, view) => {
+    state.orgId = orgId;
+    $('organization').value = orgId;
+    await navigate(view);
+  };
   return [
     title(
       'Security center',
-      'How your account is protected, what your roles allow, your devices, and what we collect.',
+      'Protect your account, manage your devices, and open security controls for your organizations.',
     ),
+    button('Refresh security status', () => navigate('Security center')),
     ...(sc.recommendations.length
       ? [panel(node('h2', 'Recommended'), ...sc.recommendations.map((r) => node('p', r)))]
       : []),
@@ -749,10 +758,25 @@ async function securityCenterView() {
         passkeys: sc.account.passkeys,
         platform_operator: yes(sc.account.operator),
       }),
+      ...(state.principal.recovery_configured && !sc.account.email_verified
+        ? [
+            button('Send verification email', async () => {
+              const result = await api('/v1/auth/email/request', 'POST', {});
+              notice(result.message);
+            }),
+          ]
+        : []),
+      button('Sign out', () => $('signout').click()),
     ),
+    mfaPanel(sc.account.authenticator_enabled),
+    await passkeyPanel('Security center'),
     ...sc.organizations.map((o) =>
       panel(
         node('h2', `${o.name} — ${o.role}`),
+        button('Manage organization', () => openWorkspace(o.id, 'Organization')),
+        ...(o.permissions.some((x) => x.permission === 'ops:read')
+          ? [button('Manage application monitoring', () => openWorkspace(o.id, 'Applications'))]
+          : []),
         table(
           ['You may', 'Permission'],
           o.permissions.map((x) => [x.description, node('span', x.permission, 'mono')]),
@@ -763,7 +787,7 @@ async function securityCenterView() {
       node('h2', 'Your devices'),
       sc.devices.length
         ? table(
-            ['Device', 'Trust', 'Hardware evidence', 'Works offline until'],
+            ['Device', 'Trust', 'Hardware evidence', 'Works offline until', 'Action'],
             sc.devices.map((d) => [
               node('span', d.device_id, 'mono'),
               badge(d.posture),
@@ -771,6 +795,28 @@ async function securityCenterView() {
               d.offline_lease_valid_until
                 ? new Date(d.offline_lease_valid_until).toLocaleString()
                 : '—',
+              button(
+                'Deactivate device',
+                async () => {
+                  const until = d.offline_lease_valid_until
+                    ? new Date(d.offline_lease_valid_until).toLocaleString()
+                    : 'its existing lease expires';
+                  if (
+                    !confirm(
+                      `Deactivate this device and free its slot? It may still work offline until ${until}.`,
+                    )
+                  )
+                    return;
+                  await api(
+                    `/v1/organizations/${encodeURIComponent(d.org_id)}/activations/${encodeURIComponent(d.activation_id)}/deactivate`,
+                    'POST',
+                  );
+                  if (!current()) return;
+                  await navigate('Security center');
+                  notice('Device deactivated. Existing offline leases remain valid until expiry.');
+                },
+                'danger',
+              ),
             ]),
           )
         : empty('You have not activated any devices.'),
@@ -794,7 +840,10 @@ const toB64u = (buffer) =>
 const fromB64u = (text) =>
   Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 
-async function passkeyPanel() {
+async function passkeyPanel(returnView = 'Account') {
+  const version = state.version;
+  const token = state.token;
+  const current = () => state.version === version && state.token === token;
   const card = panel(node('h2', 'Passkeys'));
   if (!passkeysAvailable) {
     card.append(node('p', 'Passkeys are not available on this deployment or in this browser.'));
@@ -819,7 +868,8 @@ async function passkeyPanel() {
               await api(`/v1/auth/passkeys/${encodeURIComponent(k.id)}/delete`, 'POST', {
                 password,
               });
-              await navigate('Account');
+              if (!current()) return;
+              await navigate(returnView);
               notice('Passkey removed.');
             }),
           ]),
@@ -835,6 +885,7 @@ async function passkeyPanel() {
         const options = await api('/v1/auth/passkeys/register/begin', 'POST', {
           password: data.password,
         });
+        if (!current()) return;
         const cred = await navigator.credentials.create({
           publicKey: {
             ...options,
@@ -846,7 +897,7 @@ async function passkeyPanel() {
             })),
           },
         });
-        if (!cred) return;
+        if (!cred || !current()) return;
         await api('/v1/auth/passkeys/register/finish', 'POST', {
           name: data.name,
           credential: {
@@ -859,7 +910,8 @@ async function passkeyPanel() {
           },
         });
         form.reset();
-        await navigate('Account');
+        if (!current()) return;
+        await navigate(returnView);
         notice('Passkey added. You can now sign in with it.');
       },
     ),
@@ -867,7 +919,10 @@ async function passkeyPanel() {
   return card;
 }
 
-function mfaPanel() {
+function mfaPanel(enabled = state.principal.mfa_enabled) {
+  const version = state.version;
+  const token = state.token;
+  const current = () => state.version === version && state.token === token;
   if (!state.principal.mfa_configured)
     return panel(
       node('h2', 'Authenticator protection'),
@@ -877,10 +932,10 @@ function mfaPanel() {
   if (
     state.principal.operator_mfa_required &&
     state.principal.platform_role === 'platform_admin' &&
-    !state.principal.mfa_enabled
+    !enabled
   )
     card.append(node('p', 'Enroll an authenticator before using operator administration.'));
-  if (state.principal.mfa_enabled) {
+  if (enabled) {
     card.append(
       node(
         'p',
@@ -896,6 +951,7 @@ function mfaPanel() {
         async (data, form) => {
           await api('/v1/auth/mfa/disable', 'POST', data);
           form.reset();
+          if (!current()) return;
           state.token = '';
           state.principal = null;
           renderAuth();
@@ -916,6 +972,7 @@ function mfaPanel() {
       async (data, form) => {
         const setup = await api('/v1/auth/mfa/begin', 'POST', data);
         form.reset();
+        if (!current()) return;
         // Setup secret exists only in this view. Navigation removes it; nothing goes to storage or a QR service.
         const secret = node('input');
         secret.readOnly = true;
@@ -942,6 +999,7 @@ function mfaPanel() {
               const result = await api('/v1/auth/mfa/confirm', 'POST', confirm);
               confirmForm.reset();
               secret.value = '';
+              if (!current()) return;
               state.token = '';
               state.principal = null;
               renderAuth();
