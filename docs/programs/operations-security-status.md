@@ -18,16 +18,16 @@ OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLE
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
 Manual triage and the automatic failure/incident/recovery lifecycle are production accepted with synthetic sources. The Rokela PDF source adapter is locally verified and published; its real production binding remains pending. Ingestion is enabled in production; no live PDF source acceptance is claimed.
 
-| Task    | State                                           | Verification/evidence                                                                                                                          |
-| ------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPS-001 | Contract complete; local verification           | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
-| OPS-002 | Production API/dashboard enabled                | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
-| OPS-003 | Production API/dashboard enabled                | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
-| OPS-004 | Production enabled; source acceptance pending   | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
-| OPS-005 | Production enabled; source acceptance pending   | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Production lifecycle and UI verified            | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
-| OPS-007 | Adapter locally verified; live binding pending  | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
-| OPS-008 | Source/API/UI verified; Railway rollout blocked | Scoped scan/recovery imports and triage, bounded read-only GitHub collection and organization overview; evidence remains unverified.           |
+| Task    | State                                          | Verification/evidence                                                                                                                          |
+| ------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPS-001 | Contract complete; local verification          | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
+| OPS-002 | Production API/dashboard enabled               | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
+| OPS-003 | Production API/dashboard enabled               | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
+| OPS-004 | Production enabled; source acceptance pending  | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
+| OPS-005 | Production enabled; source acceptance pending  | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
+| OPS-006 | Production lifecycle and UI verified           | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
+| OPS-007 | Adapter locally verified; live binding pending | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
+| OPS-008 | Production enabled; synthetic API accepted     | Scoped scan/recovery imports and triage, bounded read-only GitHub collection and organization overview; evidence remains unverified.           |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -1237,3 +1237,41 @@ Next actions, with existing implementation authority retained:
   `operations.mjs` digest still differs from the new source, confirming that the
   published UI must not be represented as deployed. The current checkpoint changes
   documentation only; the verified application and tests are unchanged.
+
+### Railway resumed — production acceptance, 20 October 2026
+
+- Exact source `67730ada0a07b15ce5db72da6f4ee7600b2ccb23` passed GitHub CI
+  `39489285630` and CodeQL `39489285760`. Railway deployment
+  `6eb3fceb-22b1-4d55-b2b5-15799650dd9d` reached **SUCCESS** on that exact commit.
+  An initial deployment without an explicit SHA restarted the older `fc51e49`
+  release; the subsequent explicit-SHA deployment is the accepted release.
+- Production inventory and posture flags are enabled. Deployment logs confirm
+  migration 0024, grants and completed predeploy profile verification. All twelve
+  database checks passed, including TLS, migration completeness, least privilege,
+  append-only audit, required grants and table coverage.
+- Public `/healthz` and `/readyz` returned HTTP 200. Served `operations.mjs`
+  matches the tested source byte for byte (SHA-256
+  `39bed294c3945f9070c37912ee1237c42824119e6729b53d20658ab50d454723`).
+  Owners/admins can open **Applications → Review security overview**, then
+  **Review** an environment's findings or **Open environment** for its controls.
+- Live isolated synthetic acceptance passed normalized scan import and exact
+  deduplication, refusal of raw extra fields, assigned finding remediation,
+  stale-version conflict, separate backup/restore reports and rejection of a
+  successful restore report lacking passed checks. Calculated reported RPO/RTO
+  and the explicit `independently_verified: false` boundary passed. Synthetic
+  application/environment/component inventory was archived and the session logged
+  out; audit/evidence history remains intact.
+- This was live API acceptance plus exact served-source verification; the 21
+  Chromium workflows remain local browser evidence. Synthetic recovery reports
+  are **not an actual production restore**, and the GitHub collector has not had
+  authenticated live provider acceptance.
+- The earlier Railway rollout blocker is resolved. PDF email hook activation,
+  genuine fresh-MFA PDF monitoring binding, independent witness/monitoring,
+  production restore drills, external delivery and physical Windows acceptance
+  remain separate gates. Cloudflare standby is an assessment only; no redundant
+  deployment or traffic failover is active.
+
+Next: securely activate the PDF authentication-email hook when its Railway and
+Supabase administration are available; complete controlled-recipient confirmation
+and recovery acceptance. Bind PDF monitoring only with its genuine scoped MFA
+credential. Do not bypass these external-access or authorization requirements.
