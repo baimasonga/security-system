@@ -47,7 +47,9 @@ it('the real predeploy CLI migrates, grants and checks the runtime role; reruns 
       const r = await app.query(
         "SELECT has_table_privilege(current_user,'operations_incidents','UPDATE') AS upd,has_table_privilege(current_user,'operations_incidents','DELETE') AS del",
       );
-      expect(r.rows[0]).toEqual({ upd: true, del: false });
+      // Migration 0023 grants bounded retention deletion; the incident-retention
+      // trigger, exercised by the store contract, still refuses active/recent rows.
+      expect(r.rows[0]).toEqual({ upd: true, del: true });
     } finally {
       await app.end();
     }

@@ -978,3 +978,10 @@ both passed, including PostgreSQL, browser and Windows checks.
   project; hostname knowledge does not grant PDF deployment configuration access.
 - Rollout/rollback instructions are in
   [operations-automation.md](../deploy/operations-automation.md).
+
+- The broad PG run found a predeploy assertion still expecting incident DELETE to
+  be ungranted. Migration 0023 intentionally grants retention deletion while the
+  database trigger rejects active/recent rows. Updated the expected grant; the real
+  predeploy CLI rerun passed (migration, grants, profile and grant repair). Existing
+  owner/app-role store checks explicitly refuse active/recent incident deletion.
+  This is a corrected test contract, not removal of the retention protection.
