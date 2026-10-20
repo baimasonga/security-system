@@ -418,3 +418,27 @@ upstream contracts before continuing feature work.
 
 - Readiness cache expiry uses monotonic time. A regression rolls wall time backward
   after cache expiry and confirms a new failed persistence check cannot reuse ready.
+
+## Historical CI failures and assertion timing — 20 October 2026
+
+The supplied Actions screenshot shows historical default-branch failures, not the
+latest merged build. On merged `0f35a30`, [CI #89](https://github.com/baimasonga/security-system/actions/runs/39341881603)
+and [CodeQL #91](https://github.com/baimasonga/security-system/actions/runs/39341881609)
+both passed, including PostgreSQL, browser and Windows checks.
+
+- [CI #85](https://github.com/baimasonga/security-system/actions/runs/39336192159)
+  on `381a31b` failed the passkey clone test: sign-in was correctly refused, but
+  the immediate database query raced asynchronous security-signal persistence.
+  The test now polls for the same required signal with a five-second bound.
+- [CI #84](https://github.com/baimasonga/security-system/actions/runs/39330159017)
+  on `b5da658` inspected checked dependency options before the component form
+  finished rendering. The browser test now polls for the same exact selected
+  dependency list, independently of the later history-panel assertion.
+- Controlled 50 ms signal/fetch delays exercise the asynchronous boundaries.
+  In an isolated source copy, restoring either old immediate assertion fails
+  with AssertionError; the fixed tests pass. No production delivery/authentication
+  behavior, dependency persistence, test retry count or required assertion changed.
+- Verification: passkey unit **10 passed**, PostgreSQL owner/app-role **20 passed**,
+  browser **4 passed**. Full application checks are recorded with publication.
+- Branch: `codex/ci-async-assertions`, based on merged `0f35a30`; PR reference follows
+  publication. OPS-006 remains the next feature task.
