@@ -486,12 +486,31 @@ export async function operationsView(ui) {
                     const actions = node('div', undefined, 'actions');
                     const change = async (enabled, until) => {
                       const n = generation;
-                      await ui.api(`${path}/rules/${enc(r.id)}`, 'PATCH', {
-                        expected_version: r.version,
-                        enabled,
-                        maintenance_until: until,
-                        reason: 'maintenance',
-                      });
+                      for (let attempt = 0; attempt < 2; attempt++) {
+                        const latest = (await ui.api(`${path}/rules`)).items.find(
+                          (item) => item.id === r.id,
+                        );
+                        if (!current(n)) return;
+                        if (
+                          !latest ||
+                          latest.enabled !== r.enabled ||
+                          latest.maintenance_until !== r.maintenance_until
+                        )
+                          throw new Error(
+                            'Rule settings changed. Refresh this view and try again.',
+                          );
+                        try {
+                          await ui.api(`${path}/rules/${enc(r.id)}`, 'PATCH', {
+                            expected_version: latest.version,
+                            enabled,
+                            maintenance_until: until,
+                            reason: 'maintenance',
+                          });
+                          break;
+                        } catch (error) {
+                          if (error.status !== 409 || attempt === 1) throw error;
+                        }
+                      }
                       if (current(n)) await show(reload);
                     };
                     actions.append(

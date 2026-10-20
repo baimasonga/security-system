@@ -431,7 +431,12 @@ it('does not reopen an incident workspace when a late mutation response arrives 
 });
 
 it('creates, evaluates, mutes and disables automatic alerts through real dashboard controls', async () => {
-  const { page } = await setup();
+  const { page, owner } = await setup();
+  let rulePath = '';
+  page.on('request', (request) => {
+    if (request.method() === 'GET' && request.url().endsWith('/rules'))
+      rulePath = new URL(request.url()).pathname;
+  });
   await registerApp(page, 'alert-dashboard');
   await addEnv(page);
   const add = section(page, 'Add component');
@@ -444,10 +449,35 @@ it('creates, evaluates, mutes and disables automatic alerts through real dashboa
   await alerts.getByRole('button', { name: 'Create rule', exact: true }).click();
   await alerts.getByRole('cell', { name: 'unknown', exact: true }).waitFor();
   await alerts.getByRole('button', { name: 'Evaluate rules now', exact: true }).click();
+  await page.waitForLoadState('networkidle');
+  // The scheduler can evaluate after rendering without changing rule settings.
+  await env.c.operationsAutomation.tick();
   await alerts.getByRole('button', { name: 'Mute for 1 hour', exact: true }).click();
   await alerts.getByRole('button', { name: 'End maintenance', exact: true }).waitFor();
   await alerts.getByRole('button', { name: 'Disable rule', exact: true }).click();
   await alerts.getByRole('button', { name: 'Enable rule', exact: true }).waitFor();
+  await page.waitForLoadState('networkidle');
+  const latest = (await env.call('GET', rulePath, { token: owner.token })).body.items[0];
+  expect(
+    (
+      await env.call('PATCH', `${rulePath}/${latest.id}`, {
+        token: owner.token,
+        body: {
+          expected_version: latest.version,
+          enabled: true,
+          maintenance_until: null,
+          reason: 'maintenance',
+        },
+      })
+    ).status,
+  ).toBe(200);
+  await alerts.getByRole('button', { name: 'Enable rule', exact: true }).click();
+  await page
+    .getByText('Rule settings changed. Refresh this view and try again.', { exact: true })
+    .waitFor();
+  expect(
+    (await env.call('GET', rulePath, { token: owner.token })).body.items[0].maintenance_until,
+  ).toBeNull();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
 });

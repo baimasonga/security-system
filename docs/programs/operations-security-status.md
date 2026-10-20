@@ -25,7 +25,7 @@ Manual triage is production accepted. Automatic rules/portal notifications and t
 | OPS-003 | Production API/dashboard enabled               | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
 | OPS-004 | Production enabled; source acceptance pending  | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
 | OPS-005 | Production enabled; source acceptance pending  | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Automation locally verified; rollout pending   | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
+| OPS-006 | Production lifecycle verified; UI follow-up   | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
 | OPS-007 | Adapter locally verified; live binding pending | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
 | OPS-008 | Not started; depends on OPS-006                | Existing recovery runbook is not restore evidence.                                                                                             |
 
@@ -994,3 +994,40 @@ both passed, including PostgreSQL, browser and Windows checks.
   Final `npm run check` after correction passed **884 tests, 3 skipped**. PDF's CI
   branch-filter fix (`4a9cfb0`) now watches its actual default release branch; its
   final source check again passed **212 tests, 2 skipped**.
+
+### Automatic alerts production acceptance — 20 October
+
+- Published automation source `51772e3`, corrected predeploy assertion `9eef4a9`,
+  release handoff `e1cff72`. Enabled `OPERATIONS_AUTOMATION_ENABLED=true` on the
+  existing production service without changing credentials, billing or licensing.
+  Railway deployment `f5856c0d-0c5c-4691-a3c3-d0a1e0c653d1` reached SUCCESS on
+  exact source `e1cff72`; public `operations.mjs` matched published source bytes.
+- Exact-head GitHub CI `39437907423` passed all applicable jobs, including the
+  **clean full PostgreSQL suite**, browser workflows, Windows protected storage,
+  format/lint/types/tests and dependency/secret scanning. This closes the broad
+  local-run correction gate above. PDF CI `39437700388` passed its source and real
+  converter jobs on `4a9cfb0`.
+- Live synthetic acceptance passed normal MFA enrollment/login, scoped credential
+  issuance, rule creation/evaluation/maintenance/disable, committed failure receipt,
+  one deduplicated automatic incident, fresh healthy recovery and **two delivered
+  portal intents**. Credential was revoked using fresh MFA, synthetic inventory
+  archived and session logged out. Only `.invalid` accounts and synthetic event
+  attributes were used; no private files, real messages or commercial grants.
+- Acceptance-helper corrections: the first attempt sent an offset timestamp instead
+  of required UTC `Z`; its inventory was archived. The next attempt encountered an
+  optimistic conflict when evaluation advanced the rule revision. The final helper
+  refreshed versions on bounded retries and passed the complete lifecycle.
+- The conflict also revealed a dashboard usability defect: rendered rule versions
+  go stale during scheduled evaluation. A follow-up UI fix refreshes revisions,
+  compares settings before saving and retries one evaluation conflict; it refuses
+  another administrator's changed settings and cancels late navigation responses.
+  A regression failed before the fix; all **15 portal workflows** now pass with
+  both scheduler and administrator-conflict coverage. Follow-up source check passed **884 tests, 3 skipped**; a deliberate removal of
+  the administrator-settings guard was killed by the browser regression. UI rollout
+  is pending below; the database/API authorization contract is unchanged.
+- Production PDF source binding remains pending deployment access and a genuine
+  owner/admin fresh-MFA integration credential. The public hostname is identified;
+  a secure `ROKELA_PDF_RAILWAY_TOKEN` requirement and the hostname allowlist are saved
+  in the environment draft, requiring review/save/publish. Do not paste tokens into
+  chat. OPS-008, production restore evidence, independent audit anchoring and actual
+  desktop release acceptance remain separate outstanding work.
