@@ -16,7 +16,7 @@ Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
 Credential verification remains a guarded transaction primitive, not a collector.
 OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLED`
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
-Manual triage is production accepted. Automatic rules/portal notifications and the Rokela PDF source adapter are now locally verified in the slices below; their production rollout/live source binding remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
+Manual triage and the automatic failure/incident/recovery lifecycle are production accepted with synthetic sources. The Rokela PDF source adapter is locally verified and published; its real production binding remains pending. Ingestion is enabled in production; no live PDF source acceptance is claimed.
 
 | Task    | State                                          | Verification/evidence                                                                                                                          |
 | ------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,9 +25,9 @@ Manual triage is production accepted. Automatic rules/portal notifications and t
 | OPS-003 | Production API/dashboard enabled               | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
 | OPS-004 | Production enabled; source acceptance pending  | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
 | OPS-005 | Production enabled; source acceptance pending  | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Production lifecycle verified; UI follow-up   | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
+| OPS-006 | Production lifecycle and UI verified           | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
 | OPS-007 | Adapter locally verified; live binding pending | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
-| OPS-008 | Not started; depends on OPS-006                | Existing recovery runbook is not restore evidence.                                                                                             |
+| OPS-008 | Ready; not started                             | Existing recovery runbook is not restore evidence.                                                                                             |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -1024,10 +1024,26 @@ both passed, including PostgreSQL, browser and Windows checks.
   A regression failed before the fix; all **15 portal workflows** now pass with
   both scheduler and administrator-conflict coverage. Follow-up source check passed **884 tests, 3 skipped**; a deliberate removal of
   the administrator-settings guard was killed by the browser regression. UI rollout
-  is pending below; the database/API authorization contract is unchanged.
+  completed below; the database/API authorization contract is unchanged.
 - Production PDF source binding remains pending deployment access and a genuine
   owner/admin fresh-MFA integration credential. The public hostname is identified;
   a secure `ROKELA_PDF_RAILWAY_TOKEN` requirement and the hostname allowlist are saved
   in the environment draft, requiring review/save/publish. Do not paste tokens into
   chat. OPS-008, production restore evidence, independent audit anchoring and actual
   desktop release acceptance remain separate outstanding work.
+
+- Rule-control correction source: `d17e726`. The source/UI checks passed before push;
+  its final status-table edit introduced a one-space Markdown formatting failure.
+  The formatting correction is included in the follow-up handoff commit. No API,
+  database or authorization behavior changed in that correction.
+
+- Rule UI deployment `782cd6f6-7c4c-4617-9120-e15fb4a08eeb` reached SUCCESS on
+  `d17e726`; its live `operations.mjs` matched the corrected source byte-for-byte
+  and public `/healthz` returned the expected 200 status. Final source check after
+  the handoff formatting correction passed **884 tests, 3 skipped**. The final
+  handoff commit changes documentation only; database/API contracts are unchanged.
+- Next independent implementation task: OPS-008 security posture/recovery evidence.
+  For OPS-007 live binding, publish the saved environment network/credential draft,
+  supply PDF-project Railway access through its secure field and issue the actual
+  environment-scoped integration credential through fresh MFA. Do not use the
+  synthetic acceptance account/credential for production PDF.
