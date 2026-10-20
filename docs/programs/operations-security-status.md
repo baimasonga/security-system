@@ -517,3 +517,7 @@ both passed, including PostgreSQL, browser and Windows checks.
   remains an explicit deployment prerequisite; no provider mail, production device
   mutation or authenticated production acceptance was performed. Health freshness
   findings and independent-monitor/OPS-006 gates remain open.
+- Source: [`7b65ead`](https://github.com/baimasonga/security-system/commit/7b65ead)
+  on `codex/security-center-actions`, based on `b58b74e`. After publication, compare
+  public `/portal.mjs` and `/portal.css` with this source and inspect the exact-head
+  Railway status; a successful push alone does not establish the corrected UI is live.
