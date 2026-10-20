@@ -336,8 +336,10 @@ it('activates the browser, verifies its cached lease and deactivates from adjace
     .locator('details')
     .filter({ has: page.locator('summary', { hasText: 'Installation details' }) });
   expect(await installation.getAttribute('open')).toBe(null);
-  await page.getByRole('button', { name: 'Verify offline', exact: true }).click();
-  await page.getByText('Result: valid', { exact: true }).waitFor();
+  for (const action of ['Validate online', 'Refresh lease', 'Verify offline']) {
+    await page.getByRole('button', { name: action, exact: true }).click();
+    await page.getByText('Result: valid', { exact: true }).waitFor();
+  }
   await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
   await page
     .getByText('Not activated. Enter a license key below to get started.', { exact: true })

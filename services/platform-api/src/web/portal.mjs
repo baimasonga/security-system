@@ -1323,7 +1323,10 @@ async function deviceView() {
     renderStatus(await device.summary());
     const evidence = node('details', undefined, 'compact-disclosure');
     evidence.append(node('summary', 'Result details'), node('pre', JSON.stringify(value, null, 2)));
-    output.replaceChildren(node('p', `Result: ${value.state || 'Completed'}`), evidence);
+    output.replaceChildren(
+      node('p', `Result: ${value.state || value.status || 'Completed'}`),
+      evidence,
+    );
   };
   return [
     title(

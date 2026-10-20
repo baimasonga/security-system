@@ -871,3 +871,42 @@ both passed, including PostgreSQL, browser and Windows checks.
   This change does not complete automatic rules/notifications, independent monitoring,
   payment setup, recovery exercises or the live Rokela PDF integration. The next
   program slice remains OPS-006 typed rules/evaluation windows and durable deduplication.
+
+### Compact UI production delivery and release catalog inspection
+
+- UI correction [`2e0cadc`](https://github.com/baimasonga/security-system/commit/2e0cadc)
+  is deployed successfully as `1cb15da3-a33d-4ced-84d8-0425f5c89d6d`.
+  Both public `portal.mjs` and `portal.css` match the committed source byte for byte.
+  `/healthz` and `/readyz` returned 200. Browser acceptance above remains local;
+  production asset verification proves delivery, not a customer's authenticated UI flow.
+- User identified the two release applications as Rokela PDF and Rokela Business
+  Admin. A fresh ordinary synthetic account could read the live catalog: only
+  `sierra-business` / Rokela Business Admin is listed, with an `integration-test`
+  trial plan and one device. The synthetic inspection session was logged out;
+  registration does not send email. No commercial configuration was changed.
+- Rokela PDF is not currently in Warrior's catalog. Its separate repository uses
+  one workspace subscription across PDF, transfers and short links; adding a
+  Warrior product is not evidence of an integrated license or monitoring adapter.
+  Preserve its existing authentication and subscription authority. Physical Windows
+  installation/upgrade and production PDF conversion/scanner acceptance remain
+  separate release gates.
+
+### Business Admin live trial acceptance
+
+- The existing `sierra-business` production trial passed synthetic account trial
+  issuance, duplicate-trial refusal (409), device proof/activation, real signed
+  offline lease verification with boolean `business_write: true`, and online
+  validation with the same resolved entitlement. The activated device was
+  deactivated and the session logged out. Synthetic trial/account/audit records
+  remain; no payment, provider email or real business document was involved.
+- Initial acceptance helper attempts incorrectly expected a 200 challenge response
+  instead of 201, then inspected `state` instead of `status`, then inspected the
+  outer rather than nested resolved-entitlement object. The corrected assertions
+  passed; those were helper contract mistakes, not evidence of licensing outages.
+  Each successfully created activation was deactivated. No credentials or license
+  keys were written to disk or included in logs.
+- Follow-up UI correction displays online validation's `status` as well as offline
+  verification's `state`. Browser acceptance now exercises online validation and
+  lease refresh in addition to activation/offline/deactivation. This does not
+  establish physical Windows installation, update signing or desktop business
+  posting acceptance, and does not verify Rokela PDF's independent production stack.
