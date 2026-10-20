@@ -639,3 +639,46 @@ both passed, including PostgreSQL, browser and Windows checks.
   changes object-store wire compatibility only; no transaction, retention, quota,
   locking or schema behavior changed, so a new database load scenario is not
   applicable. Production upload quarantine/scanner acceptance remains pending.
+
+## Files & links production activation — 20 October 2026
+
+- Published endpoint access became active in the running cloud session (enforced
+  policy revision 5). The provider-recommended bucket-qualified endpoint passed
+  real multipart create/upload/list/complete/read, anonymous object-access denial,
+  and synthetic object/multipart cleanup. Stored and actual upload/preflight CORS
+  both allow the exact portal origin and expose ETag. The shared-endpoint wildcard
+  finding does not apply to the recommended endpoint used in production.
+- Storage compatibility source `39a178c` deployed successfully as
+  `b558f024-a783-48f4-ae35-9c5fb3ad353a`. Configured the existing API service with
+  approved private S3 storage and private ClamAV on port 3310. Generated a dedicated
+  sharing secret only because none existed; preserved all existing identity,
+  licensing, MFA and signing secrets. Malware scanning remains required. The
+  scanner has no public service domain. Connection values are not retained here.
+- Sharing configuration deployment `0ccc3d36-5cbe-4f54-9260-171ae3164715` reached
+  SUCCESS. Public readiness and health both returned 200. Authenticated production
+  acceptance with isolated synthetic accounts passed: Files & links overview,
+  temporary transfer creation, signed multipart uploads, clean PDF quarantine
+  through the configured scanner, EICAR rejection/removal, exact clean download
+  contents and denial of a download URL for the rejected file. No paid entitlement
+  was fabricated and no provider mail or payment was initiated.
+- The first acceptance probe timed out because it expected a durable `rejected`
+  status: cleanup had already moved EICAR to `deleted`. The corrected probe accepts
+  either state only with the persisted `malware_signature` rejection reason, and
+  then verifies download refusal. Final run passed. Both synthetic transfers were
+  deleted through the API and background object deletion queued; sessions logged
+  out. Synthetic account/audit records remain, with no elevated privileges.
+  Evidence: `/tmp/live-sharing-acceptance.log` and
+  `/tmp/live-sharing-acceptance-final.log`; helpers outside the checkout retain no
+  credential values or private URLs. Public accounts/providers were not exercised.
+- A separate provider-level two-day incomplete-multipart lifecycle policy could
+  not be installed: the bucket returned an empty lifecycle configuration, then
+  rejected the standard cleanup rule. Existing lifecycle rules were not replaced
+  and no complete-object expiration was requested. Application abandoned-upload
+  retention/abort and deletion jobs remain enabled; independent provider lifecycle
+  cleanup remains an operational follow-up, not a verified capability.
+- Enabled and deployed: inventory, credential management, durable ingestion, health,
+  passkey configuration and Files & links. Existing plan/RBAC gates still apply.
+  Billing provider setup, independent audit witnessing, enrolled dual-control
+  approvers and authenticated operations-source integration retain their earlier
+  acceptance limits. Next implementation task remains OPS-006; OPS-007/008 are
+  pending and must not be described as activated features.
