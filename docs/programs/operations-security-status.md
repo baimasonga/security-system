@@ -18,16 +18,16 @@ OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLE
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
 Manual incident triage is implemented in the OPS-006 first slice below; automatic alerts and a live Rokela PDF monitoring integration remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
 
-| Task    | State                                 | Verification/evidence                                                                                                                          |
-| ------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPS-001 | Contract complete; local verification | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
-| OPS-002 | Production API/dashboard enabled      | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
-| OPS-003 | Production API/dashboard enabled      | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
-| OPS-004 | Implemented; local verification       | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
-| OPS-005 | Implemented; local verification       | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Manual triage slice; in progress      | Audited open/assign/acknowledge/resolve and dashboard controls; rules/outbox remain pending.                                                   |
-| OPS-007 | Not started; depends on OPS-004/006   | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                     |
-| OPS-008 | Not started; depends on OPS-006       | Existing recovery runbook is not restore evidence.                                                                                             |
+| Task    | State                                         | Verification/evidence                                                                                                                          |
+| ------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPS-001 | Contract complete; local verification         | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
+| OPS-002 | Production API/dashboard enabled              | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
+| OPS-003 | Production API/dashboard enabled              | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
+| OPS-004 | Production enabled; source acceptance pending | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
+| OPS-005 | Production enabled; source acceptance pending | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
+| OPS-006 | Manual triage production accepted; partial    | Audited open/assign/acknowledge/resolve and dashboard controls; rules/outbox remain pending.                                                   |
+| OPS-007 | Not started; depends on OPS-004/006           | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                     |
+| OPS-008 | Not started; depends on OPS-006               | Existing recovery runbook is not restore evidence.                                                                                             |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -807,3 +807,40 @@ both passed, including PostgreSQL, browser and Windows checks.
   target allowlist removal) were killed by assertions in disposable copies. The
   earlier two SQLSTATE/message privacy mutations were also killed. These tests
   establish local correction behavior; live permission repair is recorded next.
+
+### Manual incident production acceptance completed
+
+- Permission/deployment correction [`f0811e3`](https://github.com/baimasonga/security-system/commit/f0811e3)
+  deployed successfully as `67e761e9-b4ed-4725-aaff-49905f2e97d4`. The API service
+  override and repository both use `node tools/predeploy.ts`. Logs now explicitly
+  confirm grant application, **12 passing profile checks** and the fixed completion
+  marker for all three pre-deploy gates. This repaired the live permission failure
+  without changing role ownership, granting incident DELETE, or weakening guards.
+- `OPERATIONS_INCIDENTS_ENABLED=true` is live. Fresh isolated production acceptance
+  passed scoped incident open/list, active deduplication, assignment, acknowledgement,
+  resolution, stale-version refusal and resolved-edit refusal. The successful test
+  run archived its inventory through the correct DELETE/version/reason routes and
+  logged out. Terminal incident/audit evidence remains. Failed earlier fixtures may
+  remain as noted above; they contain synthetic metadata only, no monitored source
+  credentials or real recipients. No external alert, provider email or payment was
+  initiated. Public `/readyz` and `/healthz` returned 200 after acceptance.
+- Existing inventory, credentials, ingestion, health and S3 sharing settings remain
+  enabled; malware scanning remains required. The source dashboard byte comparison
+  and local **11-workflow** Chromium acceptance establish delivery and UI behavior;
+  production acceptance exercised authenticated APIs with synthetic accounts, not
+  a real customer's browser session.
+- Final source checks passed **871 tests, 3 skipped**. Full incident-schema PG
+  regressions passed **694 tests**; the later actual pre-deploy/profile correction
+  passed its **12 targeted PostgreSQL checks**. In addition to the **20** core
+  incident mutations, **two** SQLSTATE/message privacy and **three** pre-deploy/
+  required-grant/permission-target privacy mutations were killed. Final contention
+  correctness repeated the exact expected outcomes in **1167 ms**, not a capacity
+  claim. Logs: `/tmp/predeploy-check.log`, `/tmp/predeploy-pg.log`,
+  `/tmp/incidents-load-final.log`; live pass summaries were returned by the
+  deployment/acceptance command without retaining credentials or private URLs.
+- OPS-006 is still in progress overall. Manual triage is now production enabled and
+  accepted. The next ready slice is typed automatic rules/evaluation windows with
+  durable deduplication, followed by maintenance suppression and a fenced, bounded
+  notification outbox tested only with fake recipients. Then implement incident
+  pruning and outage acceptance before claiming OPS-006 complete or the OPS-007
+  live Rokela incident integration ready.
