@@ -774,3 +774,36 @@ both passed, including PostgreSQL, browser and Windows checks.
   request body, URL or database parameters; tests reject private message/code
   disclosure. Use these diagnostics to identify the live failure, then verify the
   complete workflow before calling the production slice accepted.
+
+### Deployment permission correction
+
+- Safe diagnostic deployment `5f972050-21b8-439c-aada-17e287136a4b` identified SQLSTATE
+  42501 (insufficient privilege). Railway stores structured logger fields as log
+  attributes, not as JSON message text; decode only the allowlisted diagnostic
+  fields when reviewing them. No raw database message/parameters were retrieved.
+- The runtime login's pooler-role prefix matches APP_DB_ROLE. The deployed pre-deploy
+  override is one shell-chained string, and logs showed migration output without
+  grant/profile completion. Replace it with `node tools/predeploy.ts`: three
+  explicit Node child processes, fail-fast exit propagation, no shell semantics.
+  The Dockerfile copies this runner. The repository command and service override
+  must match. `db:check` also rejects missing required table privileges so a partial
+  grant profile cannot look successful.
+- TDD: deployment-config and required INSERT/UPDATE profile regressions failed
+  before the correction. Six runner tests cover ordered execution, each step's
+  failure, signal and spawn failure. A real disposable-role CLI test runs the whole
+  migration/grants/profile flow, revokes incident UPDATE to prove profile refusal,
+  then reruns to repair it without granting DELETE. Targeted deployment/profile
+  PostgreSQL checks passed **12 tests in 2 files**. A direct unit attempt initially
+  hit sandbox EPERM in the existing unreachable-database negative test; use the
+  permitted full check for its normal ECONNREFUSED assertion.
+- This is a least-privilege deployment fix, not a grant of database ownership or a
+  relaxation of incident guards. The additional permission-target diagnostic is
+  restricted to a fixed table-name allowlist; private names/messages remain hidden.
+  Live acceptance remains pending until the corrected pre-deploy sequence completes.
+
+- Final correction checks: full `npm run check` **871 passed, 3 skipped**. The real
+  CLI/profile PostgreSQL checks passed **12 tests**. Three additional mutations
+  (pre-deploy failure propagation, required-grant detection and private permission-
+  target allowlist removal) were killed by assertions in disposable copies. The
+  earlier two SQLSTATE/message privacy mutations were also killed. These tests
+  establish local correction behavior; live permission repair is recorded next.

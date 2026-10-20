@@ -107,10 +107,18 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
       const safeStatus = status in codes ? status : 503;
       if (safeStatus === 503) {
         const code = (error as { code?: unknown }).code;
+        const message = (error as { message?: unknown }).message;
+        const target =
+          typeof message === 'string'
+            ? /^permission denied for table (operations_incidents|operations_accounts|users|sessions|memberships|privileged_freezes|audit_events|audit_chains)$/.exec(
+                message,
+              )?.[1]
+            : undefined;
         app.log.error(
           {
             failure: 'operations_unavailable',
             sqlstate: typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? code : 'unknown',
+            ...(code === '42501' ? { permission_target: target ?? 'unknown' } : {}),
           },
           'operations request failed',
         );

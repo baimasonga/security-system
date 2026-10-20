@@ -52,3 +52,13 @@ mutation; compile/setup failures do not count. Omit NPM_CONFIG_CACHE to use npm'
 default cache on other machines. The load scenario uses real loopback HTTP, an
 isolated fsync-on schema and a two-connection pool. It asserts exact deduplication,
 stale-edit and audit outcomes; its duration is not a production capacity benchmark.
+
+Railway pre-deploy uses **`node tools/predeploy.ts`**, copied into the image. This
+runs migration, grants and profile verification as three explicit Node processes,
+without shell `&&`, and propagates the first failed exit status. Configure the
+service override to the same single command; a UI setting can override repository
+configuration. Success must include the fixed `predeploy completed` message.
+`db:check` now rejects missing required SELECT/INSERT/UPDATE/DELETE privileges from
+the declared table policy as well as forbidden privileges. No owner/superuser or
+extra incident DELETE permission is needed. A live SQLSTATE 42501 is not passing
+incident acceptance even if process health is green.

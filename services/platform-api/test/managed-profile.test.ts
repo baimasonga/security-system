@@ -180,6 +180,14 @@ describe('evaluate (db:check judgement)', () => {
       .map((c) => c.id);
 
   it('passes a correctly configured connection', () => expect(fails(good)).toEqual([]));
+  it.each(['insert', 'update'] as const)(
+    'fails when the incident table lacks required %s rights',
+    (field) => {
+      expect(
+        fails({ ...good, tables: [...good.tables, t('operations_incidents', { [field]: false })] }),
+      ).toContain('required-grants');
+    },
+  );
 
   it.each([
     ['unencrypted remote', { tls: false }, 'tls'],

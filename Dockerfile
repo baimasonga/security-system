@@ -16,7 +16,7 @@ COPY package.json ./
 COPY packages ./packages
 COPY services ./services
 # Operator tooling that must be runnable inside the deployment (e.g. `railway ssh` / one-off jobs).
-COPY tools/migrate.ts tools/db-grants.ts tools/db-check.ts tools/bootstrap-operator.ts tools/verify-anchor.ts ./tools/
+COPY tools/predeploy.ts tools/migrate.ts tools/db-grants.ts tools/db-check.ts tools/bootstrap-operator.ts tools/verify-anchor.ts ./tools/
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '8080') + '/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

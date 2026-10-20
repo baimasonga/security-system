@@ -1,6 +1,6 @@
 import { SCHEMA_NAME } from './connection.ts';
 import type { Queryable } from './pg.ts';
-import { API_ROLES } from './grants.ts';
+import { API_ROLES, TABLE_PRIVILEGES } from './grants.ts';
 
 // `npm run db:check`: is this database connection set up the way the Supabase/managed profile (ADR-012) requires?
 // Facts are gathered with read-only catalog queries; judgement is a pure function so it can be tested exhaustively.
@@ -117,6 +117,17 @@ export function evaluate(f: ProfileFacts): Check[] {
   );
 
   const unreachable = f.tables.filter((t) => !t.select).map((t) => t.name);
+  const field = { SELECT: 'select', INSERT: 'insert', UPDATE: 'update', DELETE: 'delete' } as const;
+  const missing = f.tables.flatMap((t) =>
+    (TABLE_PRIVILEGES[t.name] ?? []).filter((p) => !t[field[p]]).map((p) => `${t.name}:${p}`),
+  );
+  add(
+    'required-grants',
+    missing.length === 0,
+    missing.length
+      ? `missing required privileges: ${missing.join(', ')} (run npm run db:grants)`
+      : 'required table grants are present',
+  );
   add(
     'table-coverage',
     f.tables.length > 0 && unreachable.length === 0,

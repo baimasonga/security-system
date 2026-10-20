@@ -172,3 +172,29 @@ it.each([
   expect(JSON.stringify(spy.mock.calls)).not.toContain('private SQL parameters');
   spy.mockRestore();
 });
+
+it.each([
+  ['permission denied for table operations_incidents', 'operations_incidents'],
+  ['permission denied for table private_customer_data', 'unknown'],
+])('logs only allowlisted permission targets: %s', async (message, target) => {
+  const f = await setup();
+  const { vi } = await import('vitest');
+  const spy = vi.spyOn(env.app.log, 'error').mockImplementation(() => {});
+  vi.spyOn(env.c.operationsIncidents, 'open').mockRejectedValueOnce(
+    Object.assign(new Error(message), { code: '42501' }),
+  );
+  expect(
+    (
+      await env.call('POST', f.path, {
+        token: f.owner.token,
+        body: { component_id: f.c.id, severity: 'informational', reason: 'security_response' },
+      })
+    ).status,
+  ).toBe(503);
+  expect(spy.mock.calls[0]).toEqual([
+    { failure: 'operations_unavailable', sqlstate: '42501', permission_target: target },
+    'operations request failed',
+  ]);
+  expect(JSON.stringify(spy.mock.calls)).not.toContain('private_customer_data');
+  spy.mockRestore();
+});

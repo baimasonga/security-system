@@ -5,9 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "preDeployCommand": [
-      "node tools/migrate.ts && node tools/db-grants.ts && node tools/db-check.ts"
-    ],
+    "preDeployCommand": ["node tools/predeploy.ts"],
     "healthcheckPath": "/healthz",
     "healthcheckTimeout": 120,
     "numReplicas": 1,
