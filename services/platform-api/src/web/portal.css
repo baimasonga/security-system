@@ -611,3 +611,32 @@ body.public {
     grid-template-columns: 1fr;
   }
 }
+
+/* Keep workspace tasks together without reducing touch target sizes. */
+.workspace-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.workspace-actions .panel {
+  min-width: 0;
+}
+.workspace-actions form button {
+  justify-self: start;
+}
+.compact-disclosure summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 0;
+  font-weight: 600;
+}
+.compact-disclosure dl {
+  margin-bottom: 0;
+}
+@media (max-width: 960px) {
+  .workspace-actions {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

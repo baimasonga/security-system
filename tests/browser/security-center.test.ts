@@ -290,3 +290,61 @@ it('does not show late recovery codes after leaving the security view', async ()
   await expect.poll(() => page.getByLabel('One-time recovery codes').count()).toBe(0);
   expect(await page.locator('dialog[open]').count()).toBe(0);
 });
+
+it('creates a usable team workspace and keeps organization tasks compact on desktop and mobile', async () => {
+  const { page } = await setup();
+  await env.register('teammate@example.test');
+  await page.getByRole('button', { name: 'Organization', exact: true }).click();
+  await page.getByRole('heading', { name: 'Work with a team', exact: true }).waitFor();
+  expect(await page.getByRole('button', { name: 'Add member', exact: true }).count()).toBe(0);
+  expect(await page.getByText('center@example.test (you)', { exact: true }).isVisible()).toBe(true);
+  expect(await page.locator('details.compact-disclosure').getAttribute('open')).toBe(null);
+  await page.getByLabel('Workspace name', { exact: true }).fill('Trial team');
+  await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
+  await page.getByLabel('Existing account email').waitFor();
+  await page.getByLabel('Existing account email').fill('teammate@example.test');
+  await page.getByRole('button', { name: 'Add member', exact: true }).click();
+  await page.getByRole('cell', { name: 'teammate@example.test', exact: true }).waitFor();
+  const artifacts = process.env['PORTAL_ARTIFACTS'];
+  if (artifacts) {
+    mkdirSync(artifacts, { recursive: true });
+    await page.screenshot({ path: join(artifacts, 'organization-desktop.png'), fullPage: true });
+  }
+  const forms = page.locator('.workspace-actions section');
+  const first = await forms.nth(0).boundingBox();
+  const second = await forms.nth(1).boundingBox();
+  expect(first!.y).toBe(second!.y);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+  expect((await forms.nth(1).boundingBox())!.y).toBeGreaterThan(
+    (await forms.nth(0).boundingBox())!.y,
+  );
+  if (artifacts)
+    await page.screenshot({ path: join(artifacts, 'organization-mobile.png'), fullPage: true });
+});
+
+it('activates the browser, verifies its cached lease and deactivates from adjacent controls', async () => {
+  const { page, owner } = await setup();
+  const license = await env.provision(owner.orgId);
+  await page.reload();
+  await login(page);
+  await page.getByRole('button', { name: 'Device demo', exact: true }).click();
+  await page.getByLabel('License key', { exact: true }).fill(license.licenseKey);
+  await page.getByRole('button', { name: 'Activate this browser', exact: true }).click();
+  await page.getByText('Result: valid', { exact: true }).waitFor();
+  const installation = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: 'Installation details' }) });
+  expect(await installation.getAttribute('open')).toBe(null);
+  await page.getByRole('button', { name: 'Verify offline', exact: true }).click();
+  await page.getByText('Result: valid', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
+  await page
+    .getByText('Not activated. Enter a license key below to get started.', { exact: true })
+    .waitFor();
+  await page.getByRole('button', { name: 'Verify offline', exact: true }).click();
+  await page
+    .locator('#notice')
+    .getByText('No cached lease. Activate this browser first.', { exact: true })
+    .waitFor();
+});

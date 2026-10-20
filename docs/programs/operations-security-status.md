@@ -844,3 +844,30 @@ both passed, including PostgreSQL, browser and Windows checks.
   notification outbox tested only with fake recipients. Then implement incident
   pruning and outage acceptance before claiming OPS-006 complete or the OPS-007
   live Rokela incident integration ready.
+
+### Trial-facing organization and device UI correction — 20 October
+
+- User approved the compact desktop/mobile concept. Organization now shows member
+  emails already provided by the authorized API, marks the signed-in member, puts
+  team forms side by side on desktop and stacks them on mobile. Technical workspace
+  identifiers are collapsed. Personal workspaces explain the team-workspace path
+  rather than offering an Add member operation that the server always rejects.
+  Admins are not offered the owner role; server authorization remains authoritative.
+- Device demo now collapses installation identifiers, keeps validation, lease
+  refresh, offline verification and deactivation together with their result, and
+  announces concise results through a live status region. Structured result evidence
+  remains expandable. Software-backed browser key limitations remain explicit.
+- Chromium acceptance passed **13 workflows in 2 files**, including real team
+  creation/member addition, desktop/mobile ordering and no horizontal page overflow,
+  plus actual browser activation, signed cached-lease verification, deactivation and
+  refusal to verify the removed cached lease. The initial device fixture created its
+  product after catalog loading; reloading before login corrected the fixture.
+  Screenshots: `/workspace/scratch/organization-desktop.png` and
+  `/workspace/scratch/organization-mobile.png`. These are synthetic local fixtures,
+  not screenshots of a production customer session.
+- Full `npm run check` passed **871 tests, 3 skipped**; formatting, lint,
+  architecture boundaries and typechecking passed. Production delivery is recorded
+  below when complete.
+  This change does not complete automatic rules/notifications, independent monitoring,
+  payment setup, recovery exercises or the live Rokela PDF integration. The next
+  program slice remains OPS-006 typed rules/evaluation windows and durable deduplication.

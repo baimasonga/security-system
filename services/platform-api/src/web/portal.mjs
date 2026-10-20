@@ -569,22 +569,42 @@ async function renderView(view) {
   if (view === 'Organization') {
     const org = await api(orgPath());
     const members = (await api(`${orgPath()}/members`)).items;
+    const workspaceDetails = node('details', undefined, 'panel compact-disclosure');
+    workspaceDetails.append(
+      node('summary', 'Workspace details'),
+      details({ organization_id: org.id, kind: org.kind, role: org.role }),
+    );
     const sections = [
-      title('Organization', 'Manage your workspace and its membership.'),
-      panel(
-        node('h2', org.name),
-        details({ organization_id: org.id, kind: org.kind, role: org.role }),
+      title(
+        'Organization',
+        `${org.name} · ${org.role} · Manage your workspace and its membership.`,
       ),
       panel(
         node('h2', 'Members'),
         table(
-          ['User', 'Role'],
-          members.map((m) => [m.user_id, m.role]),
+          ['Person', 'Role'],
+          members.map((m) => [
+            m.user_id === state.principal.user_id
+              ? `${m.email || 'You'} (you)`
+              : m.email || m.user_id,
+            m.role,
+          ]),
         ),
       ),
     ];
-    if (['owner', 'admin'].includes(org.role))
-      sections.push(
+    const actions = node('div', undefined, 'workspace-actions');
+    if (org.kind === 'personal')
+      actions.append(
+        panel(
+          node('h2', 'Work with a team'),
+          node(
+            'p',
+            'Your personal workspace is just for you. Create a team workspace to add other people and share access.',
+          ),
+        ),
+      );
+    if (org.kind !== 'personal' && ['owner', 'admin'].includes(org.role))
+      actions.append(
         panel(
           node('h2', 'Add a member'),
           fieldsForm(
@@ -596,7 +616,7 @@ async function renderView(view) {
                 options: [
                   ['member', 'Member'],
                   ['admin', 'Admin'],
-                  ['owner', 'Owner'],
+                  ...(org.role === 'owner' ? [['owner', 'Owner']] : []),
                 ],
               },
             ],
@@ -608,7 +628,7 @@ async function renderView(view) {
           ),
         ),
       );
-    sections.push(
+    actions.append(
       panel(
         node('h2', 'Create a team workspace'),
         fieldsForm(
@@ -624,6 +644,7 @@ async function renderView(view) {
         ),
       ),
     );
+    sections.push(actions, workspaceDetails);
     return sections;
   }
   if (view === 'Catalog') {
@@ -1278,15 +1299,31 @@ async function seatPanel(l) {
 }
 async function deviceView() {
   const status = await device.summary();
-  const statusBox = panel(node('h2', 'This browser installation'), details(status));
-  const output = node('div');
-  const run = async (action) => {
-    const value = await action();
+  const statusBox = panel();
+  const renderStatus = (value) => {
+    const technical = node('details', undefined, 'compact-disclosure');
+    technical.append(node('summary', 'Installation details'), details(value));
     statusBox.replaceChildren(
       node('h2', 'This browser installation'),
-      details(await device.summary()),
+      node(
+        'p',
+        value.activation_id === 'Not activated'
+          ? 'Not activated. Enter a license key below to get started.'
+          : `Activated for ${value.product}.`,
+      ),
+      technical,
     );
-    output.replaceChildren(node('pre', JSON.stringify(value, null, 2)));
+  };
+  renderStatus(status);
+  const output = node('div');
+  output.setAttribute('role', 'status');
+  output.setAttribute('aria-live', 'polite');
+  const run = async (action) => {
+    const value = await action();
+    renderStatus(await device.summary());
+    const evidence = node('details', undefined, 'compact-disclosure');
+    evidence.append(node('summary', 'Result details'), node('pre', JSON.stringify(value, null, 2)));
+    output.replaceChildren(node('p', `Result: ${value.state || 'Completed'}`), evidence);
   };
   return [
     title(
@@ -1315,24 +1352,27 @@ async function deviceView() {
       node('h2', 'Device actions'),
       node(
         'p',
-        'Offline verification uses the public keys cached at activation. Reloading retains this demo device identity.',
+        'Activate first, then validate access, refresh your lease or verify it offline. Offline verification uses the public keys cached at activation.',
       ),
-      node('div', undefined, 'actions'),
-      output,
-    ),
-    panel(
-      ...['Validate online', 'Refresh lease', 'Verify offline', 'Deactivate'].map((label, i) =>
-        button(label, () =>
-          run(() =>
-            [
-              () => device.call('validate', api),
-              () => device.call('refresh', api),
-              () => device.offline(),
-              () => device.call('deactivate', api),
-            ][i](),
+      (() => {
+        const actions = node('div', undefined, 'actions');
+        actions.append(
+          ...['Validate online', 'Refresh lease', 'Verify offline', 'Deactivate'].map((label, i) =>
+            button(label, () =>
+              run(() =>
+                [
+                  () => device.call('validate', api),
+                  () => device.call('refresh', api),
+                  () => device.offline(),
+                  () => device.call('deactivate', api),
+                ][i](),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+        return actions;
+      })(),
+      output,
     ),
   ];
 }
