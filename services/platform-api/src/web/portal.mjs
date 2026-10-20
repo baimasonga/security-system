@@ -734,95 +734,158 @@ async function securityCenterView() {
   const token = state.token;
   const current = () => state.version === version && state.token === token;
   const sc = await api('/v1/security-center');
-  const yes = (v) => (v ? 'Yes' : 'No');
+  const disclosure = (label, cls, ...children) => {
+    const fold = node('details', undefined, cls);
+    fold.append(node('summary', label), ...children);
+    return fold;
+  };
+  const status = (label, attention = false) =>
+    node('p', label, `security-state${attention ? ' attention' : ''}`);
   const openWorkspace = async (orgId, view) => {
     state.orgId = orgId;
     $('organization').value = orgId;
     await navigate(view);
   };
-  return [
-    title(
-      'Security center',
-      'Protect your account, manage your devices, and open security controls for your organizations.',
+  const heading = title(
+    'Security center',
+    'Choose an action to protect your account or manage a device.',
+  );
+  heading.append(button('Refresh security status', () => navigate('Security center')));
+  const account = panel(
+    node('h2', 'Your account'),
+    node('p', sc.account.email, 'security-email'),
+    status(
+      sc.account.email_verified ? 'Email verified' : 'Email not verified',
+      !sc.account.email_verified,
     ),
-    button('Refresh security status', () => navigate('Security center')),
-    ...(sc.recommendations.length
-      ? [panel(node('h2', 'Recommended'), ...sc.recommendations.map((r) => node('p', r)))]
-      : []),
-    panel(
-      node('h2', 'Your account'),
-      details({
-        email: sc.account.email,
-        email_verified: yes(sc.account.email_verified),
-        authenticator_app: yes(sc.account.authenticator_enabled),
-        passkeys: sc.account.passkeys,
-        platform_operator: yes(sc.account.operator),
-      }),
-      ...(state.principal.recovery_configured && !sc.account.email_verified
-        ? [
-            button('Send verification email', async () => {
+    ...(state.principal.recovery_configured && !sc.account.email_verified
+      ? [
+          button(
+            'Send verification email',
+            async () => {
               const result = await api('/v1/auth/email/request', 'POST', {});
-              notice(result.message);
-            }),
-          ]
-        : []),
-      button('Sign out', () => $('signout').click()),
+              if (current()) notice(result.message);
+            },
+            'primary',
+          ),
+        ]
+      : []),
+    button('Sign out', () => $('signout').click()),
+    disclosure(
+      'Account details',
+      'security-disclosure',
+      details({
+        email_verified: sc.account.email_verified ? 'Yes' : 'No',
+        authenticator_app: sc.account.authenticator_enabled ? 'Yes' : 'No',
+        passkeys: sc.account.passkeys,
+        platform_operator: sc.account.operator ? 'Yes' : 'No',
+      }),
     ),
-    mfaPanel(sc.account.authenticator_enabled),
-    await passkeyPanel('Security center'),
-    ...sc.organizations.map((o) =>
-      panel(
-        node('h2', `${o.name} — ${o.role}`),
-        button('Manage organization', () => openWorkspace(o.id, 'Organization')),
-        ...(o.permissions.some((x) => x.permission === 'ops:read')
-          ? [button('Manage application monitoring', () => openWorkspace(o.id, 'Applications'))]
-          : []),
-        table(
-          ['You may', 'Permission'],
-          o.permissions.map((x) => [x.description, node('span', x.permission, 'mono')]),
-        ),
-      ),
+  );
+  const mfa = mfaPanel(sc.account.authenticator_enabled);
+  mfa.children[0].after(
+    status(
+      !state.principal.mfa_configured
+        ? 'Unavailable on this deployment'
+        : sc.account.authenticator_enabled
+          ? 'Authenticator enabled'
+          : 'Authenticator not enabled',
+      state.principal.mfa_configured && !sc.account.authenticator_enabled,
     ),
-    panel(
-      node('h2', 'Your devices'),
-      sc.devices.length
-        ? table(
-            ['Device', 'Trust', 'Hardware evidence', 'Works offline until', 'Action'],
-            sc.devices.map((d) => [
-              node('span', d.device_id, 'mono'),
-              badge(d.posture),
-              d.attestation === 'unknown' ? 'None verified' : d.attestation,
-              d.offline_lease_valid_until
-                ? new Date(d.offline_lease_valid_until).toLocaleString()
-                : '—',
-              button(
-                'Deactivate device',
-                async () => {
-                  const until = d.offline_lease_valid_until
-                    ? new Date(d.offline_lease_valid_until).toLocaleString()
-                    : 'its existing lease expires';
-                  if (
-                    !confirm(
-                      `Deactivate this device and free its slot? It may still work offline until ${until}.`,
-                    )
+  );
+  const passkeys = await passkeyPanel('Security center');
+  passkeys.children[0].after(
+    status(
+      passkeysAvailable
+        ? `${sc.account.passkeys} passkey${sc.account.passkeys === 1 ? '' : 's'} registered`
+        : 'Unavailable on this deployment or browser',
+      passkeysAvailable && sc.account.passkeys === 0,
+    ),
+  );
+  const actions = node('div', undefined, 'security-actions');
+  actions.setAttribute('aria-label', 'Account security actions');
+  actions.append(account, mfa, passkeys);
+  const devices = panel(
+    node('h2', 'Your devices'),
+    sc.devices.length
+      ? table(
+          ['Device', 'Trust', 'Hardware evidence', 'Works offline until', 'Action'],
+          sc.devices.map((d) => [
+            node('span', d.device_id, 'mono'),
+            badge(d.posture),
+            d.attestation === 'unknown' ? 'None verified' : d.attestation,
+            d.offline_lease_valid_until
+              ? new Date(d.offline_lease_valid_until).toLocaleString()
+              : '—',
+            button(
+              'Deactivate device',
+              async () => {
+                const until = d.offline_lease_valid_until
+                  ? new Date(d.offline_lease_valid_until).toLocaleString()
+                  : 'its existing lease expires';
+                if (
+                  !confirm(
+                    `Deactivate this device and free its slot? It may still work offline until ${until}.`,
                   )
-                    return;
-                  await api(
-                    `/v1/organizations/${encodeURIComponent(d.org_id)}/activations/${encodeURIComponent(d.activation_id)}/deactivate`,
-                    'POST',
-                  );
-                  if (!current()) return;
-                  await navigate('Security center');
-                  notice('Device deactivated. Existing offline leases remain valid until expiry.');
-                },
-                'danger',
+                )
+                  return;
+                await api(
+                  `/v1/organizations/${encodeURIComponent(d.org_id)}/activations/${encodeURIComponent(d.activation_id)}/deactivate`,
+                  'POST',
+                );
+                if (!current()) return;
+                await navigate('Security center');
+                notice('Device deactivated. Existing offline leases remain valid until expiry.');
+              },
+              'danger',
+            ),
+          ]),
+        )
+      : empty('You have not activated any devices.'),
+  );
+  return [
+    heading,
+    actions,
+    devices,
+    ...sc.organizations.map((o) => {
+      const controls = node('div', undefined, 'actions');
+      controls.append(
+        ...(o.permissions.some((x) => x.permission === 'ops:read')
+          ? [
+              button(
+                'Manage application monitoring',
+                () => openWorkspace(o.id, 'Applications'),
+                'primary',
               ),
-            ]),
-          )
-        : empty('You have not activated any devices.'),
-    ),
-    panel(
-      node('h2', 'What we collect'),
+            ]
+          : []),
+        button('Manage organization', () => openWorkspace(o.id, 'Organization')),
+      );
+      return panel(
+        node('h2', `${o.name} — ${o.role}`),
+        controls,
+        disclosure(
+          'View role permissions',
+          'security-disclosure security-permissions',
+          table(
+            ['You may', 'Permission'],
+            o.permissions.map((x) => [x.description, node('span', x.permission, 'mono')]),
+          ),
+        ),
+      );
+    }),
+    ...(sc.recommendations.length
+      ? [
+          disclosure(
+            `Recommendations (${sc.recommendations.length})`,
+            'panel security-disclosure',
+            ...sc.recommendations.map((r) => node('p', r)),
+          ),
+        ]
+      : []),
+    disclosure(
+      'What we collect · Privacy & retention',
+      'panel security-disclosure security-privacy',
       table(
         ['Category', 'Contents', 'Why', 'Kept'],
         sc.data_categories.map((d) => [d.category, d.contents, d.purpose, d.retention]),

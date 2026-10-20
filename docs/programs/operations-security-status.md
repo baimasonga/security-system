@@ -484,3 +484,36 @@ both passed, including PostgreSQL, browser and Windows checks.
   Next: verify the deployed Security Center against a test account without sending
   real mail; keep production health rollout and OPS-006 gated on the recorded
   freshness corrections and independent-monitor acceptance.
+
+## Security Center information hierarchy correction — 20 October 2026
+
+- Follow-up screenshots showed that expanded privacy and permission descriptions
+  still dominated the page. The earlier deployment-label interpretation did not
+  establish the user experience. Network access now works: the public `portal.mjs`
+  was byte-identical to `b58b74e` (SHA256
+  `6af50cc5bb5e8378b62f35fdcaa6b022f25fcc9e75cb74b1b5bad29394710bad`).
+  GitHub also reported Railway success for that exact commit. This confirmed the
+  need to correct the default interface rather than assuming the old source served.
+- Put account/email, authenticator and passkey controls together with explicit
+  availability/attention states; own-device actions now precede organization cards.
+  Monitoring/organization buttons stay visible. Account details, recommendations,
+  role permission tables and privacy/retention descriptions use native collapsed
+  disclosures. Keyboard users can open the information; mobile stacks the controls.
+- Verification: full `npm run check` passed **845 tests, 3 skipped**; Chromium passed
+  **9 workflows**, including the new default-state/keyboard/mobile regression and
+  the existing real account/device/security actions. The new test failed against
+  the previous layout before implementation. Screenshots use synthetic local
+  accounts: `/workspace/scratch/security-center-desktop.png` and
+  `/workspace/scratch/security-center-mobile.png`. Optional artifact output uses
+  `SECURITY_CENTER_SCREENSHOTS`; CI has no hard-coded artifact filesystem dependency.
+- Logs: `/tmp/security-layout-red.log`, `/tmp/security-layout-browser.log` and
+  `/tmp/security-layout-check-final.log`. The first typecheck exposed DOM globals
+  in a Node-typed browser test; switched to the existing browser-expression style
+  and the complete check passed. This correction changes UI structure/styles only;
+  no API, permission, database or transaction boundary changed, so no additional
+  PostgreSQL/load/mutation scenario applies.
+- Live public checks: `/healthz` returned `{"status":"ok"}`; authentication options
+  reported email recovery configured and passkeys unconfigured. Passkey capability
+  remains an explicit deployment prerequisite; no provider mail, production device
+  mutation or authenticated production acceptance was performed. Health freshness
+  findings and independent-monitor/OPS-006 gates remain open.

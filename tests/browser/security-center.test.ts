@@ -1,6 +1,8 @@
 import { afterEach, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { createServer } from 'node:net';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { SoftwareDeviceKey } from '@trust/sdk-core';
 import { buildProofMessage } from '@trust/crypto/verify';
@@ -73,6 +75,41 @@ function decode(text: string) {
   }
   return Buffer.from(bytes);
 }
+it('puts actions first and keeps privacy and role descriptions collapsed on desktop and mobile', async () => {
+  const { page } = await setup();
+  const privacy = page.locator('details.security-privacy');
+  await privacy.locator('summary').waitFor();
+  expect(await privacy.locator('table').isVisible()).toBe(false);
+  const permissions = page.locator('details.security-permissions').first();
+  expect(await permissions.locator('summary').isVisible()).toBe(true);
+  expect(await permissions.locator('table').isVisible()).toBe(false);
+  await privacy.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  expect(await privacy.locator('table').isVisible()).toBe(true);
+  await page.keyboard.press('Enter');
+  expect(await privacy.locator('table').isVisible()).toBe(false);
+  const actions = page.locator('.security-actions');
+  expect(
+    await actions.getByRole('button', { name: 'Set up authenticator', exact: true }).isVisible(),
+  ).toBe(true);
+  expect(
+    await actions.getByRole('button', { name: 'Send verification email', exact: true }).isVisible(),
+  ).toBe(true);
+  const account = await section(page, 'Your account').boundingBox();
+  const device = await section(page, 'Your devices').boundingBox();
+  expect(account!.y).toBeLessThan(device!.y);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const artifacts = process.env['SECURITY_CENTER_SCREENSHOTS'];
+  if (artifacts) {
+    mkdirSync(artifacts, { recursive: true });
+    await page.screenshot({ path: join(artifacts, 'security-center-desktop.png'), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+  expect(await privacy.locator('table').isVisible()).toBe(false);
+  if (artifacts)
+    await page.screenshot({ path: join(artifacts, 'security-center-mobile.png'), fullPage: true });
+});
 it('enables and disables real authenticator protection and sends verification from Security center', async () => {
   const { page, mail, owner } = await setup();
   await section(page, 'Your account')

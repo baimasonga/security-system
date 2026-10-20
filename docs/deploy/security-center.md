@@ -2,6 +2,13 @@
 
 The signed-in **Security center** page supports these existing account actions:
 
+The default view places account/email, authenticator and passkey controls together,
+with current availability and attention states. Own-device actions follow immediately.
+Organization monitoring and management buttons remain visible; account detail,
+permission, recommendation and privacy/retention descriptions are collapsed native
+disclosures. Enter or Space opens a focused disclosure. Mobile stacks the same
+controls without requiring horizontal page scrolling.
+
 - Request a verification email when delivery is configured and the email is unverified.
 - Enroll an authenticator and receive one-time recovery codes. Enrollment signs out
   all sessions; sign in again with an unused authenticator or recovery code.
@@ -36,7 +43,10 @@ Run `CHROMIUM_PATH=/path/to/chromium npm run test:portal`, `npm run check`, and 
 existing MFA/passkey/privacy/device-trust PostgreSQL suites as both owner and app role.
 Browser tests cover real enrollment/disable, verification to fake mail, WebAuthn
 registration/removal, device cancellation/deactivation, member restrictions, workspace
-selection and a delayed recovery-code response after leaving the view.
+selection and a delayed recovery-code response after leaving the view. They also
+verify collapsed information by default, keyboard disclosure and mobile overflow.
+Set `SECURITY_CENTER_SCREENSHOTS` to a local artifact directory to save the tested
+desktop/mobile views (synthetic accounts only).
 
 No transaction, schema, retention, lock or quota behavior changed, so a new load
 scenario is not applicable. The delayed-response guard is mutation-checked in a

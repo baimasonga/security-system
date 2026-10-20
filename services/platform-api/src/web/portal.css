@@ -219,6 +219,58 @@ form {
 .actions button {
   white-space: normal;
 }
+.security-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.security-actions .panel {
+  margin: 0;
+  min-width: 0;
+}
+.security-actions button {
+  margin: 0 5px 10px 0;
+}
+.security-email {
+  overflow-wrap: anywhere;
+}
+.security-state {
+  display: inline-block;
+  padding: 4px 9px;
+  margin: 0 0 16px;
+  border-radius: 5px;
+  background: #edf4f5;
+  color: #005761;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+.security-state.attention {
+  background: #fff3db;
+  color: #74480c;
+}
+.security-disclosure {
+  margin-top: 16px;
+}
+.security-disclosure summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 10px 0;
+}
+.security-disclosure[open] summary {
+  margin-bottom: 12px;
+}
+@media (max-width: 1100px) {
+  .security-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .security-actions {
+    grid-template-columns: 1fr;
+  }
+}
 .table-wrap {
   overflow-x: auto;
 }
