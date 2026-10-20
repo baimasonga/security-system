@@ -105,6 +105,16 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
         429: 'rate_limited',
       };
       const safeStatus = status in codes ? status : 503;
+      if (safeStatus === 503) {
+        const code = (error as { code?: unknown }).code;
+        app.log.error(
+          {
+            failure: 'operations_unavailable',
+            sqlstate: typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? code : 'unknown',
+          },
+          'operations request failed',
+        );
+      }
       if (safeStatus === 429) reply.header('retry-after', '60');
       return reply
         .status(safeStatus)

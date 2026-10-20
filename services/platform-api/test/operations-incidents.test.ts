@@ -148,3 +148,27 @@ it('provides actionable audited incidents without granting member or integration
     'operations.incident.resolved',
   ]);
 });
+
+it.each([
+  ['23514', '23514'],
+  ['private SQL parameters', 'unknown'],
+])('logs only a bounded SQLSTATE for unavailable code %s', async (code, safe) => {
+  const f = await setup();
+  const { vi } = await import('vitest');
+  const spy = vi.spyOn(env.app.log, 'error').mockImplementation(() => {});
+  vi.spyOn(env.c.operationsIncidents, 'open').mockRejectedValueOnce(
+    Object.assign(new Error('private SQL parameters must not be logged'), { code }),
+  );
+  const result = await env.call('POST', f.path, {
+    token: f.owner.token,
+    body: { component_id: f.c.id, severity: 'informational', reason: 'security_response' },
+  });
+  expect(result.status).toBe(503);
+  expect(result.body.code).toBe('unavailable');
+  expect(spy.mock.calls[0]).toEqual([
+    { failure: 'operations_unavailable', sqlstate: safe },
+    'operations request failed',
+  ]);
+  expect(JSON.stringify(spy.mock.calls)).not.toContain('private SQL parameters');
+  spy.mockRestore();
+});

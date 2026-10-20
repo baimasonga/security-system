@@ -750,3 +750,27 @@ both passed, including PostgreSQL, browser and Windows checks.
 - Publication baseline: `330842b`; implementation branch
   `codex/manual-incident-triage`. Production rollout/acceptance is recorded separately
   after migration, grants and source deployment complete.
+
+### Initial live rollout investigation
+
+- Published implementation `5734fcf` on `codex/manual-incident-triage` and the
+  existing default branch. Source deployment `7dd22809-1c1d-46c9-849e-a623fcd9ba97`
+  reached SUCCESS; deployment logs mention migration 0022, readiness/health returned
+  200 and the served operations dashboard matched source bytes (SHA256
+  `3b2677cfcaea78eb9ce396cf07db433426bf94868ad5059ed403db1a147a8bd1`).
+- Enabled the manual-incident flag; deployment
+  `e90014f1-11ea-406e-9248-c27056e25881` reached SUCCESS. Live synthetic inventory
+  creation succeeded, but incident open/deduplication returned unavailable or a
+  disconnected response. This is a live verification failure, not passing incident
+  acceptance. Existing API health/readiness remain 200; previously enabled features
+  were not disabled or reconfigured.
+- Initial helpers also used PATCH for archive; inventory correctly requires DELETE
+  with a version/reason. Corrected that helper. Some isolated synthetic inventory
+  from the failed attempts may remain; no customer data, external alert or elevated
+  account was involved. Credentials were never saved. The successful rerun must
+  archive its own test inventory and preserve terminal incident/audit records.
+- Operations' existing failure handler intentionally hides database errors. Added
+  SQLSTATE-only unavailable diagnostics with fixed messages, no exception text,
+  request body, URL or database parameters; tests reject private message/code
+  disclosure. Use these diagnostics to identify the live failure, then verify the
+  complete workflow before calling the production slice accepted.
