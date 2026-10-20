@@ -1,4 +1,4 @@
-import { PgEventRepo } from './pg-operations-events.ts';
+import { PgAutomationRepo } from './pg-operations-automation.ts';
 import { roleAllows } from '@trust/auth';
 import { DomainError, type OrgRole } from '@trust/shared-types';
 import { AuditBuffer } from '@trust/audit';
@@ -120,6 +120,7 @@ const incidentFields = [
   'environmentId',
   'componentId',
   'source',
+  'ruleId',
   'severity',
   'state',
   'assigneeUserId',
@@ -134,10 +135,11 @@ function incidentFrom(r: Record<string, unknown>): Incident {
   const row = Object.fromEntries(incidentFields.map((f) => [f, r[column(f)]]));
   for (const f of ['createdAt', 'updatedAt', 'acknowledgedAt', 'resolvedAt'])
     if (row[f]) row[f] = new Date(row[f] as Date);
+  if (!row.ruleId) delete row.ruleId;
   row.version = Number(row.version);
   return row as unknown as Incident;
 }
-class Repo extends PgEventRepo implements InventoryRepo {
+class Repo extends PgAutomationRepo implements InventoryRepo {
   readonly #q: Queryable;
   constructor(q: Queryable) {
     super(q);

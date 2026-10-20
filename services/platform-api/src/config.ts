@@ -20,6 +20,7 @@ export interface PlatformConfig {
   operationsIngestionEnabled: boolean;
   operationsHealthEnabled: boolean;
   operationsIncidentsEnabled: boolean;
+  operationsAutomationEnabled: boolean;
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
   identityMailEncryptionKey?: string;
@@ -279,6 +280,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   if (opsInventory !== undefined && opsInventory !== 'true' && opsInventory !== 'false')
     throw new Error('OPERATIONS_INVENTORY_ENABLED must be true or false');
   const opsIngestion = env['OPERATIONS_INGESTION_ENABLED'];
+  const opsAutomation = env['OPERATIONS_AUTOMATION_ENABLED'];
+  if (opsAutomation !== undefined && !['true', 'false'].includes(opsAutomation))
+    throw new Error('OPERATIONS_AUTOMATION_ENABLED must be true or false');
+  if (
+    opsAutomation === 'true' &&
+    [opsInventory, opsIngestion, opsHealth, opsIncidents].some((v) => v !== 'true')
+  )
+    throw new Error(
+      'OPERATIONS_AUTOMATION_ENABLED requires inventory, ingestion, health and incidents',
+    );
   if (opsIngestion !== undefined && opsIngestion !== 'true' && opsIngestion !== 'false')
     throw new Error('invalid OPERATIONS_INGESTION_ENABLED');
   const opsCredentials = env['OPERATIONS_CREDENTIALS_ENABLED'];
@@ -539,6 +550,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     operationsIngestionEnabled: opsIngestion === 'true',
     operationsHealthEnabled: opsHealth === 'true',
     operationsIncidentsEnabled: opsIncidents === 'true',
+    operationsAutomationEnabled: opsAutomation === 'true',
     ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',
     port,

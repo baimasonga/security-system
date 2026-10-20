@@ -7,7 +7,8 @@ export type IncidentSeverity = 'informational' | 'warning' | 'critical';
 export interface Incident extends CredentialScope {
   id: string;
   componentId: string;
-  source: 'manual_triage';
+  source: 'manual_triage' | 'automatic_rule';
+  ruleId?: string;
   severity: IncidentSeverity;
   state: IncidentState;
   assigneeUserId: string | null;
@@ -112,7 +113,9 @@ export class IncidentService {
       if (!c || c.applicationId !== a.id || c.environmentId !== e.id) throw missing();
       if ([a, e, c].some((r) => r.state !== 'active')) throw conflict();
       const rows = await tx.listIncidents(scope, { limit: 1001 });
-      const active = rows.find((r) => r.componentId === c.id && r.state !== 'resolved');
+      const active = rows.find(
+        (r) => r.componentId === c.id && r.source === 'manual_triage' && r.state !== 'resolved',
+      );
       if (active) return { incident: active, created: false };
       if (rows.length >= 1000) throw new DomainError('quota_exceeded', 'request rejected');
       const now = this.#d.clock.now();

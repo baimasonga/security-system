@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
+  ALERT_EVENTS,
+  RUNBOOKS,
   INVENTORY_REASONS,
   type InventoryScope,
   type InventoryType,
@@ -156,6 +158,7 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
     registerEventRoutes(scoped, c);
     registerHealthRoutes(scoped, c);
     registerIncidentRoutes(scoped, c);
+    registerAutomationRoutes(scoped, c);
   });
 }
 function registerInventoryRoutes(app: FastifyInstance, c: Container) {
@@ -550,4 +553,113 @@ function registerIncidentRoutes(app: FastifyInstance, c: Container) {
       }
       return toWire(result);
     });
+}
+
+function registerAutomationRoutes(app: FastifyInstance, c: Container) {
+  const path = base + '/:applicationId/environments/:environmentId';
+  const scopeParams = z
+    .object({ orgId: id('org'), applicationId: id('opa'), environmentId: id('ope') })
+    .strict();
+  const pre = {
+    logLevel: 'silent' as const,
+    preHandler: [
+      authenticated(c),
+      async () => {
+        if (!c.config.operationsAutomationEnabled) throw new DomainError('not_found', 'not found');
+      },
+    ],
+  };
+  const params = z
+    .object({
+      orgId: id('org'),
+      applicationId: id('opa'),
+      environmentId: id('ope'),
+      ruleId: z.string().regex(/^opr_[a-f0-9]{24}$/),
+    })
+    .strict();
+  app.get(path + '/rules', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    return toWire(
+      await c.operationsAutomation.list(principalOf(req), safeParse(scopeParams, req.params)),
+    );
+  });
+  app.post(path + '/rules', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    const b = safeParse(
+      z
+        .object({
+          component_id: id('opm'),
+          kind: z.enum(['event_count', 'heartbeat']),
+          event_type: z.enum(ALERT_EVENTS).nullable(),
+          threshold: z.number().int().min(1).max(1000),
+          window_seconds: z.number().int().min(60).max(3600),
+          severity: z.enum(['informational', 'warning', 'critical']),
+          runbook: z.enum(RUNBOOKS),
+          reason: z.literal('initial_setup'),
+        })
+        .strict(),
+      req.body,
+    );
+    return reply.code(201).send(
+      toWire(
+        await c.operationsAutomation.create(principalOf(req), safeParse(scopeParams, req.params), {
+          componentId: b.component_id,
+          kind: b.kind,
+          eventType: b.event_type,
+          threshold: b.threshold,
+          windowSeconds: b.window_seconds,
+          severity: b.severity,
+          runbook: b.runbook,
+          reason: b.reason,
+        }),
+      ),
+    );
+  });
+  app.patch(path + '/rules/:ruleId', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    const { ruleId, ...scope } = safeParse(params, req.params);
+    const b = safeParse(
+      z
+        .object({
+          expected_version: version,
+          enabled: z.boolean(),
+          maintenance_until: z.string().datetime().nullable(),
+          reason: z.enum(['maintenance', 'security_response']),
+        })
+        .strict(),
+      req.body,
+    );
+    return toWire(
+      await c.operationsAutomation.configure(principalOf(req), scope, ruleId, {
+        expectedVersion: b.expected_version,
+        enabled: b.enabled,
+        maintenanceUntil: b.maintenance_until ? new Date(b.maintenance_until) : null,
+        reason: b.reason,
+      }),
+    );
+  });
+  app.post(path + '/rules/evaluate', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    safeParse(z.object({}).strict(), req.body);
+    return toWire(
+      await c.operationsAutomation.evaluateNow(
+        principalOf(req),
+        safeParse(scopeParams, req.params),
+      ),
+    );
+  });
+  app.get(path + '/notifications', pre, async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    safeParse(z.object({}).strict(), req.query);
+    return toWire(
+      await c.operationsAutomation.notifications(
+        principalOf(req),
+        safeParse(scopeParams, req.params),
+      ),
+    );
+  });
 }

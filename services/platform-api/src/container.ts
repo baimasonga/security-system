@@ -1,4 +1,9 @@
-import { HealthService, IncidentService, type InventoryAuthority } from '@trust/operations';
+import {
+  AutomationService,
+  HealthService,
+  IncidentService,
+  type InventoryAuthority,
+} from '@trust/operations';
 import { persistenceReadiness } from './readiness.ts';
 import {
   InventoryService,
@@ -98,6 +103,7 @@ export interface Container {
   operationsEvents: EventService;
   operationsHealth: HealthService;
   operationsIncidents: IncidentService;
+  operationsAutomation: AutomationService;
   readiness(): Promise<boolean>;
   licensing: LicensingService;
   billing: BillingService | undefined;
@@ -514,6 +520,12 @@ export async function createContainer(
     store: operationsStore,
     clock,
   });
+  const operationsAutomation = new AutomationService({
+    store: operationsStore,
+    clock,
+    enabled: () => config.operationsAutomationEnabled,
+    authority: operationsAuthority,
+  });
   const operationsIncidents = new IncidentService({
     store: operationsStore,
     clock,
@@ -594,6 +606,7 @@ export async function createContainer(
     operationsEvents,
     operationsHealth,
     operationsIncidents,
+    operationsAutomation,
     readiness,
     licensing,
     billing,

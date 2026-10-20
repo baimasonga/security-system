@@ -408,6 +408,12 @@ export async function operationsView(ui) {
       button('Refresh', refresh(reload)),
       await healthPanel(path),
       await incidentsPanel(path, components, writable, reload),
+      await automationPanel(
+        path,
+        components,
+        writable && ['owner', 'admin'].includes(ui.role),
+        reload,
+      ),
       panel(
         node('h2', 'Components'),
         rows.length ? table(['Component', 'Kind', 'State', ''], rows) : empty('No components yet.'),
@@ -443,12 +449,172 @@ export async function operationsView(ui) {
       ),
     ];
   }
+  async function automationPanel(path, components, writable, reload) {
+    const card = panel(node('h2', 'Automatic alerts'));
+    let rules, notifications;
+    try {
+      rules = (await ui.api(`${path}/rules`)).items;
+      notifications = (await ui.api(`${path}/notifications`)).items;
+    } catch (e) {
+      card.append(
+        node(
+          'p',
+          e.status === 404
+            ? 'Automatic alerts are not enabled in this workspace.'
+            : 'Automatic alert state could not be loaded.',
+        ),
+      );
+      return card;
+    }
+    card.append(
+      node(
+        'p',
+        'Rules evaluate committed backend observations. Recovery requires fresh healthy evidence. Notifications appear here for the person who created the rule.',
+      ),
+    );
+    card.append(
+      rules.length
+        ? table(
+            ['Component', 'Rule', 'Observation', 'Maintenance', 'Actions'],
+            rules.map((r) => [
+              components.find((c) => c.id === r.component_id)?.code || r.component_id,
+              `${r.kind === 'heartbeat' ? 'Heartbeat' : r.event_type} · ${r.threshold} / ${r.window_seconds}s · ${r.severity}`,
+              `${r.enabled ? r.observation : 'Disabled'}${r.kind === 'event_count' ? ` (${r.observed_count})` : ''}`,
+              when(r.maintenance_until),
+              writable
+                ? (() => {
+                    const actions = node('div', undefined, 'actions');
+                    const change = async (enabled, until) => {
+                      const n = generation;
+                      await ui.api(`${path}/rules/${enc(r.id)}`, 'PATCH', {
+                        expected_version: r.version,
+                        enabled,
+                        maintenance_until: until,
+                        reason: 'maintenance',
+                      });
+                      if (current(n)) await show(reload);
+                    };
+                    actions.append(
+                      button(r.enabled ? 'Disable rule' : 'Enable rule', () =>
+                        change(
+                          !r.enabled,
+                          r.maintenance_until && new Date(r.maintenance_until) > new Date()
+                            ? r.maintenance_until
+                            : null,
+                        ),
+                      ),
+                      button(
+                        r.maintenance_until && new Date(r.maintenance_until) > new Date()
+                          ? 'End maintenance'
+                          : 'Mute for 1 hour',
+                        () =>
+                          change(
+                            r.enabled,
+                            r.maintenance_until && new Date(r.maintenance_until) > new Date()
+                              ? null
+                              : new Date(Date.now() + 3600000).toISOString(),
+                          ),
+                      ),
+                    );
+                    return actions;
+                  })()
+                : 'Read only',
+            ]),
+          )
+        : empty('No automatic rules configured.'),
+    );
+    if (writable) {
+      card.append(
+        button('Evaluate rules now', async () => {
+          const n = generation;
+          await ui.api(`${path}/rules/evaluate`, 'POST', {});
+          if (current(n)) await show(reload);
+        }),
+      );
+      const setup = node('details', undefined, 'compact-disclosure');
+      setup.append(node('summary', 'Create an automatic rule'));
+      setup.append(
+        form(
+          [
+            {
+              name: 'component_id',
+              label: 'Alert component',
+              options: components.filter((c) => c.state === 'active').map((c) => [c.id, c.code]),
+            },
+            { name: 'kind', label: 'Condition', options: choices(['heartbeat', 'event_count']) },
+            {
+              name: 'event_type',
+              label: 'Failure event (event count only)',
+              options: choices([
+                'conversion.failed',
+                'upload.failed',
+                'scanner.unavailable',
+                'malware.detected',
+                'email.delivery_failed',
+              ]),
+            },
+            {
+              name: 'threshold',
+              label: 'Failure count (heartbeat: 1)',
+              type: 'number',
+              value: '1',
+            },
+            {
+              name: 'window_seconds',
+              label: 'Evaluation window in seconds (60–3600)',
+              type: 'number',
+              value: '60',
+            },
+            {
+              name: 'severity',
+              label: 'Alert severity',
+              options: choices(['informational', 'warning', 'critical']),
+            },
+            {
+              name: 'runbook',
+              label: 'Response guide',
+              options: choices([
+                'investigate_component',
+                'check_scanner',
+                'check_converter',
+                'check_storage',
+                'check_email',
+              ]),
+            },
+          ],
+          'Create rule',
+          async (data, n) => {
+            data.event_type = data.kind === 'heartbeat' ? null : data.event_type;
+            await ui.api(`${path}/rules`, 'POST', { ...data, reason: 'initial_setup' });
+            if (current(n)) await show(reload);
+          },
+        ),
+      );
+      card.append(setup);
+    }
+    card.append(
+      node('h3', 'Your portal notifications'),
+      notifications.length
+        ? table(
+            ['Incident', 'Transition', 'Delivery', 'Attempts', 'Created'],
+            notifications.map((n) => [
+              n.incident_id,
+              n.transition,
+              n.state === 'delivered' ? 'Available in portal' : n.state,
+              n.attempts,
+              when(n.created_at),
+            ]),
+          )
+        : empty('No portal notifications yet.'),
+    );
+    return card;
+  }
   async function incidentsPanel(path, components, openAllowed, reload) {
     const wrap = panel(
       node('h2', 'Incidents'),
       node(
         'p',
-        'Human triage records. Opening or resolving an incident does not change reported health. Automatic alerts and external notifications are not enabled by this workflow.',
+        'Incident triage. Opening or resolving an incident does not change reported health. Automatic rule settings and portal notifications appear below.',
       ),
     );
     let page;

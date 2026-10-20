@@ -1,3 +1,4 @@
+import type { AlertRule, AlertNotification } from './automation-model.ts';
 import type { Heartbeat } from './health.ts';
 import type { Incident } from './incidents.ts';
 import type { OperationEvent } from './events-model.ts';
@@ -16,6 +17,185 @@ import type {
 } from './model.ts';
 
 class Repo extends MemoryEventRepo implements InventoryRepo {
+  rules = new Map<string, AlertRule>();
+  notifications = new Map<string, AlertNotification>();
+  async listAlertRules(scope: CredentialScope) {
+    return [...this.rules.values()]
+      .filter(
+        (r) =>
+          r.orgId === scope.orgId &&
+          r.applicationId === scope.applicationId &&
+          r.environmentId === scope.environmentId,
+      )
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((r) => structuredClone(r));
+  }
+  async findAlertRule(orgId: string, id: string) {
+    const r = this.rules.get(id);
+    return r?.orgId === orgId ? structuredClone(r) : undefined;
+  }
+  async insertAlertRule(row: AlertRule) {
+    const c = await this.find('component', row.orgId, row.componentId);
+    if (
+      !c ||
+      c.applicationId !== row.applicationId ||
+      c.environmentId !== row.environmentId ||
+      this.rules.has(row.id) ||
+      row.version !== 1
+    )
+      throw new Error('rule_invalid');
+    this.rules.set(row.id, structuredClone(row));
+  }
+  async updateAlertRule(row: AlertRule, expectedVersion: number) {
+    const old = await this.findAlertRule(row.orgId, row.id);
+    if (
+      !old ||
+      old.version !== expectedVersion ||
+      row.version !== old.version + 1 ||
+      row.updatedAt < old.updatedAt
+    )
+      throw new Error('rule_version');
+    for (const k of [
+      'orgId',
+      'applicationId',
+      'environmentId',
+      'componentId',
+      'kind',
+      'eventType',
+      'threshold',
+      'windowSeconds',
+      'severity',
+      'runbook',
+      'createdByUserId',
+    ] as const)
+      if (row[k] !== old[k]) throw new Error('rule_immutable');
+    if (
+      +row.createdAt !== +old.createdAt ||
+      (old.evaluatedAt && (!row.evaluatedAt || row.evaluatedAt < old.evaluatedAt))
+    )
+      throw new Error('rule_immutable');
+    this.rules.set(row.id, structuredClone(row));
+  }
+  async automationScopes(now: Date, limit: number) {
+    const rows = new Map<string, { scope: CredentialScope; time: number }>();
+    const add = (r: CredentialScope, time: number) => {
+      const key = JSON.stringify([r.orgId, r.applicationId, r.environmentId]);
+      const old = rows.get(key);
+      if (!old || time < old.time)
+        rows.set(key, {
+          scope: { orgId: r.orgId, applicationId: r.applicationId, environmentId: r.environmentId },
+          time,
+        });
+    };
+    for (const r of this.rules.values()) add(r, +(r.evaluatedAt ?? new Date(0)));
+    for (const n of this.notifications.values())
+      if (
+        (n.state === 'pending' && n.availableAt <= now) ||
+        (n.state === 'claimed' && n.leaseUntil! <= now) ||
+        n.expiresAt <= now
+      )
+        add(n, +n.availableAt);
+    for (const r of this.incidents.values())
+      if (r.state === 'resolved' && r.resolvedAt && +r.resolvedAt <= +now - 365 * 86400000)
+        add(r, +r.resolvedAt);
+    return [...rows.values()]
+      .sort((a, b) => a.time - b.time)
+      .slice(0, limit)
+      .map((r) => r.scope);
+  }
+  async countAlertEvents(
+    scope: CredentialScope,
+    componentId: string,
+    type: string,
+    from: Date,
+    to: Date,
+    cap: number,
+  ) {
+    return Math.min(
+      cap,
+      [...this.events.values()].filter(
+        (r) =>
+          r.orgId === scope.orgId &&
+          r.applicationId === scope.applicationId &&
+          r.environmentId === scope.environmentId &&
+          r.componentId === componentId &&
+          r.type === type &&
+          r.receivedAt > from &&
+          r.receivedAt <= to &&
+          r.expiresAt > to,
+      ).length,
+    );
+  }
+  async listAlertNotifications(scope: CredentialScope, recipientUserId?: string) {
+    return [...this.notifications.values()]
+      .filter(
+        (r) =>
+          r.orgId === scope.orgId &&
+          r.applicationId === scope.applicationId &&
+          r.environmentId === scope.environmentId &&
+          (!recipientUserId || r.recipientUserId === recipientUserId),
+      )
+      .sort((a, b) => +a.createdAt - +b.createdAt || a.id.localeCompare(b.id))
+      .slice(0, 2000)
+      .map((r) => structuredClone(r));
+  }
+  async findAlertNotification(orgId: string, id: string) {
+    const r = this.notifications.get(id);
+    return r?.orgId === orgId ? structuredClone(r) : undefined;
+  }
+  async insertAlertNotification(row: AlertNotification) {
+    const incident = await this.findIncident(row.orgId, row.incidentId);
+    if (
+      !incident ||
+      incident.applicationId !== row.applicationId ||
+      incident.environmentId !== row.environmentId ||
+      this.notifications.has(row.id) ||
+      [...this.notifications.values()].some(
+        (r) =>
+          r.incidentId === row.incidentId &&
+          r.transition === row.transition &&
+          r.recipientUserId === row.recipientUserId,
+      )
+    )
+      throw new Error('notification_invalid');
+    this.notifications.set(row.id, structuredClone(row));
+  }
+  async updateAlertNotification(row: AlertNotification) {
+    const old = await this.findAlertNotification(row.orgId, row.id);
+    if (!old || ['delivered', 'failed'].includes(old.state) || row.attempts < old.attempts)
+      throw new Error('notification_invalid');
+    for (const k of [
+      'incidentId',
+      'recipientUserId',
+      'transition',
+      'applicationId',
+      'environmentId',
+    ] as const)
+      if (row[k] !== old[k]) throw new Error('notification_immutable');
+    this.notifications.set(row.id, structuredClone(row));
+  }
+  async pruneAutomation(orgId: string, now: Date, limit: number) {
+    let notifications = 0,
+      incidents = 0;
+    for (const r of this.notifications.values())
+      if (notifications < limit && r.orgId === orgId && r.expiresAt <= now) {
+        this.notifications.delete(r.id);
+        notifications++;
+      }
+    for (const r of this.incidents.values())
+      if (
+        incidents < limit &&
+        r.orgId === orgId &&
+        r.resolvedAt &&
+        +r.resolvedAt <= +now - 365 * 86400000 &&
+        ![...this.notifications.values()].some((n) => n.incidentId === r.id)
+      ) {
+        this.incidents.delete(r.id);
+
+        incidents++;
+      }
+    return { notifications, incidents };
+  }
   incidents = new Map<string, Incident>();
   async findIncident(orgId: string, id: string) {
     const row = this.incidents.get(id);
@@ -47,9 +227,24 @@ class Repo extends MemoryEventRepo implements InventoryRepo {
       row.resolvedAt
     )
       throw new Error('incident_invalid');
+    if (row.source === 'automatic_rule') {
+      const rule = await this.findAlertRule(row.orgId, row.ruleId ?? '');
+      if (
+        !rule ||
+        rule.componentId !== row.componentId ||
+        rule.applicationId !== row.applicationId ||
+        rule.environmentId !== row.environmentId
+      )
+        throw new Error('incident_rule_parent');
+    } else if (row.source !== 'manual_triage' || row.ruleId) throw new Error('incident_source');
     if (
       [...this.incidents.values()].some(
-        (r) => r.orgId === row.orgId && r.componentId === row.componentId && r.state !== 'resolved',
+        (r) =>
+          r.orgId === row.orgId &&
+          r.componentId === row.componentId &&
+          r.source === row.source &&
+          r.ruleId === row.ruleId &&
+          r.state !== 'resolved',
       )
     )
       throw new Error('incident_conflict');
@@ -76,6 +271,7 @@ class Repo extends MemoryEventRepo implements InventoryRepo {
       'environmentId',
       'componentId',
       'source',
+      'ruleId',
       'severity',
       'createdByUserId',
       'createdAt',
@@ -235,6 +431,8 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       repo.heartbeats = structuredClone(this.heartbeats);
       repo.healthClocks = structuredClone(this.healthClocks);
       repo.incidents = structuredClone(this.incidents);
+      repo.rules = structuredClone(this.rules);
+      repo.notifications = structuredClone(this.notifications);
       const buffer = new AuditBuffer();
       const out = await fn(Object.assign(repo, { audit: buffer }));
       const events = buffer.drain();
@@ -248,6 +446,8 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       this.heartbeats = repo.heartbeats;
       this.healthClocks = repo.healthClocks;
       this.incidents = repo.incidents;
+      this.rules = repo.rules;
+      this.notifications = repo.notifications;
       return out;
     };
     const result = this.#tail.then(run, run);

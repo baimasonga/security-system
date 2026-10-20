@@ -1,3 +1,4 @@
+import { startOperationsWorker } from './operations-worker.ts';
 import { startIdentityMailWorker } from './identity-mail-worker.ts';
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
@@ -54,6 +55,12 @@ const maintenance = startMaintenance(container, {
     ),
 });
 app.addHook('onClose', async () => maintenance.stop());
+if (config.operationsAutomationEnabled) {
+  const operationsWorker = startOperationsWorker(container, {
+    onError: () => app.log.error('operations worker failed; durable work remains pending'),
+  });
+  app.addHook('onClose', () => operationsWorker.stop());
+}
 if (config.identityMailEncryptionKey) {
   const mail = startIdentityMailWorker(container, {
     onError: () => app.log.error('identity mail worker failed; pending work remains queued'),

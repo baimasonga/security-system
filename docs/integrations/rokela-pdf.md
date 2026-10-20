@@ -1,6 +1,6 @@
 # Rokela PDF — second application integration brief
 
-Status: **planned, not connected by this document**. Depends on OPS-004/006; tracked
+Status: **source adapter implemented and locally accepted; production not connected**. Depends on OPS-004/006; tracked
 as OPS-007 in [the program](../programs/operations-security.md).
 
 ## Inventory and scope
@@ -59,3 +59,18 @@ The accepted version-1 envelope contains schema, UUIDv4 event ID, component ID, 
    retention, rollback and independent monitoring of Warrior before production.
 5. Record actual staging/production observations in the status file. Do not send
    real alerts or change production configuration just to satisfy a local test.
+
+## Implemented source adapter and isolated acceptance
+
+The `baimasonga/rokelapdf-online` source adds server-only conversion/scanner
+observations and a bounded PostgreSQL outbox, fixed to Warrior's collector origin.
+It preserves Supabase identity and the one shared workspace subscription. See that
+repository's `docs/warrior-monitoring.md` for exact configuration, event privacy,
+fencing/retry budgets, operator backlog UI and rollback.
+
+Its optional cross-repository test provisions synthetic local MFA/credentials and
+drives actual conversion failure → collector outage/restart → durable receipt →
+concurrent automatic incident deduplication → fresh conversion recovery → resolved
+incident/portal notifications. Private test schemas and fake transport/providers are
+used. This is not live staging or production acceptance. A fresh-MFA issued scoped
+credential and access to the actual PDF deployment are still required for rollout.

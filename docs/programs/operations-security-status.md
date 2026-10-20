@@ -16,18 +16,18 @@ Dashboard deployment `3d2dd35a-cff8-4b24-8762-a72e7a554a3b` reached SUCCESS.
 Credential verification remains a guarded transaction primitive, not a collector.
 OPS-004 durable ingestion is now implemented behind `OPERATIONS_INGESTION_ENABLED`
 (default false); verification is recorded below. Health/history reads are now implemented behind default-off `OPERATIONS_HEALTH_ENABLED`.
-Manual incident triage is implemented in the OPS-006 first slice below; automatic alerts and a live Rokela PDF monitoring integration remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
+Manual triage is production accepted. Automatic rules/portal notifications and the Rokela PDF source adapter are now locally verified in the slices below; their production rollout/live source binding remain pending. Ingestion was enabled in production on 20 October; authenticated source acceptance remains pending.
 
-| Task    | State                                         | Verification/evidence                                                                                                                          |
-| ------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| OPS-001 | Contract complete; local verification         | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
-| OPS-002 | Production API/dashboard enabled              | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
-| OPS-003 | Production API/dashboard enabled              | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
-| OPS-004 | Production enabled; source acceptance pending | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
-| OPS-005 | Production enabled; source acceptance pending | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
-| OPS-006 | Manual triage production accepted; partial    | Audited open/assign/acknowledge/resolve and dashboard controls; rules/outbox remain pending.                                                   |
-| OPS-007 | Not started; depends on OPS-004/006           | Rokela PDF brief aligned with accepted event contract; no live connection.                                                                     |
-| OPS-008 | Not started; depends on OPS-006               | Existing recovery runbook is not restore evidence.                                                                                             |
+| Task    | State                                          | Verification/evidence                                                                                                                          |
+| ------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| OPS-001 | Contract complete; local verification          | Accepted ADR-029/threat model, normative contract, separate planned OpenAPI, safe examples and 25 schema checks. Publication evidence below.   |
+| OPS-002 | Production API/dashboard enabled               | Inventory API, store contracts, PostgreSQL migration/grants, safe errors, atomic audit and opt-in rollout.                                     |
+| OPS-003 | Production API/dashboard enabled               | Scoped secrets, fresh MFA, rotation/revoke, guarded transaction verification and digest-only storage.                                          |
+| OPS-004 | Production enabled; source acceptance pending  | Strict committed ingestion, scoped deduplication, quotas, aggregates and bounded retention; evidence below.                                    |
+| OPS-005 | Production enabled; source acceptance pending  | Ordered heartbeat state, dependency health, scoped hourly history, persistence readiness and dashboard panels; network probes remain disabled. |
+| OPS-006 | Automation locally verified; rollout pending   | Audited manual/automatic incidents, typed rules, maintenance and fenced portal notifications; local acceptance below.                          |
+| OPS-007 | Adapter locally verified; live binding pending | Private source outbox and real local failure/recovery acceptance; no production source connection.                                             |
+| OPS-008 | Not started; depends on OPS-006                | Existing recovery runbook is not restore evidence.                                                                                             |
 
 ## Initial backend enablement — 19 October 2026 (historical)
 
@@ -910,3 +910,71 @@ both passed, including PostgreSQL, browser and Windows checks.
   lease refresh in addition to activation/offline/deactivation. This does not
   establish physical Windows installation, update signing or desktop business
   posting acceptance, and does not verify Rokela PDF's independent production stack.
+
+### Automatic rule / portal notification implementation in progress — 20 October
+
+- Uncommitted source adds opt-in `OPERATIONS_AUTOMATION_ENABLED`, typed immutable
+  event-count/heartbeat rules, audited enable/disable and seven-day-bounded
+  maintenance, receipt-time evaluation, durable automatic incident correlation and
+  fresh-evidence recovery. Manual incidents remain independent. Dashboard controls
+  create/evaluate/disable/mute rules and show the creator's portal delivery state.
+- Migration 0023 adds rules, fenced notification intents and scoped automatic active
+  keys. Incident DELETE is now explicitly granted for retention but a database
+  trigger rejects every active/recent incident deletion; resolved records require
+  365 days. Notification identity and terminal delivery states are immutable, and
+  retention is separately bounded. No external recipients/provider credentials are
+  configured; the first delivery channel is the creator's authenticated portal.
+- Local evidence so far: **884 source tests, 3 skipped**; **14 Chromium workflows**;
+  **30 targeted PG owner/app-role checks**, plus **2** real PG automatic lifecycle
+  checks; **16 security mutations killed**. Real HTTP/fsync-on contention with pool
+  two produced exactly one incident from 20 evaluations, one initial intent and one
+  delivery attempt from 20 workers, then fresh recovery and a second intent; audit
+  verified, **1827 ms** (correctness evidence, not capacity).
+- Full PG regression was interrupted by an execution-environment transport loss.
+  Before interruption it found fixed migration lists needing the new 0023 entry
+  and one tenant-isolation case exceeding its 20-second budget. Migration lists
+  are corrected; the legacy audit upgrade rerun passed. Remaining reruns must
+  finish before push/deployment. Do not describe this broad regression as passed.
+- Rokela PDF source in `/workspace/rokelapdf-online` now has an uncommitted, opt-in,
+  private PostgreSQL event outbox and fixed-destination server adapter. A real
+  conversion failure was preserved through collector outage/restart, ingested by
+  local PG-backed Warrior with a normally issued fresh-MFA scoped credential,
+  deduplicated to one incident and resolved after fresh successful conversions;
+  two portal notifications and the audit chain verified. This was an isolated
+  local test, **not** a production PDF connection. Source authentication and its
+  single workspace subscription are unchanged. No real email, provider alert,
+  payment, private document or production integration secret was used.
+- Remaining rollout gates: finish source/PG/mutation regressions and source build,
+  record commits, deploy Warrior migration/flag with synthetic acceptance, then
+  obtain a real environment-scoped credential through the existing fresh-MFA
+  portal and configure the actual PDF service securely. OPS-008 independent
+  monitoring/restore evidence and physical Windows release acceptance remain
+  separate; none is established by a local pass.
+
+- Final targeted evidence: **15** portal workflows now pass, including suppression
+  of a late rule creation response after leaving Applications. **16** Warrior and
+  **7** PDF adapter security mutations were killed. Mutation checks initially found
+  redundant-only coverage for the event-count lower bound and the ACK byte budget;
+  independent valid-predicate/valid-oversized-ACK tests were added before rerunning.
+- The PDF production build succeeded. Its source check passed **211 tests, 2 skipped**
+  before the final two queue/fence tests; the final source rerun is pending. Eight
+  focused adapter tests pass under its least-privilege role. The real cross-repository
+  failure/recovery test passed in **4.65 seconds**. This test is explicitly skipped
+  without a supplied Warrior checkout; its standalone pass is recorded separately.
+- Source full PG checks are being rerun after environment interruptions/time-budget
+  failures; no claim of a clean full run or production rollout is made yet. The
+  final complete PG invocation uses a 60-second per-test budget, preserving all
+  behavioral assertions. The two explicit migration-list corrections and the
+  isolated tenant-isolation rerun passed **28 checks**; legacy audit upgrade passed.
+
+- Final source checks passed: Warrior **884 passed, 3 skipped**; PDF **212 passed,
+  2 skipped**, plus its full least-privilege suite with the same totals. PDF's
+  production-build Chromium release workflow passed. PDF adapter source commit:
+  `d6e367b` on `claude/zealous-newton-a8gzpy`. Production binding remains pending.
+- User identified the public PDF target as
+  `https://rokelapdf-online-production.up.railway.app`. The managed environment's
+  network allowlist draft adds only that hostname and requires publishing before
+  live HTTP verification. Existing Railway access is still scoped to Warrior's
+  project; hostname knowledge does not grant PDF deployment configuration access.
+- Rollout/rollback instructions are in
+  [operations-automation.md](../deploy/operations-automation.md).

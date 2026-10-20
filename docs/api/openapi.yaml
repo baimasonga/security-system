@@ -3764,6 +3764,210 @@ paths:
                 properties:
                   status:
                     const: unavailable
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/rules:
+    get:
+      operationId: listOperationsAlertRules
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - &id001
+          name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^org_[a-f0-9]{24}$
+        - &id002
+          name: applicationId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^opa_[a-f0-9]{24}$
+        - &id003
+          name: environmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^ope_[a-f0-9]{24}$
+      responses:
+        '200':
+          description: Scoped operations automation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsAlertRuleList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+    post:
+      operationId: createOperationsAlertRule
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *id001
+        - *id002
+        - *id003
+      responses:
+        '201':
+          description: Scoped operations automation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsAlertRule'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsAlertRuleCreate'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/rules/{ruleId}:
+    patch:
+      operationId: configureOperationsAlertRule
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *id001
+        - *id002
+        - *id003
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^opr_[a-f0-9]{24}$
+      responses:
+        '200':
+          description: Scoped operations automation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsAlertRule'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsAlertRuleConfigure'
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/rules/evaluate:
+    post:
+      operationId: evaluateOperationsAlertRules
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *id001
+        - *id002
+        - *id003
+      responses:
+        '200':
+          description: Scoped operations automation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsAlertRuleList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties: {}
+              required: []
+  /v1/organizations/{orgId}/operations/applications/{applicationId}/environments/{environmentId}/notifications:
+    get:
+      operationId: listOperationsPortalNotifications
+      tags:
+        - Operations
+      security:
+        - bearer: []
+      parameters:
+        - *id001
+        - *id002
+        - *id003
+      responses:
+        '200':
+          description: Scoped operations automation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsPortalNotificationList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
 components:
   securitySchemes:
     IntegrationBearer:
@@ -4472,6 +4676,9 @@ components:
         - acknowledged_at
         - resolved_at
       properties:
+        rule_id:
+          type: string
+          pattern: ^opr_[a-f0-9]{24}$
         id:
           type: string
           pattern: ^opi_[a-f0-9]{24}$
@@ -4484,6 +4691,7 @@ components:
           type: string
           enum:
             - manual_triage
+            - automatic_rule
         severity: &a3
           type: string
           enum:
@@ -5951,3 +6159,214 @@ components:
                 minimum: 1
               source:
                 const: backend_report
+
+    OperationsAlertRule:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        application_id:
+          type: string
+        environment_id:
+          type: string
+        component_id: &id002
+          type: string
+        created_by_user_id:
+          type: string
+        kind: &id003
+          enum:
+            - event_count
+            - heartbeat
+        event_type: &id004
+          type:
+            - string
+            - 'null'
+          enum:
+            - upload.failed
+            - conversion.failed
+            - scanner.unavailable
+            - malware.detected
+            - email.delivery_failed
+            - null
+        threshold: &id005
+          type: integer
+          minimum: 1
+          maximum: 1000
+        window_seconds: &id006
+          type: integer
+          minimum: 60
+          maximum: 3600
+        severity: &id007
+          enum:
+            - informational
+            - warning
+            - critical
+        runbook: &id008
+          enum:
+            - investigate_component
+            - check_scanner
+            - check_converter
+            - check_storage
+            - check_email
+        enabled:
+          type: boolean
+        maintenance_until: &id001
+          type:
+            - string
+            - 'null'
+          format: date-time
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        evaluated_at: *id001
+        bad_since: *id001
+        recovery_since: *id001
+        incident_id:
+          type:
+            - string
+            - 'null'
+        observation:
+          enum:
+            - unknown
+            - healthy
+            - breaching
+            - inactive
+        observed_count:
+          type: integer
+          minimum: 0
+          maximum: 1000
+      required:
+        - id
+        - org_id
+        - application_id
+        - environment_id
+        - component_id
+        - created_by_user_id
+        - kind
+        - event_type
+        - threshold
+        - window_seconds
+        - severity
+        - runbook
+        - enabled
+        - maintenance_until
+        - version
+        - created_at
+        - updated_at
+        - evaluated_at
+        - bad_since
+        - recovery_since
+        - incident_id
+        - observation
+        - observed_count
+    OperationsAlertRuleCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        component_id: *id002
+        kind: *id003
+        event_type: *id004
+        threshold: *id005
+        window_seconds: *id006
+        severity: *id007
+        runbook: *id008
+        reason:
+          const: initial_setup
+      required:
+        - component_id
+        - kind
+        - event_type
+        - threshold
+        - window_seconds
+        - severity
+        - runbook
+        - reason
+    OperationsAlertRuleConfigure:
+      type: object
+      additionalProperties: false
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        enabled:
+          type: boolean
+        maintenance_until: *id001
+        reason:
+          enum:
+            - maintenance
+            - security_response
+      required:
+        - expected_version
+        - enabled
+        - maintenance_until
+        - reason
+    OperationsAlertRuleList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/OperationsAlertRule'
+      required:
+        - items
+    OperationsPortalNotification:
+      type: object
+      additionalProperties: false
+      properties:
+        id: &id009
+          type: string
+        incident_id: *id009
+        transition:
+          enum:
+            - opened
+            - resolved
+        state:
+          enum:
+            - pending
+            - claimed
+            - delivered
+            - failed
+        attempts:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        created_at:
+          type: string
+          format: date-time
+        deadline:
+          type: string
+          format: date-time
+        delivered_at: *id001
+      required:
+        - id
+        - incident_id
+        - transition
+        - state
+        - attempts
+        - created_at
+        - deadline
+        - delivered_at
+    OperationsPortalNotificationList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 2000
+          items:
+            $ref: '#/components/schemas/OperationsPortalNotification'
+      required:
+        - items

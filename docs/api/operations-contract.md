@@ -314,3 +314,36 @@ recipients or notification secrets in this slice. Display component codes, sourc
 severity, state, assignee and timestamps. Automatic typed rules, maintenance
 suppression, fenced notification delivery and 365-day incident pruning remain
 OPS-006 follow-up work; this slice must not be described as completed alerting.
+
+## Automatic rules and portal notifications (OPS-006 implementation)
+
+Opt-in automation requires inventory, ingestion, health and incidents enabled.
+Rules are immutable typed predicates (`event_count` or `heartbeat`) with a component,
+allow-listed failure event, threshold 1–1000, receipt window 60–3600 seconds,
+severity and enumerated runbook. Owners/admins manage them through incident
+permission; reads require existing `ops:read` permission (owners/admins). Ordinary
+members remain denied. Configuration carries optimistic versions and reason.
+Maintenance is a bounded future timestamp (at most seven days), suppressing new
+notification intents without altering observed health or incident transitions.
+
+Rules and runtime evaluation are persisted under the organization transaction lock.
+One active incident per rule/component; manual incidents remain independent. Event
+counts use committed server receipts after rule/resource creation and last resolved
+incident, never caller-supplied occurrence time. Heartbeat rules require an actual
+eligible observation and a full bad-state window; no observation remains unknown.
+Recovery requires a fresh healthy heartbeat after the incident and a full recovery
+window, never merely an empty event window. Frozen scopes keep observations but
+suppress configuration and responder mutations. Inactive ancestors suspend rule
+processing. The evaluator makes no network requests or licensing mutations.
+
+Portal notification destinations are fixed to the rule creator's authenticated user
+identity, rechecked for active organization membership. No email address, webhook,
+URL, arbitrary template or event-provided destination is accepted. Incident transition,
+audit and notification intent commit together. A bounded worker claims with a random
+fence and lease, sends outside the transaction through a delivery port, then checks
+the fence before acknowledging. Portal delivery exposes only safe metadata; test
+transports are fake. Retries use bounded 1–300 second backoff for at most 72 hours;
+failures remain visible. Delivery is at least once; crash-after-send can repeat a
+notification but cannot repeat the incident transition. Notification metadata expires
+after 30 days; resolved incidents are pruned only after 365 days. Audit is retained
+independently. External email/webhook transports are not configured by this slice.

@@ -1,3 +1,4 @@
+import { automationStoreContract } from '../../../packages/operations/test/automation-store-contract.ts';
 import { incidentStoreContract } from '../../../packages/operations/test/incident-store-contract.ts';
 import { healthStoreContract } from '../../../packages/operations/test/health-store-contract.ts';
 import {
@@ -80,6 +81,7 @@ async function seeded() {
 }
 eventStoreContract(seeded);
 incidentStoreContract(seeded);
+automationStoreContract(seeded);
 it('requires ancestor-consistent event provenance and prevents app-role evidence updates', async () => {
   const { pool, store, scope, componentId } = await seeded();
   const event = {
@@ -242,7 +244,7 @@ it('incident storm deduplicates, guards SQL transitions and rolls back a failed 
   if (appRoleMode()) {
     await expect(
       pool.query('DELETE FROM operations_incidents WHERE id=$1', [row.id]),
-    ).rejects.toThrow(/permission denied/);
+    ).rejects.toThrow(/retention protected/);
     await expect(pool.query('TRUNCATE operations_incidents')).rejects.toThrow(/permission denied/);
   }
   const failing = {
@@ -284,5 +286,109 @@ it('incident storm deduplicates, guards SQL transitions and rolls back a failed 
   expect(audits.rows.map((r) => r.action)).toEqual([
     'operations.incident.opened',
     'operations.incident.acknowledged',
+  ]);
+});
+
+it('persists automatic storm deduplication, atomic intents, recovery and fenced retry across workers', async () => {
+  const { AutomationService } = await import('@trust/operations');
+  const f = await seeded();
+  let now = +clock.now();
+  const rule = {
+    ...f.scope,
+    id: 'opr_' + 'a'.repeat(24),
+    componentId: f.componentId,
+    kind: 'heartbeat' as const,
+    eventType: null,
+    threshold: 1,
+    windowSeconds: 60,
+    severity: 'warning' as const,
+    runbook: 'check_scanner' as const,
+    enabled: true,
+    maintenanceUntil: null,
+    createdByUserId: 'usr_' + 'a'.repeat(24),
+    version: 1,
+    createdAt: new Date(now),
+    updatedAt: new Date(now),
+    evaluatedAt: null,
+    badSince: null,
+    recoverySince: null,
+    incidentId: null,
+    observation: 'unknown' as const,
+    observedCount: 0,
+  };
+  await f.store.transaction(f.scope.orgId, (tx) => tx.insertAlertRule(rule));
+  const authority = {
+    authorize: async () => {},
+    assertWritable: async () => {},
+    activeMember: async () => true,
+    activeProduct: async () => true,
+    sessionActive: async () => true,
+  };
+  let attempts = 0;
+  const service = new AutomationService({
+    store: f.store,
+    clock: { now: () => new Date(now) },
+    enabled: () => true,
+    authority,
+    deliver: async () => {
+      attempts++;
+      if (attempts === 1) throw new Error('synthetic provider failure');
+    },
+  });
+  const report = async (status: 'healthy' | 'unavailable') =>
+    f.store.transaction(f.scope.orgId, (tx) =>
+      tx.recordHeartbeat({
+        ...f.scope,
+        componentId: f.componentId,
+        status,
+        occurredAt: new Date(now),
+        receivedAt: new Date(now),
+        expiresAt: new Date(now + 86400000),
+      }),
+    );
+  await report('unavailable');
+  await service.evaluate(f.scope);
+  now += 60000;
+  await Promise.all(Array.from({ length: 20 }, () => service.evaluate(f.scope)));
+  const incidents = await f.store.listIncidents(f.scope, { limit: 100 });
+  expect(incidents).toHaveLength(1);
+  expect(incidents[0]?.ruleId).toBe(rule.id);
+  expect(await f.store.listAlertNotifications(f.scope)).toHaveLength(1);
+  await service.deliverPending(f.scope);
+  expect((await f.store.listAlertNotifications(f.scope))[0]?.state).toBe('pending');
+  now += 300000;
+  await Promise.all([service.deliverPending(f.scope), service.deliverPending(f.scope)]);
+  expect(attempts).toBe(2);
+  expect((await f.store.listAlertNotifications(f.scope))[0]?.state).toBe('delivered');
+  await report('healthy');
+  await service.evaluate(f.scope);
+  now += 60000;
+  await report('healthy');
+  await service.evaluate(f.scope);
+  expect((await f.store.findIncident(f.scope.orgId, incidents[0]!.id))?.state).toBe('resolved');
+  expect(await f.store.listAlertNotifications(f.scope)).toHaveLength(2);
+  await expect(
+    f.pool.query('UPDATE operations_alert_rules SET threshold=2,version=version+1 WHERE id=$1', [
+      rule.id,
+    ]),
+  ).rejects.toThrow();
+  await expect(
+    f.pool.query('DELETE FROM operations_incidents WHERE id=$1', [incidents[0]!.id]),
+  ).rejects.toThrow(/retention protected/);
+  const note = (await f.store.listAlertNotifications(f.scope))[0]!;
+  await expect(
+    f.pool.query(
+      "UPDATE operations_alert_notifications SET state='pending',delivered_at=NULL WHERE id=$1",
+      [note.id],
+    ),
+  ).rejects.toThrow();
+  const audit = (
+    await f.pool.query(
+      "SELECT action FROM audit_events WHERE action LIKE 'operations.incident.%' ORDER BY seq",
+    )
+  ).rows;
+  expect(audit.map((r) => r.action)).toEqual([
+    'operations.incident.opened',
+    'operations.incident.resolved',
   ]);
 });

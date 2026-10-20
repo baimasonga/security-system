@@ -1,3 +1,4 @@
+import type { AutomationRepo } from './automation-model.ts';
 import type { EventRepo } from './events-model.ts';
 import type { IncidentRepo } from './incidents.ts';
 import type { UserPrincipal } from '@trust/shared-types';
@@ -64,7 +65,7 @@ export interface CredentialListOptions {
   activeAt?: Date;
 }
 /** All mutation work, including audit, must run inside a serialized organization transaction. */
-export interface InventoryRepo extends EventRepo, IncidentRepo {
+export interface InventoryRepo extends EventRepo, IncidentRepo, AutomationRepo {
   findCredential(id: string): Promise<CredentialRecord | undefined>;
   listCredentials(
     scope: CredentialScope,

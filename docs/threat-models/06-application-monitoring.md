@@ -103,3 +103,16 @@ collapse to one active incident. Optimistic versions prevent lost responder upda
 resolved incidents cannot reopen. Audit failures roll back state. A bounded retained
 record cap fails closed rather than dropping history. This does not establish any
 automatic rule, maintenance suppression, notification delivery or pruning control.
+
+### OPS-006 automatic evaluation and portal notification boundary
+
+Rules admit only reviewed event types, finite thresholds/windows and runbook enums.
+Counts derive from durable receipt timestamps and full scope. A stale/absent source
+cannot trigger a healthy recovery. Persist evaluation/incident correlation and use
+unique active rule keys to contain storms across workers/restarts. Maintenance
+suppresses notification creation without rewriting health. Every configuration
+mutation and incident transition is audited atomically. Portal destinations are
+fixed user IDs, never addresses supplied by evidence. Claim fences prevent a late
+worker from acknowledging a newer attempt; retry deadlines/caps bound outages.
+Tests must cover wrong scope/role, freeze, audit rollback, duplicate evaluations,
+maintenance, missing/stale recovery, retry fences and retention scope.

@@ -156,3 +156,13 @@ A partial unique index prevents multiple active manual incidents per component;
 terminal-state, immutable-scope and revision guards protect the database adapter.
 Retained records cannot be deleted by the application role. Automated alerting and
 bounded pruning require their own completed acceptance before OPS-006 is done.
+
+### OPS-006 automation and first notification channel
+
+Implement persisted, typed rule evaluation under the existing organization lock.
+Add nullable rule identity to incidents with separate manual/automatic active-key
+indexes. Rule definitions cannot execute code or contain destinations. Initial
+notifications target the rule creator's portal inbox, with active membership checked
+at delivery/read. An injectable, fenced outbox port proves outage/retry behavior
+without contacting real recipients. External provider bindings remain a separate,
+verified destination rollout, not an implicit use of identity email credentials.

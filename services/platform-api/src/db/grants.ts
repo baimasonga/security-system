@@ -16,7 +16,9 @@ const ALL: Priv[] = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 
 export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   operations_credentials: RIU,
-  operations_incidents: RIU,
+  operations_incidents: ALL, // DELETE is restricted to resolved rows older than 365 days by a DB trigger.
+  operations_alert_rules: RIU,
+  operations_alert_notifications: ALL,
   operations_heartbeats: ALL,
   operations_events: ['SELECT', 'INSERT', 'DELETE'],
   operations_event_counters: ALL,

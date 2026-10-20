@@ -30,6 +30,8 @@ async function setup() {
       operationsInventoryEnabled: true,
       operationsIncidentsEnabled: true,
       operationsHealthEnabled: true,
+      operationsIngestionEnabled: true,
+      operationsAutomationEnabled: true,
       operationsCredentialsEnabled: true,
       mfaEncryptionKey: randomBytes(32).toString('hex'),
       sharing: undefined,
@@ -426,4 +428,63 @@ it('does not reopen an incident workspace when a late mutation response arrives 
   await page.waitForLoadState('networkidle');
   expect(await page.getByRole('heading', { name: 'Licenses', exact: true }).count()).toBe(1);
   expect(await page.getByRole('heading', { name: 'Incidents', exact: true }).count()).toBe(0);
+});
+
+it('creates, evaluates, mutes and disables automatic alerts through real dashboard controls', async () => {
+  const { page } = await setup();
+  await registerApp(page, 'alert-dashboard');
+  await addEnv(page);
+  const add = section(page, 'Add component');
+  await add.getByLabel('Code (permanent)').fill('scanner');
+  await add.getByRole('button', { name: 'Add component', exact: true }).click();
+  await section(page, 'Components').getByRole('cell', { name: 'scanner', exact: true }).waitFor();
+  const alerts = section(page, 'Automatic alerts');
+  await alerts.locator('summary', { hasText: 'Create an automatic rule' }).click();
+  await alerts.getByLabel('Condition', { exact: true }).selectOption('heartbeat');
+  await alerts.getByRole('button', { name: 'Create rule', exact: true }).click();
+  await alerts.getByRole('cell', { name: 'unknown', exact: true }).waitFor();
+  await alerts.getByRole('button', { name: 'Evaluate rules now', exact: true }).click();
+  await alerts.getByRole('button', { name: 'Mute for 1 hour', exact: true }).click();
+  await alerts.getByRole('button', { name: 'End maintenance', exact: true }).waitFor();
+  await alerts.getByRole('button', { name: 'Disable rule', exact: true }).click();
+  await alerts.getByRole('button', { name: 'Enable rule', exact: true }).waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+});
+
+it('does not replace the current page after a late automatic rule creation response', async () => {
+  const { page } = await setup();
+  await registerApp(page, 'late-rule');
+  await addEnv(page);
+  const add = section(page, 'Add component');
+  await add.getByLabel('Code (permanent)').fill('scanner');
+  await add.getByRole('button', { name: 'Add component', exact: true }).click();
+  await section(page, 'Components').getByRole('cell', { name: 'scanner', exact: true }).waitFor();
+  let release!: () => void, arrived!: () => void;
+  const began = new Promise<void>((r) => {
+      arrived = r;
+    }),
+    gate = new Promise<void>((r) => {
+      release = r;
+    });
+  await page.route('**/rules', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch();
+    arrived();
+    await gate;
+    await route.fulfill({ response });
+  });
+  await section(page, 'Automatic alerts')
+    .locator('summary', { hasText: 'Create an automatic rule' })
+    .click();
+  await page.getByRole('button', { name: 'Create rule', exact: true }).click();
+  await began;
+  await page.getByRole('button', { name: 'Licenses', exact: true }).click();
+  await page.getByRole('heading', { name: 'Licenses', exact: true }).waitFor();
+  release();
+  await page.unrouteAll({ behavior: 'wait' });
+  expect(await page.getByRole('heading', { name: 'Licenses', exact: true }).isVisible()).toBe(true);
+  expect(await page.getByRole('heading', { name: 'Automatic alerts', exact: true }).count()).toBe(
+    0,
+  );
 });
