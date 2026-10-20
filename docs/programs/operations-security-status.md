@@ -985,3 +985,12 @@ both passed, including PostgreSQL, browser and Windows checks.
   predeploy CLI rerun passed (migration, grants, profile and grant repair). Existing
   owner/app-role store checks explicitly refuse active/recent incident deletion.
   This is a corrected test contract, not removal of the retention protection.
+
+- Broad PostgreSQL owner/app-role regression completed: **710 passed, 1 failed**
+  across 70 files in **1395.15 seconds**. Its only failure was the already-corrected
+  predeploy DELETE-grant expectation above; the corrected isolated test passed.
+  Thus all 711 cases have passing evidence across the broad run plus correction,
+  but the original broad invocation exited 1 and is not represented as a clean run.
+  Final `npm run check` after correction passed **884 tests, 3 skipped**. PDF's CI
+  branch-filter fix (`4a9cfb0`) now watches its actual default release branch; its
+  final source check again passed **212 tests, 2 skipped**.
