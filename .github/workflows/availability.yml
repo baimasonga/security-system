@@ -1,0 +1,30 @@
+name: Warrior external availability
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  push:
+    branches: [main, claude/sleepy-carson-l0if1k]
+    paths:
+      - tools/check-warrior-availability.mjs
+      - .github/workflows/availability.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warrior-external-availability
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: External liveness and database readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/check-warrior-availability.mjs

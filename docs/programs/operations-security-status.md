@@ -1380,3 +1380,30 @@ Response-guide publication and rollout:
   PostgreSQL, Windows, dependency/secret and CodeQL checks; PR-only dependency
   review was correctly skipped. Live PDF binding, independent monitoring/witnessing
   and production restore retain the previously documented acceptance gates.
+
+### Independent availability observer — 21 October 2026
+
+- Incident-filter source `977fe9e` completed all applicable exact-head CI and
+  CodeQL checks successfully. Railway still serves `93c15c2`; an authorized
+  source reconnect was refused with `Deploys have been paused temporarily`.
+  Do not present the published incident filters as production deployed.
+- Added a separate GitHub Actions observer for Warrior's fixed public liveness
+  and database-readiness endpoints, scheduled approximately every ten minutes
+  and manually runnable. No credentials, user destinations, redirects, provider
+  messages or production mutations are involved. Either failed endpoint fails
+  the job; results never imply connected-application health or restore evidence.
+- Response schema/size/cache validation, whole-request deadlines and safe output
+  keep this independent observer bounded. GitHub schedule delay or missing runs
+  remain explicit gaps, not healthy observations. The workflow does not ingest
+  observations or open incidents inside Warrior.
+- Local verification: full `npm run check` passed **942 tests, 3 skipped**. Ten
+  focused transport tests pass. Four deliberate mutations (HTTP status, body limit,
+  exact schema and timeout refusal) were killed by assertions; the original source
+  was restored and the focused suite passed again. Workflow YAML, read-only job
+  permissions and bounded runtime were checked. No application/API/database or
+  licensing behavior changed.
+- Next: publish and observe the first remote availability run. Local injected
+  transport tests alone are not live external acceptance.
+  Retry the tested UI deployment when Railway permits, then verify served bytes.
+  Real PDF binding, independent audit witness, production restore drills and
+  controlled notification delivery retain their separate acceptance requirements.

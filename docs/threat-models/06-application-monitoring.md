@@ -147,3 +147,15 @@ an old workspace. Refuse auth failures rather than showing cached data; render o
 read failures as unavailable. Label inventory/evidence truncation and snapshot counts.
 No absent report, successful backup or zero visible finding count implies a verified
 restore or complete security coverage. Navigation goes only to API-returned scoped IDs.
+
+## Independent availability observer
+
+A separate GitHub Actions workflow observes only the fixed public Warrior liveness
+and persistence-readiness endpoints. There is no tenant-controlled probe target,
+credential, redirect following, private-network access or infrastructure mutation.
+Ten-second deadlines and 1 KiB response bounds include body reading. Fixed safe
+results do not retain provider diagnostics. This observer does not write trusted
+health evidence or incidents into Warrior. GitHub scheduling failure remains a
+risk; missing/stale observations must not be interpreted as healthy. This limited
+observer does not activate configurable application/network probes or audit
+witnessing. See the independent availability deployment guide for rollout limits.
