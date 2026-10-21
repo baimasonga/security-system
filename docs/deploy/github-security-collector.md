@@ -58,3 +58,16 @@ presenting an incomplete report as a complete inventory.
 This local read-only integration does not provide scheduled server collection,
 independent attestation, production restore evidence or external notifications.
 It does not remove Railway's deployment gate for the existing posture UI/API.
+
+## Ongoing repository checks
+
+The repository's CI workflow runs on pushes and pull requests, on Mondays at
+03:43 UTC, and through **Actions → CI → Run workflow**. Weekly runs check the
+current default branch, including the full high-severity dependency audit and
+secret scan. GitHub may delay scheduled runs. CodeQL also has its own weekly
+schedule. A failed or cancelled run is not a clean security report.
+
+These checks do not automatically import findings into Warrior or deliver its
+notifications. Use the bounded collector and reviewed import above for posture
+evidence. A passing workflow does not prove production restore, source binding,
+or absence of vulnerabilities outside the scanners' coverage.

@@ -1323,3 +1323,34 @@ Response-guide publication and rollout:
   controlled production recovery drills and physical Windows release acceptance.
   PDF authentication-email activation has moved to the PDF chat. No external
   alert recipient, infrastructure remediation or Cloudflare failover was enabled.
+
+### Continuous verification checkpoint — 21 October 2026
+
+- Reconciled the current default branch at `93c15c2`; OPS-004–008 implementation
+  and the explicit predeploy runner already exist. Do not repeat the older
+  OPS-004 implementation instructions in historical checkpoints.
+- Exact-head CI `39518709818` and CodeQL `39518709710` completed successfully.
+  All applicable source, PostgreSQL, browser, Windows and dependency/secret jobs
+  passed; PR-only dependency review was correctly skipped. Earlier source run
+  `39518443617` was cancelled, superseded by this completed verification.
+- Current Railway inspection reports API deployment
+  `5ca309cd-e18d-4a50-a408-594249888ec9` SUCCESS with one running replica;
+  the sharing scanner is also online. No pending work, warnings, critical issues
+  or recent deployment failures were reported. This status inspection does not
+  establish a new authenticated PDF-source integration or restore exercise.
+- CI now offers manual dispatch and a weekly Monday 03:43 UTC run. The existing
+  full checks, including high-severity dependency audit and secret scanning, run
+  even without a source change; CodeQL retains its separate weekly schedule.
+  Scheduled runs use GitHub's default branch and may be delayed by GitHub. They
+  do not deploy source, ingest findings into Warrior, or send Warrior alerts.
+- Verification: workflow YAML parsed and its schedule/manual entry points and
+  unchanged security gate were checked. Full `npm run check` passed after locked
+  dependencies were installed and local test networking enabled. The initial
+  sandbox-restricted run was stopped after network-dependent tests failed; no
+  assertions were weakened. No application, database or authorization code changed.
+- Next-agent action: verify the new exact-head CI after publication. For live PDF
+  source binding, obtain PDF-project access through the secure environment field
+  and a genuine owner/admin fresh-MFA environment credential. Do not use synthetic
+  acceptance identities or bypass MFA. Independent monitoring/witness rollout,
+  controlled production restore drills and physical Windows acceptance remain
+  unverified gates. Authentication-email activation stays in the PDF chat.
