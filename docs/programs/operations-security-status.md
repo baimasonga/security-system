@@ -1407,3 +1407,17 @@ Response-guide publication and rollout:
   Retry the tested UI deployment when Railway permits, then verify served bytes.
   Real PDF binding, independent audit witness, production restore drills and
   controlled notification delivery retain their separate acceptance requirements.
+
+Observer publication and live acceptance:
+
+- Source `ed51a95da1726f7da00fdc0f48c4020043a3bcaf` was published to the default
+  branch. Independent workflow run `39576119326`, job `119141954961`, completed
+  successfully on that exact SHA. Its logs report both `liveness: passed` and
+  `readiness: passed` from the GitHub-hosted runner at 09:20 UTC on 21 October 2026.
+- This establishes one actual external observation and a configured schedule, not
+  continuous uptime, notification delivery, PDF source binding or recovery proof.
+  Full source CI/CodeQL for the new source remain separate from this observer job.
+- The observer runs without a Railway release. The incident-filter UI deployment
+  remains blocked by Railway's temporary deployment pause. Next agent: verify the
+  newest exact-head CI, retry rollout when permitted and verify served source bytes;
+  retain the healthy existing release and do not bypass provider or MFA boundaries.
