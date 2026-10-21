@@ -1302,3 +1302,24 @@ credential. Do not bypass these external-access or authorization requirements.
   scenario was introduced. Deployment acceptance remains separate from local
   browser evidence. Next: publish the verified source, deploy its exact SHA and
   check public health/readiness and exact served `operations.mjs` bytes.
+
+Response-guide publication and rollout:
+
+- Source committed/pushed as `089643dbd28a020fe466552d13aada056f7f4e77`.
+  Railway automatic deployment `352cf8dc-2aea-48a7-8d55-28686b9e5b2f` reached
+  **SUCCESS** on that exact source. A concurrent explicit request
+  `d2ef4c4a-1505-4904-9bde-8765f4e068ea` failed; it is not deployment evidence.
+  Future pushes should first check automatic deployment before issuing a duplicate.
+- Successful release logs confirm completed predeploy migrations/grants/profile
+  verification and all twelve database checks passed. Public health and readiness
+  returned HTTP 200. Served `operations.mjs` matches the source exactly, SHA-256
+  `6ccc3be4c15148f4e7727c2c515f1bbaafdee389fe7dd79dae92468b1d88a50c`.
+- Browser acceptance remains the local complete 21-workflow suite, not an
+  authenticated production browser exercise. Exact-source remote CI `39518443617`
+  and CodeQL `39518443525` were running at publication; do not call them green
+  without checking their completed outcome.
+- Next independent rollout gates remain real PDF source binding with genuine
+  scoped fresh-MFA credentials, independent monitoring/witness deployment,
+  controlled production recovery drills and physical Windows release acceptance.
+  PDF authentication-email activation has moved to the PDF chat. No external
+  alert recipient, infrastructure remediation or Cloudflare failover was enabled.
