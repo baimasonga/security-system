@@ -370,9 +370,21 @@ it('opens, assigns, acknowledges and resolves a manual incident using dashboard 
   await add.getByLabel('Code (permanent)').fill('api');
   await add.getByRole('button', { name: 'Add component', exact: true }).click();
   const incidents = section(page, 'Incidents');
-  await incidents.getByLabel('Incident severity').selectOption('warning');
+  await incidents.getByLabel('Incident severity', { exact: true }).selectOption('warning');
   await incidents.getByRole('button', { name: 'Open incident', exact: true }).click();
   await incidents.getByRole('cell', { name: 'open', exact: true }).waitFor();
+  await incidents.getByLabel('Filter incident severity').selectOption('critical');
+  await incidents.getByText('No loaded incidents match these filters.', { exact: true }).waitFor();
+  expect(
+    await incidents.getByRole('button', { name: 'Manage incident', exact: true }).count(),
+  ).toBe(0);
+  expect(await incidents.getByRole('status').textContent()).toContain('0 matching of 1 loaded');
+  await incidents.getByLabel('Filter incident state').selectOption('acknowledged');
+  await incidents.getByLabel('Filter incident severity').selectOption('warning');
+  await incidents.getByText('No loaded incidents match these filters.', { exact: true }).waitFor();
+  await incidents.getByRole('button', { name: 'Clear incident filters' }).click();
+  await incidents.getByRole('cell', { name: 'open', exact: true }).waitFor();
+  expect(await incidents.getByRole('status').textContent()).toContain('1 matching of 1 loaded');
   await incidents.getByRole('button', { name: 'Manage incident', exact: true }).click();
   let dialog = page.getByRole('dialog');
   await dialog.getByLabel('Assigned responder').selectOption({ label: 'You' });
@@ -393,6 +405,48 @@ it('opens, assigns, acknowledges and resolves a manual incident using dashboard 
   expect(
     await incidents.getByRole('button', { name: 'Manage incident', exact: true }).count(),
   ).toBe(0);
+});
+
+it('keeps pagination available when loaded incident filters match nothing', async () => {
+  const { page } = await setup();
+  await registerApp(page, 'filtered-pages');
+  await addEnv(page);
+  const add = section(page, 'Add component');
+  await add.getByLabel('Code (permanent)').fill('api');
+  await add.getByRole('button', { name: 'Add component', exact: true }).click();
+  const incidents = section(page, 'Incidents');
+  await incidents.getByRole('button', { name: 'Open incident', exact: true }).click();
+  await incidents.getByRole('cell', { name: 'open', exact: true }).waitFor();
+  let fixture: Record<string, unknown> = {};
+  // Exercise paginated rendering with controlled read responses; mutations still use the real API.
+  await page.route(/\/incidents\?limit=25/, async (route) => {
+    if (!fixture.id) {
+      const response = await route.fetch();
+      fixture = (await response.json()).items[0];
+    }
+    const more = new URL(route.request().url()).searchParams.has('after');
+    await route.fulfill({
+      json: more
+        ? {
+            items: [{ ...fixture, id: 'opi_' + 'f'.repeat(24), severity: 'critical' }],
+            next_after: null,
+          }
+        : { items: [{ ...fixture, severity: 'warning' }], next_after: fixture.id },
+    });
+  });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await incidents.getByLabel('Filter incident severity').selectOption('critical');
+  await incidents.getByText('No loaded incidents match these filters.', { exact: true }).waitFor();
+  expect(await incidents.getByRole('status').textContent()).toContain('More records remain');
+  await incidents.getByRole('button', { name: 'Load more incidents' }).click();
+  await incidents.getByRole('cell', { name: 'critical', exact: true }).waitFor();
+  expect(await incidents.getByRole('status').textContent()).toContain('1 matching of 2 loaded');
+  expect(await incidents.getByRole('status').textContent()).toContain('All available');
+  expect(await incidents.getByRole('button', { name: 'Load more incidents' }).isVisible()).toBe(
+    false,
+  );
+  await incidents.getByRole('button', { name: 'Clear incident filters' }).click();
+  expect(await incidents.getByRole('cell', { name: 'open', exact: true }).count()).toBe(2);
 });
 
 it('does not reopen an incident workspace when a late mutation response arrives after navigation', async () => {

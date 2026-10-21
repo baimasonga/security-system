@@ -1354,3 +1354,29 @@ Response-guide publication and rollout:
   acceptance identities or bypass MFA. Independent monitoring/witness rollout,
   controlled production restore drills and physical Windows acceptance remain
   unverified gates. Authentication-email activation stays in the PDF chat.
+
+### Incident review filters — 21 October 2026
+
+- Added state and severity filters to the existing scoped incident dashboard.
+  Matching/loaded counts and explicit remaining-page disclosure prevent a filtered
+  empty view from being presented as a complete incident inventory. Pagination
+  remains available when no loaded rows match; clearing filters restores loaded
+  rows. Filters reset with the current view rather than persisting tenant state.
+- No server route, authorization, schema, audit transition, commercial entitlement
+  or external provider changed. Browser acceptance covers combined filters,
+  no-match counts, clearing and continued real-API triage; a controlled paginated
+  read fixture covers finding a match on the next page without dropping filters.
+- Initial full source verification passed **932 tests, 3 skipped** and all **22
+  browser workflows** passed. A deliberate removal of the severity predicate was
+  caught by the browser regression. The first mutation run instead exposed an
+  ambiguous existing field selector; it was corrected to use the exact accessible
+  name and passed before the actual mutation check. Filters have explicit accessible
+  names. Final full source verification again passed **932 tests, 3 skipped**;
+  the final complete browser suite passed **22 workflows**. No persistence or server
+  boundary changed, so additional PostgreSQL/load scenarios were not required.
+  Next: publish, check exact-head CI and verify the automatic Railway deployment;
+  local browser evidence alone is not authenticated production acceptance.
+- Previous release `746c905` now has completed successful exact-head source, browser,
+  PostgreSQL, Windows, dependency/secret and CodeQL checks; PR-only dependency
+  review was correctly skipped. Live PDF binding, independent monitoring/witnessing
+  and production restore retain the previously documented acceptance gates.

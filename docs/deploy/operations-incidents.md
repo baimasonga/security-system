@@ -62,3 +62,16 @@ configuration. Success must include the fixed `predeploy completed` message.
 the declared table policy as well as forbidden privileges. No owner/superuser or
 extra incident DELETE permission is needed. A live SQLSTATE 42501 is not passing
 incident acceptance even if process health is green.
+
+## Filter incident review
+
+In an environment's **Incidents** panel, filter by state (open, acknowledged or
+resolved) and severity. Both filters apply together to the records already loaded.
+The summary reports matching and loaded counts, and explicitly says when more
+records remain. **Load more incidents** remains available even when nothing on the
+current page matches. **Clear incident filters** restores all loaded rows.
+
+Filters are local to the current view and reset after refresh/navigation or a
+triage mutation. They do not change authorization, retention, incident state,
+reported health or automatic rules. A filtered empty table is not evidence that
+the environment has no incidents.

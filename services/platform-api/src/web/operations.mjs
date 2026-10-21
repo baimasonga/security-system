@@ -1239,13 +1239,50 @@ export async function operationsView(ui) {
       after = next.next_after;
       render();
     });
+    const filters = node('div');
+    function filter(label, values) {
+      const select = node('select');
+      select.setAttribute('aria-label', label);
+      const field = node('label', label);
+      for (const [value, text] of [['', 'All'], ...choices(values)]) {
+        const option = node('option', text);
+        option.value = value;
+        select.append(option);
+      }
+      field.append(select);
+      filters.append(field);
+      select.addEventListener('change', render);
+      return select;
+    }
+    const stateFilter = filter('Filter incident state', ['open', 'acknowledged', 'resolved']);
+    const severityFilter = filter('Filter incident severity', [
+      'informational',
+      'warning',
+      'critical',
+    ]);
+    const summary = node('p');
+    summary.setAttribute('role', 'status');
+    filters.append(
+      button('Clear incident filters', () => {
+        stateFilter.value = '';
+        severityFilter.value = '';
+        render();
+      }),
+      summary,
+    );
     function render() {
       more.hidden = !after;
+      const matching = rows.filter(
+        (r) =>
+          (!stateFilter.value || r.state === stateFilter.value) &&
+          (!severityFilter.value || r.severity === severityFilter.value),
+      );
+      summary.textContent = `${matching.length} matching of ${rows.length} loaded incidents.${after ? ' More records remain; load more to include them.' : ' All available incident records are loaded.'}`;
       content.replaceChildren(
-        rows.length
+        matching.length
           ? table(
               ['Component', 'Severity', 'State', 'Assigned responder', 'Opened', 'Actions'],
-              rows.map((r) => [
+              matching.map((r) => [
                 codes.get(r.component_id) || r.component_id,
                 r.severity,
                 r.state,
@@ -1256,12 +1293,14 @@ export async function operationsView(ui) {
                 r.state === 'resolved' ? 'Resolved' : button('Manage incident', () => manage(r)),
               ]),
             )
-          : empty('No incidents recorded.'),
+          : empty(
+              rows.length ? 'No loaded incidents match these filters.' : 'No incidents recorded.',
+            ),
         more,
       );
     }
     render();
-    wrap.append(content);
+    wrap.append(filters, content);
     const active = components.filter((c) => c.state === 'active');
     if (openAllowed && active.length)
       wrap.append(
