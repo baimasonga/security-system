@@ -1421,3 +1421,30 @@ Observer publication and live acceptance:
   remains blocked by Railway's temporary deployment pause. Next agent: verify the
   newest exact-head CI, retry rollout when permitted and verify served source bytes;
   retain the healthy existing release and do not bypass provider or MFA boundaries.
+
+### Cloudflare alternative preparation — 21 October 2026
+
+- User requested a prepared alternative deployment. Added an isolated, pinned
+  Wrangler/Containers package using the existing Node Dockerfile, singleton
+  routing, disabled traffic/public previews, strict runtime-secret allowlist and
+  origin validation, fixed safe refusals and overwritten edge forwarding headers.
+  Migration-owner credentials and production guard/scanner bypasses are rejected.
+- Worker bundling passes with `--dry-run --containers-rollout none`; 23 focused
+  runtime/gateway tests pass. This is not a Docker-image build, provider deployment
+  or successful production container start. No account resource, DNS, secret,
+  customer data or traffic has been changed.
+- The deployment guide documents separate predeploy migrations/grants/profile
+  verification, existing-key preservation, external PostgreSQL/TLS, unreachable
+  Railway-private scanner addressing, staging/cutover/rollback and overlapping
+  background-worker risks. Plain Workers/Pages are not compatible replacements.
+- Final source check passed **966 tests, 3 skipped**. All **24 focused gateway
+  tests** pass, including the per-binding UTF-8 byte cap. Deliberate removals of
+  traffic gating, origin checks, the secret allowlist and trusted forwarding were
+  killed by assertions; restored-source focused tests pass. The final Wrangler
+  dry-run bundle passes, and the isolated package audit found zero vulnerabilities.
+  Added a separate CI bundle/audit job. Secrets are individual reviewed bindings
+  because Cloudflare limits variable values to 5 KB; no aggregate secret is used.
+- Next: verify the new exact-head CI, then perform an actual image build and
+  isolated Cloudflare staging acceptance with account access, reviewed secrets and
+  the chosen hostname. No Docker-image or live Cloudflare acceptance is claimed.
+  Do not mark standby/failover active from a successful bundle alone.

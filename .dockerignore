@@ -5,3 +5,10 @@ docs
 tests
 *.pem
 .env*
+
+**/node_modules
+**/.wrangler
+**/.bundle
+**/.dev.vars*
+**/secrets*.json
+*.key

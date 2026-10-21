@@ -45,6 +45,21 @@ jobs:
       - run: npx playwright-core install --with-deps chromium
       - run: npm run test:portal
 
+  cloudflare:
+    name: Cloudflare standby bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts --prefix infrastructure/cloudflare
+      - run: npm run bundle --prefix infrastructure/cloudflare
+      - run: npm audit --prefix infrastructure/cloudflare --audit-level=high
+
   windows-sdk:
     name: Windows protected-storage integration
     runs-on: windows-latest

@@ -1,0 +1,4 @@
+.wrangler/
+.bundle/
+.dev.vars*
+secrets*.json

@@ -159,3 +159,15 @@ health evidence or incidents into Warrior. GitHub scheduling failure remains a
 risk; missing/stale observations must not be interpreted as healthy. This limited
 observer does not activate configurable application/network probes or audit
 witnessing. See the independent availability deployment guide for rollout limits.
+
+## Cloudflare deployment gateway preparation
+
+The alternative Worker/Container boundary defaults to disabled traffic, no public
+preview and one fixed container identity. It checks the configured HTTPS origin,
+replaces client forwarding headers with edge-derived identity and emits fixed
+503 refusals on errors. A reviewed, byte-bounded runtime binding allowlist excludes
+migration-owner credentials and production/scanner bypasses. Normal application
+production validation, authorization and database safeguards still apply. Secrets
+are runtime bindings, not image build arguments. This preparation establishes no
+Cloudflare deployment, live scanner path, worker fencing or automatic failover;
+controlled staging and cutover acceptance remain required.

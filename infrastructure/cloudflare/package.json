@@ -1,0 +1,15 @@
+{
+  "name": "warrior-cloudflare-standby",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "wrangler deploy --dry-run --containers-rollout none --outdir .bundle",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.3"
+  }
+}
