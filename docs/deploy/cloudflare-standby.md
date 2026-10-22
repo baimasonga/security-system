@@ -11,8 +11,9 @@ access, Docker, Cloudflare deployment permissions and runtime secrets are requir
 for a real deployment. Verify current plan availability and prices in your account.
 
 Preparation creates no Cloudflare resources and changes no DNS or production
-traffic. Defaults disable traffic, workers.dev and preview URLs; no routes are
-committed. The Worker returns a fixed no-store 503 until explicitly enabled with a
+traffic. Defaults disable application traffic, workers.dev and preview URLs.
+The user-selected `warrior.quantixsl.com` custom-domain route is committed, but
+it is created only by an actual deployment. Before activation it returns 503. The Worker returns a fixed no-store 503 until explicitly enabled with a
 matching host and valid runtime settings. It routes every accepted request to one
 fixed container identity, never a tenant/path-selected instance. Background workers
 keep that container active during HTTP inactivity; budget for an active container.
@@ -79,7 +80,7 @@ npx wrangler secret put DATABASE_URL
 ```
 
 If Wrangler requires an initial Worker deployment before accepting secrets, deploy
-with the committed disabled-traffic/no-route configuration first. No request can
+with the committed disabled-traffic configuration first. No request can
 start the application through that disabled gateway. Installing a secret is not a
 successful container-start or database acceptance test.
 
@@ -147,3 +148,37 @@ Review its fixed destinations when the canonical deployment changes; otherwise a
 green old-host check says nothing about Cloudflare. A shared database is still a
 single failure domain; database failover, PITR/restore and audit witnessing remain
 separate exercises.
+
+## Manual GitHub deployment without local Cloudflare credentials
+
+The user confirmed Workers Paid/Containers access and selected
+`warrior.quantixsl.com`. Cloudflare can create its Worker custom-domain binding;
+do not point a new CNAME at Railway. The source still disables application traffic.
+
+1. In **GitHub → baimasonga/security-system → Settings → Environments**, create
+   `cloudflare-standby`. Configure an appropriate environment reviewer if available.
+2. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+   Use a token scoped to the intended account with the current Cloudflare
+   Workers/Containers deployment permissions and the `quantixsl.com` zone access
+   needed for the custom domain. Follow Cloudflare's current permission wizard;
+   do not substitute a global API key or paste values into chat/issues.
+3. Wait for the exact default-branch commit's CI to pass. Open **Actions → Deploy
+   Cloudflare alternative → Run workflow** on the default branch. The job verifies
+   the source's required successful GitHub checks and the disabled, fixed-host,
+   single-container configuration before exposing the deployment credentials to
+   Wrangler. It does not run on pushes or pull requests and cannot enable traffic.
+4. The job provisions the Worker, image/Container application and custom domain.
+   A 503 is expected until runtime bindings and controlled activation are complete.
+   This step does not supply the application's database, signing, MFA, mail or
+   sharing secrets. Those are separate Worker bindings described above.
+5. Complete isolated staging, database profile and application acceptance before
+   production-connected activation. Do not start another set of production
+   background workers while the old Railway process remains active and unfenced.
+
+The local image build now supports an optional BuildKit `proxy_ca` secret for
+managed build environments while retaining strict TLS verification. It normalizes
+source permissions so the non-root Node process can read but not modify code even
+when a checkout uses restrictive modes. CI builds and starts the image against
+synthetic in-memory data, checks its exact served UI assets and removes the local
+container. Those checks do not establish Cloudflare or production PostgreSQL
+acceptance.

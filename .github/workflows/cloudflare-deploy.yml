@@ -1,0 +1,54 @@
+name: Deploy Cloudflare alternative
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: read
+
+concurrency:
+  group: cloudflare-standby-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Provision disabled Cloudflare alternative
+    if: github.ref_name == github.event.repository.default_branch
+    environment: cloudflare-standby
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require verified source and disabled traffic
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { pathToFileURL } = require('node:url');
+            const { requireVerifiedRelease } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/tools/cloudflare-release-policy.mjs`));
+            const config = JSON.parse(fs.readFileSync('infrastructure/cloudflare/wrangler.json', 'utf8'));
+            const { data } = await github.rest.checks.listForRef({ ...context.repo, ref: context.sha, per_page: 100 });
+            requireVerifiedRelease(config, data.check_runs);
+      - run: npm ci --ignore-scripts --prefix infrastructure/cloudflare
+      - run: npm audit --prefix infrastructure/cloudflare --audit-level=high
+      - run: npm run bundle --prefix infrastructure/cloudflare
+      - name: Deploy Worker and Container with traffic disabled
+        working-directory: infrastructure/cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo 'Cloudflare environment credentials are required.' >&2
+            exit 1
+          fi
+          npm run deploy

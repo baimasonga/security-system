@@ -59,6 +59,14 @@ jobs:
       - run: npm ci --ignore-scripts --prefix infrastructure/cloudflare
       - run: npm run bundle --prefix infrastructure/cloudflare
       - run: npm audit --prefix infrastructure/cloudflare --audit-level=high
+      - name: Build and start the non-root application image
+        run: |
+          docker build -t warrior-image-check .
+          docker run -d --name warrior-image-check -e NODE_ENV=test -p 127.0.0.1:18080:8080 warrior-image-check
+          node tools/check-container-image.mjs
+      - name: Remove disposable image-check container
+        if: always()
+        run: docker rm -f warrior-image-check || true
 
   windows-sdk:
     name: Windows protected-storage integration

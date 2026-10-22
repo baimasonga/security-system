@@ -5,7 +5,10 @@
   "compatibility_date": "2026-10-21",
   "workers_dev": false,
   "preview_urls": false,
-  "vars": { "TRAFFIC_ENABLED": "false", "PUBLIC_HOST": "" },
+  "vars": {
+    "TRAFFIC_ENABLED": "false",
+    "PUBLIC_HOST": "warrior.quantixsl.com"
+  },
   "containers": [
     {
       "class_name": "WarriorContainer",
@@ -15,7 +18,27 @@
       "max_instances": 1
     }
   ],
-  "durable_objects": { "bindings": [{ "name": "WARRIOR", "class_name": "WarriorContainer" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WarriorContainer"] }],
-  "observability": { "enabled": false }
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WARRIOR",
+        "class_name": "WarriorContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WarriorContainer"]
+    }
+  ],
+  "observability": {
+    "enabled": false
+  },
+  "routes": [
+    {
+      "pattern": "warrior.quantixsl.com",
+      "custom_domain": true
+    }
+  ]
 }
