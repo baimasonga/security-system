@@ -621,3 +621,28 @@ Observer publication and live acceptance:
   Confirm Railway build/start and live assets before claiming recovery.
 - Validation: `npm run check` passed (979 tests passed, 3 skipped). Remote
   image-build and Railway rollout evidence must still be checked after publication.
+
+### Release observation completion slice — 22 October 2026
+
+- Builder-fix source `afa38c5` passed Linux source, PostgreSQL, browser,
+  dependency/secret, CodeQL and actual image/bundle checks. Windows DPAPI hit its
+  existing 15-second deadline; the follow-up disposable diagnostic passed all
+  seven steps. Requested one exact-source Windows job retry; no runtime timeout
+  or encryption assertion was weakened.
+- Added independent GitHub release observation: fixed public liveness/readiness
+  plus exact-source hashes for HTML/CSS/portal/operations JavaScript, a six-minute
+  rollout window and fixed non-sensitive output. Existing scheduled availability
+  checks remain independent. No provider credentials, account connection,
+  production mutation, private data or external notification is involved.
+- Nine focused checks pass for matching source, failed readiness, older assets,
+  failed/cached/oversized responses and stalled transport/body cancellation.
+  Mutation checks remove hash, readiness and cache guards independently. Full
+  source verification and exact-head live observation follow publication.
+- Remaining implementation is not equivalent to external activation: actual PDF
+  source binding still needs genuine scoped fresh-MFA credentials; independent
+  audit witness, controlled restore drills, native installer acceptance and
+  configured notification providers need their documented real environments.
+  Automatic infrastructure remediation remains deferred by the accepted program.
+- Final local verification: all 988 tests passed (3 skipped), all nine observer
+  tests passed, and three deliberately removed guards were caught. Exact-source
+  Windows retry for `afa38c5` passed. Live observer outcome is recorded separately.

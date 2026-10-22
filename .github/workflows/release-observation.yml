@@ -1,0 +1,28 @@
+name: Warrior release observation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/sleepy-carson-l0if1k]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warrior-release-observation
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: Live release health and UI assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/check-warrior-release.mjs

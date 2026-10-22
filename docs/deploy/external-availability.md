@@ -31,3 +31,25 @@ To suspend observation, disable this workflow in GitHub Actions. There is no
 production application flag or data migration to roll back. If the permanent
 Warrior domain changes, review and change both fixed targets in the script and
 its tests; do not replace them with arbitrary environment-supplied destinations.
+
+## Release observation
+
+A separate **Warrior release observation** workflow runs on default-branch pushes
+or manual dispatch. It checks liveness and persistence readiness, then compares
+SHA-256 digests of the public HTML, CSS, portal and operations JavaScript against
+the checked-out source. It waits up to six minutes for deployment to settle and
+fails if the expected public release cannot be observed. An older healthy UI does
+not pass the release comparison. Scheduled availability monitoring stays independent
+and continues to check health even when a new deployment has failed.
+
+The observer uses only fixed public destinations, omits credentials, refuses
+redirects and cached responses, bounds transport/body time and reads at most 1 MiB
+per asset. It prints fixed outcomes rather than provider response bodies. The
+workflow never deploys, changes Railway settings or sends application alerts.
+
+Matching public assets verifies those bytes and readiness at the observation time.
+It does not identify the exact backend commit when multiple commits share the same
+UI, establish authenticated acceptance, prove PDF integration or exercise restores.
+After changing the canonical domain, review both observer scripts. On a slow build,
+inspect the job and rerun it after deployment; do not remove the comparison to make
+an older release appear successful. Newer pushes cancel obsolete release observers.
