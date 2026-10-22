@@ -79,3 +79,20 @@ with four reads in flight. Partial inventory, truncated evidence and unavailable
 reporting are explicit. Counts describe shown finding snapshots, not unique
 vulnerabilities or whole-organization safety. Backup and rollback reports never
 count as a restore exercise. All evidence retains administrator-report provenance.
+
+### Recurring synthetic restore acceptance
+
+**Actions → Warrior synthetic recovery exercise** runs the existing isolated
+logical restore drill on relevant source pushes, weekly on Monday at 04:23 UTC,
+and through manual dispatch. It provisions a disposable loopback-only PostgreSQL
+container with fsync enabled. No production database URL, provider token, backup
+file or user data is supplied. The job removes its fixture container on completion.
+
+The drill restores a consistent snapshot to a different randomly named database,
+checks the migration count, recovered findings, application reads and audit chain,
+and proves a post-snapshot user was excluded. Its output includes measured fixture
+snapshot age and restore duration. These are small synthetic logical-restore
+measurements, not production RPO/RTO, PITR, infrastructure recovery, key recovery or
+proof that the real provider backup can be restored. Continue the controlled
+production restore procedure separately; a successful scheduled run must not turn
+unverified imported recovery evidence into independently verified evidence.

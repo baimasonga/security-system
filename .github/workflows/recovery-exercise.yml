@@ -1,0 +1,53 @@
+name: Warrior synthetic recovery exercise
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+  push:
+    branches: [claude/sleepy-carson-l0if1k]
+    paths:
+      - .github/workflows/recovery-exercise.yml
+      - tools/restore-drill-local.ts
+      - services/platform-api/migrations/**
+      - services/platform-api/src/db/**
+      - packages/operations/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warrior-synthetic-recovery
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    name: Isolated logical backup and restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start isolated fixture database
+        run: |
+          docker run -d --name onboarding-security-postgres \
+            -e POSTGRES_HOST_AUTH_METHOD=trust \
+            -p 127.0.0.1:55432:5432 postgres:16 -c fsync=on
+          for attempt in $(seq 1 30); do
+            if docker exec onboarding-security-postgres pg_isready -U postgres; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Exercise snapshot, restore, application and audit integrity
+        run: node tools/restore-drill-local.ts
+      - name: Remove disposable fixture database
+        if: always()
+        run: docker rm -f onboarding-security-postgres || true

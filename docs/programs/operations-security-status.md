@@ -646,3 +646,20 @@ Observer publication and live acceptance:
 - Final local verification: all 988 tests passed (3 skipped), all nine observer
   tests passed, and three deliberately removed guards were caught. Exact-source
   Windows retry for `afa38c5` passed. Live observer outcome is recorded separately.
+
+### Recurring recovery acceptance slice — 22 October 2026
+
+- Live release observation for source `0a222fd` passed at 22:25 UTC: public
+  liveness/readiness and exact HTML/CSS/portal/operations assets. This establishes
+  deployed UI bytes, not authenticated application or real PDF-source acceptance.
+- Added a credential-free scheduled/manual GitHub workflow for the existing
+  isolated logical-backup/restore drill. It uses a disposable loopback PostgreSQL
+  container, fsync, newly generated fixture databases, real pg_dump/pg_restore,
+  application reads and audit integrity assertions, followed by container cleanup.
+  Relevant source pushes also run the exercise. No production data is accessed.
+- The recorded measurement remains explicitly synthetic: no claim of production
+  RPO/RTO, provider backup verification, PITR, independent witnessing or key recovery.
+  Remote exercise/source checks follow publication. Live PDF integration and
+  real provider configuration remain blocked by their secure setup prerequisites.
+- Full local source checks passed: 988 tests, 3 skipped. CI must exercise the
+  actual disposable PostgreSQL restore before this workflow is marked accepted.
