@@ -12,6 +12,59 @@ const state = {
   version: 0,
 };
 const content = $('content');
+const mobileLayout = window.matchMedia('(max-width: 760px)');
+function closeNavigation(restoreFocus = false) {
+  $('shell').classList.remove('navigation-open');
+  $('menu-toggle').setAttribute('aria-expanded', 'false');
+  if (restoreFocus && mobileLayout.matches) $('menu-toggle').focus();
+}
+$('menu-toggle').addEventListener('click', () => {
+  const expanded = $('shell').classList.toggle('navigation-open');
+  $('menu-toggle').setAttribute('aria-expanded', String(expanded));
+});
+mobileLayout.addEventListener('change', () => {
+  // Hiding the desktop rail can blur its link before matchMedia delivers this event.
+  const focusLost = document.activeElement === document.body;
+  closeNavigation(
+    mobileLayout.matches && (focusLost || $('navigation').contains(document.activeElement)),
+  );
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && $('shell').classList.contains('navigation-open')) {
+    closeNavigation(true);
+  }
+});
+const navigationIcons = {
+  Licenses: 'M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h5',
+  Applications: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+  'Files & links':
+    'M9 15l6-6 M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0 M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0',
+  Devices: 'M3 4h18v13H3z M8 21h8 M12 17v4',
+  Organization:
+    'M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M2 21v-3a6 6 0 0 1 12 0v3 M17 4a4 4 0 0 1 0 8 M17 15a5 5 0 0 1 5 5',
+  Catalog: 'M3 7h18v14H3z M8 7V3h8v4 M3 12h18 M10 12v3h4v-3',
+  'Device demo': 'M3 4h18v13H3z M8 21h8 M12 17v4 M9 8l-2 2 2 2 M15 8l2 2-2 2',
+  Account: 'M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10 M3 22a9 9 0 0 1 18 0z',
+  'Security center': 'M12 2l9 4v6c0 5-5 8-9 10-4-2-9-5-9-10V6z M8 12l3 3 5-6',
+  'Operator console': 'M4 5l6 6-6 6 M12 19h8',
+};
+function navigationButton(view) {
+  const item = button(view, async () => {
+    closeNavigation();
+    await navigate(view);
+    if (mobileLayout.matches) content.focus();
+  });
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', navigationIcons[view]);
+  icon.append(path);
+  item.prepend(icon);
+  return item;
+}
+
 let recoveryAvailable = false;
 let passkeysAvailable = false;
 const device = new BrowserDevice();
@@ -186,6 +239,9 @@ window.addEventListener('pagehide', clearModal);
 function renderAuth(register = false) {
   state.version++;
   clearModal();
+  document.body.classList.remove('signed-in');
+  closeNavigation();
+  $('workspace-path').hidden = true;
   $('navigation').replaceChildren();
   $('organization').replaceChildren();
   $('identity').textContent = '';
@@ -355,6 +411,8 @@ async function initialize() {
   await navigate('Licenses');
 }
 function renderShell() {
+  document.body.classList.add('signed-in');
+  $('workspace-path').hidden = false;
   const select = $('organization');
   select.replaceChildren();
   for (const org of state.orgs) {
@@ -378,7 +436,7 @@ function renderShell() {
     'Security center',
   ];
   if (state.principal.platform_role === 'platform_admin') views.push('Operator console');
-  $('navigation').replaceChildren(...views.map((view) => button(view, () => navigate(view))));
+  $('navigation').replaceChildren(...views.map(navigationButton));
 }
 $('organization').addEventListener('change', async () => {
   state.orgId = $('organization').value;
@@ -442,6 +500,7 @@ const productName = (id) => state.products.find((p) => p.id === id)?.name || id;
 async function navigate(view) {
   clearModal();
   state.view = view;
+  $('workspace-path').textContent = `Workspace / ${view}`;
   const version = ++state.version;
   notice();
   content.replaceChildren(node('div', 'Loading your workspace…', 'loading'));

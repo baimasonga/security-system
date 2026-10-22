@@ -1448,3 +1448,43 @@ Observer publication and live acceptance:
   isolated Cloudflare staging acceptance with account access, reviewed secrets and
   the chosen hostname. No Docker-image or live Cloudflare acceptance is claimed.
   Do not mark standby/failover active from a successful bundle alone.
+
+### Approved cloud-console restyle
+
+- User explicitly approved the desktop/mobile concept and requested implementation.
+  Reworked the shared portal shell/styles with compact neutral surfaces, orange
+  actions/selection, icon navigation, full-width utility header, status badges,
+  responsive table records and two-column wide-screen forms. Existing Warrior
+  branding and Quantix ownership remain; no Cloudflare affiliation is claimed.
+- Added an accessible mobile menu with announced expanded state, Escape/focus
+  restoration, close-on-navigation, desktop/mobile reset and sign-out cleanup.
+  No route, authorization, session persistence, CSP, database or licensing behavior
+  changed. Credential clearing and stale-response guards remain intact.
+- Initial existing browser suite passed all 22 workflows. The new real browser/API
+  shell check passes desktop, 390-pixel portrait, 740-pixel landscape, keyboard,
+  navigation focus and sign-out behavior. Actual synthetic screenshots were
+  reviewed; final full verification/publication evidence follows after checks.
+- Focused keyboard/mobile checks pass; deliberate Escape-close and sign-out-reset
+  removals were caught at their respective assertions. A stale test field selector
+  and hidden-element lookup were corrected without removing behavior assertions;
+  resize focus awaits browser media-query delivery. Primary text contrast is
+  5.43:1, muted text 5.24:1 and active-navigation text 6.00:1.
+- Final `npm run check` passed **966 tests, 3 skipped**. The complete Chromium
+  suite passed **23 workflows**, including the responsive-shell regression and
+  existing credential/triage/security flows. Actual synthetic desktop/mobile
+  screenshots were reviewed. No database/server boundary changed, so additional
+  PostgreSQL/load scenarios were not required for this UI-only change.
+- Next: verify the published exact-head CI, then confirm deployment/served assets
+  after the provider outage. Local screenshots alone are not production evidence.
+  Cloudflare remains prepared rather than activated, and the earlier Railway pause
+  and live PDF source-binding requirements remain separate rollout gates.
+
+- The user reports a Railway outage. A deployment-status lookup did not return
+  usable service state; no deployment or traffic change is claimed. Continue local
+  UI verification and publication independently; resume live rollout only when
+  the provider is available. Do not activate the prepared Cloudflare alternative
+  or substitute credentials as an implicit response to the outage.
+- The complete browser rerun exposed a real breakpoint focus edge case: the browser
+  can blur a hidden desktop navigation link to body before matchMedia fires. The
+  handler now restores Menu focus in that case while preserving focus in visible
+  form controls. The regression retains its focus assertion and awaits delivery.

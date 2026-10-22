@@ -277,8 +277,8 @@ export async function operationsView(ui) {
   async function applications() {
     const rows = await listing(base, ['Application', 'State', 'Criticality', ''], (a) => [
       a.code,
-      a.state,
-      a.criticality,
+      node('span', a.state, a.state === 'active' ? 'badge' : 'badge inactive'),
+      node('span', a.criticality, 'badge neutral'),
       button(
         'Open',
         refresh(() => application(a.id)),

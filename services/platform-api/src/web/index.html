@@ -13,23 +13,35 @@
   <body>
     <a class="skip" href="#content">Skip to content</a>
     <div id="shell">
-      <aside>
-        <a class="brand" href="/"
-          ><img src="/rokela-icon.png" alt="" width="40" height="40" />
-          <span>Rokela<br />Bai Bureh<br />Warrior</span></a
+      <header class="global-header">
+        <a class="brand" href="/">
+          <img src="/rokela-icon.png" alt="" width="32" height="32" />
+          <span>Bai Bureh Warrior<small>ROKELA · QUANTIX SIERRA LEONE</small></span>
+        </a>
+        <button
+          id="menu-toggle"
+          class="mobile-menu"
+          type="button"
+          aria-controls="navigation"
+          aria-expanded="false"
         >
+          Menu
+        </button>
+        <label class="org-label"
+          >Workspace<select id="organization" aria-label="Current organization"></select
+        ></label>
+        <span id="identity"></span><button id="signout" hidden>Sign out</button>
+      </header>
+      <aside>
+        <p class="nav-caption">WORKSPACE</p>
         <nav aria-label="Main navigation" id="navigation"></nav>
         <p class="rail-note">Your software.<br />Your permissions.<br />One workspace.</p>
       </aside>
       <div class="workspace">
-        <header>
-          <label class="org-label"
-            >Workspace<select id="organization" aria-label="Current organization"></select></label
-          ><span id="identity"></span><button id="signout" hidden>Sign out</button>
-        </header>
+        <div class="workspace-path" id="workspace-path" hidden></div>
         <div id="notice" role="status" aria-live="polite"></div>
         <main id="content" tabindex="-1"></main>
-        <footer>Rokela Bai Bureh Warrior · Secure software licensing</footer>
+        <footer>Quantix Sierra Leone · Bai Bureh Warrior</footer>
       </div>
     </div>
     <dialog id="modal">

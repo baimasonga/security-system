@@ -2,6 +2,7 @@ import { afterEach, expect, it } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { makeEnv, PW, type Env } from '../../services/platform-api/test/harness.ts';
 import { totpCode } from '../../packages/auth/src/mfa.ts';
 
@@ -846,4 +847,81 @@ it('security overview refuses authorization failures without rendering a partial
   expect(
     await page.getByRole('heading', { name: 'Environment reports', exact: true }).count(),
   ).toBe(0);
+});
+
+it('keeps the approved console shell accessible across desktop, mobile menu and sign out', async () => {
+  const { page, owner } = await setup();
+  for (const code of ['rokela-business-admin', 'rokela-pdf']) {
+    const created = await env.call(
+      'POST',
+      `/v1/organizations/${owner.orgId}/operations/applications`,
+      {
+        token: owner.token,
+        body: {
+          code,
+          owner_user_id: owner.userId,
+          criticality: 'medium',
+          product_id: null,
+          reason: 'initial_setup',
+        },
+      },
+    );
+    expect(created.status).toBe(201);
+  }
+  await page.getByRole('button', { name: 'Applications', exact: true }).click();
+  await page.getByRole('cell', { name: 'rokela-pdf', exact: true }).waitFor();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  expect(await menu.isVisible()).toBe(false);
+  expect(await nav.isVisible()).toBe(true);
+  const header = await page.locator('.global-header').boundingBox();
+  const rail = await page.locator('aside').boundingBox();
+  expect(rail!.y).toBeGreaterThanOrEqual(header!.height);
+  const artifacts = process.env['PORTAL_ARTIFACTS'];
+  if (artifacts) {
+    mkdirSync(artifacts, { recursive: true });
+    await page.screenshot({ path: join(artifacts, 'console-desktop.png'), fullPage: true });
+  }
+  await nav.getByRole('button', { name: 'Applications', exact: true }).focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() => menu.evaluate((element) => element === element.ownerDocument.activeElement))
+    .toBe(true);
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+  expect(await nav.isVisible()).toBe(false);
+  expect(await menu.getAttribute('aria-expanded')).toBe('false');
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  expect(await nav.isVisible()).toBe(true);
+  expect(await menu.getAttribute('aria-expanded')).toBe('true');
+  await page.keyboard.press('Escape');
+  expect(await nav.isVisible()).toBe(false);
+  await expect
+    .poll(() => menu.evaluate((element) => element === element.ownerDocument.activeElement))
+    .toBe(true);
+  if (artifacts)
+    await page.screenshot({ path: join(artifacts, 'console-mobile.png'), fullPage: true });
+  await menu.click();
+  await nav.getByRole('button', { name: 'Security center', exact: true }).click();
+  await page.getByRole('heading', { name: 'Your account', exact: true }).waitFor();
+  expect(await menu.getAttribute('aria-expanded')).toBe('false');
+  expect(
+    await page
+      .locator('#content')
+      .evaluate((element) => element === element.ownerDocument.activeElement),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  expect(await nav.isVisible()).toBe(true);
+  expect(await menu.isVisible()).toBe(false);
+  await page.setViewportSize({ width: 740, height: 430 });
+  expect(await nav.isVisible()).toBe(false);
+  expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
+  await menu.click();
+  await page.locator('#signout').click();
+  await page.getByRole('heading', { name: 'Welcome back', exact: true }).waitFor();
+  expect(await menu.isVisible()).toBe(false);
+  expect(await page.locator('#menu-toggle').getAttribute('aria-expanded')).toBe('false');
+  expect(await nav.isVisible()).toBe(false);
+  expect(await page.getByLabel('Current organization').isVisible()).toBe(false);
 });
