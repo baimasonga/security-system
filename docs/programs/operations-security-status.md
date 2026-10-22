@@ -592,3 +592,18 @@ Observer publication and live acceptance:
   Git checkout authentication failed; publication uses the connected GitHub API
   with an expected-head lease instead. Remote CI and provider provisioning remain
   separate evidence; neither is implied by these local checks.
+
+### Railway recovery via GitHub — 22 October 2026
+
+- User reports Railway deployment access restored and requests the existing
+  GitHub-to-Railway auto-deploy path. Do not substitute a direct CLI upload or
+  provision another service. Cloudflare remains a prepared, disabled alternative.
+- Published source `0b84104dbb3506ef6c61bddab3fb2d460daf678e` passed all required
+  GitHub checks: source, PostgreSQL, browser, Windows, dependency/secret scan,
+  Cloudflare image/bundle and CodeQL. External liveness/readiness checks passed
+  too, but do not establish which revision the running host serves.
+- GitHub commit statuses expose no Railway deployment result for that revision.
+  This handoff update supplies a new push on the connected default branch after
+  the outage. Verify the resulting CI and live UI assets before claiming rollout.
+  If Railway does not consume the push, inspect its GitHub source/auto-deploy
+  configuration with the owner rather than changing production credentials.
