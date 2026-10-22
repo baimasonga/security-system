@@ -607,3 +607,17 @@ Observer publication and live acceptance:
   the outage. Verify the resulting CI and live UI assets before claiming rollout.
   If Railway does not consume the push, inspect its GitHub source/auto-deploy
   configuration with the owner rather than changing production credentials.
+
+### Railway builder compatibility fix — 22 October 2026
+
+- Uploaded build log proves Railway builder v4 rejects the optional BuildKit
+  secret mount at Dockerfile line 11. Removed that mount from the shared
+  Dockerfile; npm retains strict TLS verification and the non-root runtime
+  retains read-only access to source. No application credentials are changed.
+- Supersedes the earlier optional proxy-CA mount guidance. Managed local builds
+  may need their own approved CA-capable build environment; do not reintroduce
+  an unsupported mount or disable TLS verification in the Railway Dockerfile.
+- Push this compatibility fix through the existing GitHub auto-deploy path.
+  Confirm Railway build/start and live assets before claiming recovery.
+- Validation: `npm run check` passed (979 tests passed, 3 skipped). Remote
+  image-build and Railway rollout evidence must still be checked after publication.

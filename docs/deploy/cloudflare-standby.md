@@ -175,9 +175,9 @@ do not point a new CNAME at Railway. The source still disables application traff
    production-connected activation. Do not start another set of production
    background workers while the old Railway process remains active and unfenced.
 
-The local image build now supports an optional BuildKit `proxy_ca` secret for
-managed build environments while retaining strict TLS verification. It normalizes
-source permissions so the non-root Node process can read but not modify code even
+The shared Dockerfile uses portable RUN instructions and strict npm TLS
+verification; Railway builder v4 rejects secret mounts even when optional. It
+normalizes source permissions so the non-root Node process can read but not modify code even
 when a checkout uses restrictive modes. CI builds and starts the image against
 synthetic in-memory data, checks its exact served UI assets and removes the local
 container. Those checks do not establish Cloudflare or production PostgreSQL

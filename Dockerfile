@@ -7,10 +7,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages ./packages
 COPY services ./services
-# Optional managed-build CA; never copied into a layer or used to disable TLS checks.
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    npm ci --omit=dev --ignore-scripts --strict-ssl=true
+RUN npm ci --omit=dev --ignore-scripts --strict-ssl=true
 
 FROM node:22-slim
 ENV NODE_ENV=development HOST=0.0.0.0 PORT=8080
