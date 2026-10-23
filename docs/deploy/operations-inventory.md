@@ -1,5 +1,7 @@
 # Operations inventory rollout (OPS-002)
 
+> Historical rollout details. Use [current operator onboarding](operator-onboarding.md) for the current process and implementation/activation matrix.
+
 This guide covers inventory. Credential management has a
 [separate rollout guide](operations-credentials.md); ingestion, probes, alerts and a
 fleet dashboard remain later tasks. No infrastructure or commercial access changes

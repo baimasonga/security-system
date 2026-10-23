@@ -663,3 +663,33 @@ Observer publication and live acceptance:
   real provider configuration remain blocked by their secure setup prerequisites.
 - Full local source checks passed: 988 tests, 3 skipped. CI must exercise the
   actual disposable PostgreSQL restore before this workflow is marked accepted.
+
+### Guided onboarding and requested factory reset — 23 October 2026
+
+- User authorized the review recommendations and explicitly selected a factory
+  reset including Warrior application data. No deletion has been executed.
+  Reset is not an auto-deploy migration. Correct project/schema, exclusive object
+  ownership and maintenance access must be verified first. The connected Supabase
+  account exposes six projects, none with trust.operations_applications visible.
+  Asked for the Warrior project name/dashboard URL only; never collect secrets in chat.
+- Added fresh account-MFA prerequisite gating and an Account navigation action
+  for credential management, with metadata still visible and backend checks intact.
+  Manual-key enrollment explains its three steps, second password entry, expiry,
+  pending-key replacement and post-confirmation sign-out/recovery behavior.
+  Added parent context to application/environment/component creation screens.
+- Added fixed export-visible credential rejection category/status/reference
+  diagnostics, excluding raw bodies, factors, tokens, unknown fields and paths.
+  A regression first failed without the diagnostic, then passed with it.
+- Published-current source remains 60189ce until this change is checked/published.
+  Guided browser suite passed 24 workflows; diagnostic suite passed six tests.
+  Mutation checks, full checks and final publication evidence follow.
+- Current operator guide separates implemented features from provider activation
+  and real acceptance. Historical guides are labeled; prior history is retained.
+  Factory reset will also remove owner/operator accounts, licenses and audit records;
+  re-registration and audited operator bootstrap are necessary afterward. Separate
+  Rokela PDF databases/files and existing external security keys are outside scope.
+- Final verification: full source check passed 989 tests (3 skipped), complete
+  guided browser suite passed 24 workflows and both intentional MFA-readiness and
+  secret-logging mutations were caught. Current GitHub/source search contains no
+  actual project-specific Supabase hostname; DATABASE_URL is deployment config.
+  Factory reset remains blocked on verified live target and maintenance access.

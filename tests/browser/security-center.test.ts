@@ -350,3 +350,77 @@ it('activates the browser, verifies its cached lease and deactivates from adjace
     .getByText('No cached lease. Activate this browser first.', { exact: true })
     .waitFor();
 });
+
+it('guides an unenrolled owner from credential prerequisites to manual-key confirmation without issuing a token', async () => {
+  const { page, owner } = await setup();
+  env.c.config.operationsCredentialsEnabled = true;
+  const base = `/v1/organizations/${owner.orgId}/operations/applications`;
+  const app = await env.call('POST', base, {
+    token: owner.token,
+    body: {
+      code: 'guided-app',
+      owner_user_id: owner.userId,
+      criticality: 'high',
+      product_id: null,
+      reason: 'initial_setup',
+    },
+  });
+  expect(app.status).toBe(201);
+  const path = `${base}/${app.body.id}/environments`;
+  const environment = await env.call('POST', path, {
+    token: owner.token,
+    body: { code: 'production', kind: 'production', reason: 'initial_setup' },
+  });
+  expect(environment.status).toBe(201);
+  await page.getByRole('button', { name: 'Applications', exact: true }).click();
+  await page
+    .getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: 'guided-app', exact: true }) })
+    .getByRole('button', { name: 'Open', exact: true })
+    .click();
+  expect(await section(page, 'Add environment').textContent()).toContain(
+    'Parent application: guided-app',
+  );
+  await page
+    .getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: 'production', exact: true }).first() })
+    .getByRole('button', { name: 'Open', exact: true })
+    .click();
+  const credentials = section(page, 'Integration credentials');
+  await credentials
+    .getByText('Authenticator protection is not enabled.', { exact: false })
+    .waitFor();
+  expect(
+    await credentials.getByRole('button', { name: 'Issue credential', exact: true }).count(),
+  ).toBe(0);
+  expect(await section(page, 'Add component').textContent()).toContain(
+    'guided-app / environment: production',
+  );
+  const denied = await env.call('POST', `${path}/${environment.body.id}/credentials`, {
+    token: owner.token,
+    body: {
+      purpose: 'events:write',
+      ttl_seconds: 86400,
+      reason: 'initial_setup',
+      mfa_code: '123456',
+    },
+  });
+  expect(denied.status).toBe(403);
+  const list = await env.call('GET', `${path}/${environment.body.id}/credentials`, {
+    token: owner.token,
+  });
+  expect(list.body.items).toHaveLength(0);
+  await credentials.getByRole('button', { name: 'Open account security', exact: true }).click();
+  await page.getByRole('heading', { name: 'Account', exact: true }).waitFor();
+  const mfa = section(page, 'Authenticator protection');
+  await mfa.getByLabel('Current password', { exact: true }).fill(PW);
+  await mfa.getByRole('button', { name: 'Set up authenticator', exact: true }).click();
+  const confirmation = section(page, 'Confirm your authenticator');
+  await confirmation.getByLabel('Authenticator setup key').waitFor();
+  expect(await confirmation.textContent()).toContain('There is no QR code');
+  expect(await confirmation.textContent()).toContain('Starting setup again creates a new key');
+  expect(await confirmation.textContent()).toContain('Enter your Warrior password again');
+  expect((await env.call('GET', '/v1/auth/me', { token: owner.token })).body.mfa_enabled).toBe(
+    false,
+  );
+});

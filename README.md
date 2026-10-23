@@ -1,5 +1,7 @@
 # Rokela Bai Bureh Warrior
 
+**Current onboarding and feature status:** see [operator onboarding](docs/deploy/operator-onboarding.md). The V1 baseline below is historical; later implemented features and separate live activation gates are tracked in the current guide and operations handoff.
+
 **Cross-application monitoring roadmap:** the planned operations/security expansion
 is tracked in [the implementation program](docs/programs/operations-security.md) and
 [agent handoff](docs/programs/operations-security-status.md). Agents start at

@@ -125,6 +125,17 @@ export function registerOperationsRoutes(app: FastifyInstance, c: Container) {
           'operations request failed',
         );
       }
+      // Keep flattened provider exports useful without logging request bodies, paths or factors.
+      if (
+        req.method === 'POST' &&
+        /\/credentials(?:\/:credentialId\/(?:rotate|revoke))?$/.test(req.routeOptions.url ?? '')
+      ) {
+        const category = codes[safeStatus] ?? 'unavailable';
+        app.log.warn(
+          { failure: 'operations_credential_rejected', request_id: req.id, status: safeStatus },
+          `operations credential rejected: ${category} reference ${req.id}`,
+        );
+      }
       if (safeStatus === 429) reply.header('retry-after', '60');
       return reply
         .status(safeStatus)

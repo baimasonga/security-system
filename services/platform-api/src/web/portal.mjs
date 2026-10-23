@@ -549,6 +549,7 @@ async function renderView(view) {
       isCurrent: () => version === state.version && orgId === state.orgId && !!state.token,
       clearModal,
       showSecret,
+      openAccount: () => navigate('Account'),
       modal: (...children) => {
         if (version !== state.version) return;
         $('modal-content').replaceChildren(...children);
@@ -1107,7 +1108,7 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
   card.append(
     node(
       'p',
-      'Add a six-digit authenticator such as Microsoft Authenticator, Google Authenticator or a compatible password manager. Keep recovery codes safely offline.',
+      'Protection is not enabled yet. Setup has three steps: generate a manual key, add that key to your authenticator app, then confirm it here with your password and a six-digit code. Keep existing phone entries until the new setup is confirmed.',
     ),
     fieldsForm(
       [{ name: 'password', label: 'Current password', type: 'password' }],
@@ -1125,9 +1126,17 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
           node('h2', 'Confirm your authenticator'),
           node(
             'p',
-            'Add a manual time-based entry named Rokela Bai Bureh Warrior in your authenticator. Use this setup key with six digits and a 30-second period. Setup expires in ten minutes.',
+            'Step 1: In your authenticator app, add a manual time-based entry named Rokela Bai Bureh Warrior using the key below. Choose six digits and a 30-second period. There is no QR code in this setup.',
           ),
           secret,
+          node(
+            'p',
+            `This key expires at ${new Date(setup.expires_at).toLocaleTimeString()}. Starting setup again creates a new key; codes from older pending entries will not match. Leaving this page removes the displayed key.`,
+          ),
+          node(
+            'p',
+            'Step 2: Enter your Warrior password again and the current code from the entry you just added. Click Enable authenticator. Protection is enabled only after confirmation succeeds.',
+          ),
           fieldsForm(
             [
               { name: 'password', label: 'Current password', type: 'password' },
@@ -1152,7 +1161,7 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
                 'One-time recovery codes',
               );
               notice(
-                'Authenticator enabled. All sessions signed out. Use a new code or a recovery code to sign in.',
+                'Step 3 complete: authenticator enabled. Save the recovery codes privately. All sessions signed out; wait for a new authenticator code before signing in again.',
               );
             },
           ),

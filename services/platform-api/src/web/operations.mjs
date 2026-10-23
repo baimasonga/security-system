@@ -290,7 +290,14 @@ export async function operationsView(ui) {
         'Register your systems and their components. Inventory does not imply active monitoring.',
       ),
       button('Review security overview', refresh(securityOverview)),
-      panel(node('h2', 'Your applications'), rows),
+      panel(
+        node('h2', 'Your applications'),
+        node(
+          'p',
+          'Open an application to add its environments. Register application below creates a separate system, not an environment.',
+        ),
+        rows,
+      ),
       lookup('opa', application),
       panel(
         node('h2', 'Register application'),
@@ -482,6 +489,10 @@ export async function operationsView(ui) {
         ? [
             panel(
               node('h2', 'Add environment'),
+              node(
+                'p',
+                `Parent application: ${a.code}. This creates an environment inside this application.`,
+              ),
               form(
                 [
                   code(),
@@ -924,6 +935,10 @@ export async function operationsView(ui) {
         ? [
             panel(
               node('h2', 'Add component'),
+              node(
+                'p',
+                `Parent application: ${a.code} / environment: ${e.code}. Components registered here belong only to this environment.`,
+              ),
               form(
                 [
                   code(),
@@ -1392,6 +1407,8 @@ export async function operationsView(ui) {
     max: 90,
   });
   async function credentials(path, writable, reload) {
+    const account = await ui.api('/v1/auth/me');
+    const mfaReady = account.mfa_enabled === true;
     const section = panel(
       node('h2', 'Integration credentials'),
       node(
@@ -1461,7 +1478,7 @@ export async function operationsView(ui) {
                 ? 'Expired'
                 : 'Active';
             const actions = node('div');
-            if (status === 'Active') {
+            if (status === 'Active' && mfaReady) {
               if (writable)
                 actions.append(
                   button('Rotate', () =>
@@ -1481,7 +1498,17 @@ export async function operationsView(ui) {
           },
         ),
       );
-      if (writable) section.append(node('h3', 'New credential'), mutation('issue'));
+      if (!mfaReady)
+        section.append(
+          node(
+            'p',
+            account.mfa_configured
+              ? 'Authenticator protection is not enabled. Finish setup in Account before issuing, rotating or revoking integration credentials. A phone entry alone does not activate protection.'
+              : 'Authenticator protection is not configured on this deployment. Contact the administrator before managing integration credentials.',
+          ),
+          button('Open account security', () => ui.openAccount()),
+        );
+      else if (writable) section.append(node('h3', 'New credential'), mutation('issue'));
     } catch (e) {
       if (e.status === 404)
         section.append(empty('Credential management is unavailable in this deployment.'));

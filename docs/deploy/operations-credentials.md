@@ -1,5 +1,7 @@
 # Operations integration credentials (OPS-003)
 
+> Historical rollout details. Use [current operator onboarding](operator-onboarding.md) for the current process and implementation/activation matrix.
+
 Credential management is implemented; event ingestion remains OPS-004. A credential
 has no account, inventory-read, licensing, incident or infrastructure authority.
 No live application is connected by this release.

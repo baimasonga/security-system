@@ -323,3 +323,26 @@ it('blocks missing MFA setup and logout even for organization owners', async () 
   expect(loggedOut.status).toBe(204);
   expect((await f.issue()).status).toBe(401);
 });
+
+it('exports a bounded credential rejection reference without request values or secret fields', async () => {
+  const logs: string[] = [];
+  const f = await setup(logs);
+  logs.length = 0;
+  const bad = await f.call('POST', '', {
+    purpose: 'events:write',
+    ttl_seconds: 0,
+    reason: 'initial_setup',
+    mfa_code: '123456',
+    private_field_never_log: 'private-value-never-log',
+  });
+  expect(bad.status).toBe(400);
+  const entries = logs.map((line) => JSON.parse(line));
+  const diagnostic = entries.find((entry) => entry.failure === 'operations_credential_rejected');
+  expect(diagnostic?.msg).toBe(
+    `operations credential rejected: invalid_request reference ${bad.body.request_id}`,
+  );
+  expect(diagnostic?.request_id).toBe(bad.body.request_id);
+  expect(diagnostic?.status).toBe(400);
+  expect(logs.join('')).not.toMatch(/123456|private_field_never_log|private-value-never-log/);
+  expect(logs.join('')).not.toContain(f.owner.token);
+});
