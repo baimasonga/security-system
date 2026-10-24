@@ -63,7 +63,7 @@ For durable delivery, run migration `0010_identity_mail_outbox` and `npm run db:
 
 Run migration `0006_identity_recovery` and then `npm run db:grants` before deploying the browser/recovery release. Do not change existing signing keys or the license-key pepper.
 
-To enable password reset and email verification, configure `RESEND_API_KEY` securely, `EMAIL_FROM` with a verified sending domain, and `PUBLIC_ORIGIN` with the exact public HTTPS origin (for example, `https://trustplatform-api-production.up.railway.app`). The origin must have no credentials, extra path or query. With no email configuration, the portal and existing login continue working; recovery stays disabled. Do not set synthetic development keys in production.
+To enable password reset and email verification, configure `RESEND_API_KEY` (or Cloudflare Email Sending: `MAIL_PROVIDER=cloudflare`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_EMAIL_API_TOKEN`) securely, `EMAIL_FROM` with a verified sending domain, and `PUBLIC_ORIGIN` with the exact public HTTPS origin (for example, `https://trustplatform-api-production.up.railway.app`). The origin must have no credentials, extra path or query. With no email configuration, the portal and existing login continue working; recovery stays disabled. Do not set synthetic development keys in production.
 
 Delivery is asynchronous and provider failures are audited without message contents. A durable encrypted outbox is still pending; shutdown flushes in-flight sends, but a crash can require the user to request another link. Email verification is recorded, not yet a compulsory login gate.
 

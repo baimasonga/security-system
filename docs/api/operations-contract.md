@@ -346,4 +346,11 @@ transports are fake. Retries use bounded 1–300 second backoff for at most 72 h
 failures remain visible. Delivery is at least once; crash-after-send can repeat a
 notification but cannot repeat the incident transition. Notification metadata expires
 after 30 days; resolved incidents are pruned only after 365 days. Audit is retained
-independently. External email/webhook transports are not configured by this slice.
+independently. External webhook transports are not configured by this slice.
+
+Email amendment (24 October 2026): with `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED=true`,
+the delivery port emails the same fixed recipient at their verified account address,
+looked up at send time; unverified addresses are retried and become visibly `failed`.
+The fixed plain-text message names the transition, severity, runbook, inventory codes,
+incident ID, time and `PUBLIC_ORIGIN`. Routes, request schemas and notification reads
+are unchanged; `delivered` means the provider accepted the recipient.

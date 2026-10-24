@@ -187,3 +187,29 @@ but labels the result as a current alert-inventory snapshot; it must not claim a
 scan execution on that commit or independently verified provenance. Only the
 existing normalized report schema leaves the collector. Server-held GitHub tokens,
 scheduled polling and provider-attested imports remain separate reviewed changes.
+
+### OPS-006 email notification amendment — 24 October 2026
+
+Status: accepted. Automatic incident transitions may also be emailed, behind the
+separate opt-in `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED` (default false; startup fails
+without automation and a complete provider). The destination stays the notification's
+fixed recipient user: Warrior looks up that account's address at send time and sends
+only when the address is verified and the user is still an active member. No address,
+template, URL or provider is accepted from rules, events, inventory or requests.
+
+The message is a fixed plain-text template: transition, severity, runbook enum,
+validated inventory codes, incident ID, time and the configured `PUBLIC_ORIGIN`. It
+carries no event attributes, provider output, health detail or HTML. Email reuses the
+fenced outbox unchanged: the incident, audit and notification intent still commit
+together, sending happens outside the transaction, and a `delivered` state means the
+provider accepted this recipient. Failures (including an unverified address) retry
+with the existing 1–300 second backoff and become visibly `failed` after 72 hours.
+Delivery stays at least once; Cloudflare documents no idempotency key, so a timeout
+after acceptance can repeat a message, never an incident transition.
+
+Transport is the existing transactional provider: Resend, or Cloudflare Email Sending
+(`MAIL_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_EMAIL_API_TOKEN`). Both use fixed
+HTTPS endpoints, refuse redirects, validate envelopes before sending and never echo
+response bodies. Cloudflare requires a success response that names this recipient as
+delivered or queued and not permanently bounced. Webhooks, SMS, per-rule recipients and
+configurable network probes remain separate reviewed changes.

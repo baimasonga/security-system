@@ -19,7 +19,8 @@ import {
   PaddleWebhookVerifier,
   type CheckoutProvider,
 } from './integrations/billing.ts';
-import { ResendMailDelivery } from './integrations/mail.ts';
+import { configuredMailDelivery, type MailDelivery } from './integrations/mail.ts';
+import { incidentEmailDelivery } from './operations-mail.ts';
 import {
   AuthService,
   InMemoryAuthStore,
@@ -145,6 +146,8 @@ export interface ContainerOverrides {
   sharingScanner?: FileScanner;
   sharingResolveTxt?: (name: string) => Promise<string[][]>;
   sharingMailer?: IdentityDelivery;
+  /** Test seam: replaces the incident email provider (fake recipients only). */
+  operationsMail?: MailDelivery;
   sharingConfig?: Partial<typeof DEFAULT_SHARING_CONFIG>;
 }
 
@@ -303,7 +306,7 @@ export async function createContainer(
     identityMailOutcome: (outcome) => metrics.inc('identity_mail_outcomes_total', { outcome }),
     identityDelivery:
       overrides?.identityDelivery ??
-      (config.emailDelivery ? new ResendMailDelivery(config.emailDelivery) : undefined),
+      (config.emailDelivery ? configuredMailDelivery(config.emailDelivery) : undefined),
     publicOrigin: config.emailDelivery?.publicOrigin,
     mfaEncryptionKey: config.mfaEncryptionKey,
     requireOperatorMfa: config.requireOperatorMfa,
@@ -382,7 +385,7 @@ export async function createContainer(
     const scrypt = config.scrypt;
     const mailer =
       overrides?.sharingMailer ??
-      (config.emailDelivery ? new ResendMailDelivery(config.emailDelivery) : undefined);
+      (config.emailDelivery ? configuredMailDelivery(config.emailDelivery) : undefined);
     sharing = new SharingService({
       store: sharingStore,
       objects,
@@ -533,6 +536,16 @@ export async function createContainer(
     clock,
     enabled: () => config.operationsAutomationEnabled,
     authority: operationsAuthority,
+    ...(config.operationsEmailNotificationsEnabled && config.emailDelivery
+      ? {
+          deliver: incidentEmailDelivery({
+            store: operationsStore,
+            contact: (userId) => auth.contact(userId),
+            mail: overrides?.operationsMail ?? configuredMailDelivery(config.emailDelivery),
+            publicOrigin: config.emailDelivery.publicOrigin,
+          }),
+        }
+      : {}),
   });
   const operationsIncidents = new IncidentService({
     store: operationsStore,

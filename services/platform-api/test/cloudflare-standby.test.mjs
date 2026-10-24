@@ -123,3 +123,17 @@ it('enforces the per-binding UTF-8 byte limit', () => {
   expect(() => runtimeConfig(bindings({ DATABASE_CA_PEM: 'x'.repeat(5001) }))).toThrow();
   expect(() => runtimeConfig(bindings({ DATABASE_CA_PEM: 'é'.repeat(2501) }))).toThrow();
 });
+it('forwards the reviewed incident email settings', () => {
+  const email = {
+    OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED: 'true',
+    MAIL_PROVIDER: 'cloudflare',
+    CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
+    CLOUDFLARE_EMAIL_API_TOKEN: 'fixture-token',
+    EMAIL_FROM: 'alerts@example.test',
+  };
+  expect(runtimeConfig(bindings(email))).toMatchObject(email);
+  // A general Cloudflare deployment token is still not a runtime setting.
+  expect(() => runtimeConfig(bindings({ CLOUDFLARE_API_TOKEN: 'private-value' }))).toThrow(
+    'Standby configuration is unavailable',
+  );
+});

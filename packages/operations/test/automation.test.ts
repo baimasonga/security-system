@@ -325,3 +325,33 @@ it('keeps the domain disabled even without an HTTP gate', async () => {
   await off.tick();
   expect(await f.store.listAlertRules(f.scope)).toEqual([]);
 });
+it('opens an incident when a component that reported healthy goes silent, and recovers on fresh reports', async () => {
+  // A crashed or unreachable source sends nothing at all: its last report must age into a breach,
+  // not remain "unknown" (the Rokela PDF outages of 24 October 2026 sent no heartbeat).
+  const f = await setup();
+  const rule = await f.service.create(p, f.scope, f.input);
+  await f.heartbeat('healthy');
+  await f.service.evaluate(f.scope);
+  expect((await f.store.findAlertRule(f.scope.orgId, rule.id))?.observation).toBe('healthy');
+  f.advance(179000);
+  await f.service.evaluate(f.scope);
+  expect((await f.store.findAlertRule(f.scope.orgId, rule.id))?.observation).toBe('healthy');
+  f.advance(1000);
+  await f.service.evaluate(f.scope);
+  expect((await f.store.findAlertRule(f.scope.orgId, rule.id))?.observation).toBe('breaching');
+  expect(await f.store.listIncidents(f.scope, { limit: 100 })).toEqual([]);
+  f.advance(60000);
+  await f.service.evaluate(f.scope);
+  const [incident] = await f.store.listIncidents(f.scope, { limit: 100 });
+  expect(incident?.state).toBe('open');
+  expect(incident?.ruleId).toBe(rule.id);
+  expect((await f.store.listAlertNotifications(f.scope)).map((n) => n.transition)).toEqual([
+    'opened',
+  ]);
+  await f.heartbeat('healthy');
+  await f.service.evaluate(f.scope);
+  f.advance(60000);
+  await f.heartbeat('healthy');
+  await f.service.evaluate(f.scope);
+  expect((await f.store.findIncident(f.scope.orgId, incident!.id))?.state).toBe('resolved');
+});

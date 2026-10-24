@@ -21,6 +21,8 @@ export interface PlatformConfig {
   operationsHealthEnabled: boolean;
   operationsIncidentsEnabled: boolean;
   operationsAutomationEnabled: boolean;
+  /** OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED: incident transitions are emailed to the rule creator. */
+  operationsEmailNotificationsEnabled: boolean;
   operationsPostureEnabled: boolean;
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
@@ -30,7 +32,15 @@ export interface PlatformConfig {
   privilegedDualControl: boolean;
   /** Passkeys (ADR-023): WEBAUTHN_RP_ID + WEBAUTHN_ORIGIN (+ optional WEBAUTHN_RP_NAME); undefined = disabled. */
   webauthn?: { rpId: string; origin: string; rpName: string };
-  emailDelivery?: { apiKey: string; from: string; publicOrigin: string };
+  emailDelivery?:
+    | { provider: 'resend'; apiKey: string; from: string; publicOrigin: string }
+    | {
+        provider: 'cloudflare';
+        accountId: string;
+        apiToken: string;
+        from: string;
+        publicOrigin: string;
+      };
   billing?: BillingConfig;
   host: string;
   port: number;
@@ -415,20 +425,28 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       portalOrigin,
     };
   }
+  // Cloudflare is chosen only explicitly, so existing Resend settings keep their behaviour.
+  // A chosen provider must be complete.
+  const mailProvider = env['MAIL_PROVIDER'] ?? 'resend';
+  if (mailProvider !== 'resend' && mailProvider !== 'cloudflare')
+    throw new Error('MAIL_PROVIDER must be resend or cloudflare');
+  const mailConfigured = mailProvider === 'cloudflare' || !!env['RESEND_API_KEY'];
+  if (env['MAIL_PROVIDER'] === 'resend' && !env['RESEND_API_KEY'])
+    throw new Error('RESEND_API_KEY is required with MAIL_PROVIDER=resend');
   const identityMailEncryptionKey = env['MAIL_OUTBOX_ENCRYPTION_KEY'];
   if (identityMailEncryptionKey) {
     new IdentityMailCipher(identityMailEncryptionKey);
-    if (!env['RESEND_API_KEY'])
-      throw new Error('RESEND_API_KEY required with MAIL_OUTBOX_ENCRYPTION_KEY');
+    if (!mailConfigured)
+      throw new Error('an email provider is required with MAIL_OUTBOX_ENCRYPTION_KEY');
     if (identityMailEncryptionKey.toLowerCase() === env['MFA_ENCRYPTION_KEY']?.toLowerCase())
       throw new Error('identity mail key must be separate from MFA key');
   }
   let emailDelivery: PlatformConfig['emailDelivery'];
-  if (env['RESEND_API_KEY']) {
+  if (mailConfigured) {
     const from = env['EMAIL_FROM'];
     const origin = env['PUBLIC_ORIGIN'];
     if (!from || /[\r\n]/.test(from) || !origin)
-      throw new Error('EMAIL_FROM and PUBLIC_ORIGIN are required with RESEND_API_KEY');
+      throw new Error('EMAIL_FROM and PUBLIC_ORIGIN are required with an email provider');
     let url: URL;
     try {
       url = new URL(origin);
@@ -444,8 +462,34 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
       (prod ? url.protocol !== 'https:' : !['http:', 'https:'].includes(url.protocol))
     )
       throw new Error('PUBLIC_ORIGIN must be an origin (HTTPS in production)');
-    emailDelivery = { apiKey: env['RESEND_API_KEY']!, from, publicOrigin: url.origin };
+    if (mailProvider === 'cloudflare') {
+      const accountId = env['CLOUDFLARE_ACCOUNT_ID'] ?? '';
+      if (!/^[a-f0-9]{32}$/i.test(accountId))
+        throw new Error('CLOUDFLARE_ACCOUNT_ID must be a 32-character account ID');
+      if (!env['CLOUDFLARE_EMAIL_API_TOKEN'])
+        throw new Error('CLOUDFLARE_EMAIL_API_TOKEN is required with MAIL_PROVIDER=cloudflare');
+      emailDelivery = {
+        provider: 'cloudflare',
+        accountId,
+        apiToken: env['CLOUDFLARE_EMAIL_API_TOKEN'],
+        from,
+        publicOrigin: url.origin,
+      };
+    } else
+      emailDelivery = {
+        provider: 'resend',
+        apiKey: env['RESEND_API_KEY']!,
+        from,
+        publicOrigin: url.origin,
+      };
   }
+  const opsEmail = env['OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED'];
+  if (opsEmail !== undefined && !['true', 'false'].includes(opsEmail))
+    throw new Error('OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED must be true or false');
+  if (opsEmail === 'true' && (opsAutomation !== 'true' || !emailDelivery))
+    throw new Error(
+      'OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED requires automation and an email provider',
+    );
 
   const need = (name: string, fallbackLabel: string): string => {
     const v = env[name];
@@ -557,6 +601,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     operationsHealthEnabled: opsHealth === 'true',
     operationsIncidentsEnabled: opsIncidents === 'true',
     operationsAutomationEnabled: opsAutomation === 'true',
+    operationsEmailNotificationsEnabled: opsEmail === 'true',
     operationsPostureEnabled: opsPosture === 'true',
     ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',

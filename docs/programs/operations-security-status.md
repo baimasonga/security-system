@@ -737,3 +737,36 @@ Observer publication and live acceptance:
 - Verification: both audit gates report 0 vulnerabilities. `npm run check` passed (1006
   tests, 3 skipped), the Cloudflare bundle builds, and `npm run test:db` was run on
   PostgreSQL as superuser and as the app role: 727 tests passed.
+
+### Incident email and silent-source alerting — 24 October 2026
+
+- Owner request: build alerting into Warrior instead of a third-party monitor (step 2:
+  missing-heartbeat incidents, incident email, then Warrior-run probes). This change
+  delivers the first two; probes remain a separate change needing the SSRF policy above.
+- Missing heartbeats: reconciling current code showed the evaluator already treats a
+  component whose last report is 180 s stale as breaching (stored reports live 30 days,
+  so silence does not decay to `unknown`). Added a regression test (healthy → silent
+  → one incident → fresh reports resolve it). No evaluator change was needed. Rokela PDF
+  already sends API, scanner and converter heartbeats every minute.
+- Email: new opt-in `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED` wires the existing fenced
+  outbox port to the transactional mail provider (ADR-029 amendment, threat model and
+  contract updated). Recipient is the rule creator's verified account address looked
+  up at send time; fixed plain-text template; retries/72 h deadline unchanged. Added
+  Cloudflare Email Sending as a provider, chosen only by an explicit `MAIL_PROVIDER=cloudflare`
+  (existing Resend settings behave exactly as before); identity mail can use either. The
+  Cloudflare standby allowlist forwards the four new settings. No route, schema, migration or grant changed.
+- Local verification: new `operations-email.test.ts` (6 tests: config gating, provider
+  selection, end-to-end silent component → email → recovery email over real HTTP
+  ingestion, flag-off portal only, unverified recipient refused, provider outage
+  backoff → failed), 5 Cloudflare transport tests, and the evaluator regression test.
+  Eight mutations were each caught: verified-recipient check, redirect refusal,
+  recipient acceptance, permanent bounce, account-ID format, flag-requires-provider,
+  flag-gates-delivery and stale-heartbeat breach.
+- PostgreSQL: the email suite now also runs in the `db` and `db-approle` projects; full
+  `npm run test:db` passed (727 tests) and the email/automation suites pass on both roles.
+- Not established: no real email was sent; production has no rule or email settings
+  from this change. Rollout steps are in the automation guide (Incident email).
+- Next: owner configures Cloudflare Email Sending for Warrior, verifies their Warrior
+  account email, creates heartbeat rules for Rokela PDF's components and runs the
+  synthetic acceptance in the guide. Then design Warrior-run probes (fixed operator-set
+  HTTPS targets, DNS/redirect/private-address refusal) as their own ADR amendment.

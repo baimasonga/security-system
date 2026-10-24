@@ -20,7 +20,7 @@ it('validates opt-in encryption configuration and rejects MFA-key reuse', () => 
     /MAIL_OUTBOX_ENCRYPTION_KEY/,
   );
   expect(() => loadConfig({ NODE_ENV: 'test', MAIL_OUTBOX_ENCRYPTION_KEY: key })).toThrow(
-    /RESEND_API_KEY/,
+    /email provider is required/,
   );
   expect(() =>
     loadConfig({ ...base, MFA_ENCRYPTION_KEY: key, MAIL_OUTBOX_ENCRYPTION_KEY: key }),
