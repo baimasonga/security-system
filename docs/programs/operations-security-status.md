@@ -793,6 +793,11 @@ Observer publication and live acceptance:
   2 intents from 20 contenders, audit verified) and `operations-events-contention-retention`
   (retention batches 1000/101/0, zero remaining bytes, stale after 180 s, audit verified)
   match their asserted expectations with fsync on.
+- PostgreSQL caught a migration defect before publication: 0023's kind/event check has a
+  generated name (`…_check1`), and dropping `operations_alert_rules_check` by name would
+  have removed the `updated_at >= created_at` check instead. 0025 now finds the kind/event
+  check by definition (exactly one match required); a schema test proves the timestamp
+  check survives and the replacement allows `probe` (mutation to the by-name drop caught).
 - Not established: no probe has run against a real site from Warrior; production has no
   probe settings. Probes share Railway's network fate; the GitHub observers stay the
   independent check.
