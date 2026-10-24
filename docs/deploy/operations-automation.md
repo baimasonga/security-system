@@ -20,6 +20,26 @@ archive synthetic inventory afterward. Never send private documents or real aler
 
 ## Incident email (optional)
 
+### Read-only preflight
+
+Before a real delivery test, run `node tools/check-incident-email.ts` inside the
+Warrior deployment with its existing runtime configuration. Supply the recipient's
+account email on standard input, then end input (Ctrl-D on Unix). No password,
+authenticator code or provider token is entered or printed. This command does not
+send mail, change data or bypass verification. It reads only recipient verification,
+enabled-rule count and notification-state totals in a read-only transaction, with
+the configured schema and database CA verification. Query time is limited to 5 seconds.
+
+Exit 0 means prerequisites for a controlled test are present, 1 means a prerequisite
+is missing, and 2 means the preflight could not run. Configuration/database exceptions
+are deliberately not echoed. A valid identity-email configuration alone is not enough:
+both automation and `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED` must be enabled.
+Notification `delivered` can mean portal delivery when email was off; existing rows
+do not record transport and never establish inbox receipt. Inspect the live deployment's
+configuration, not a local copy, before claiming production readiness.
+
+### Controlled acceptance
+
 Email the rule creator when an automatic incident opens or resolves:
 
 1. Configure one provider. For Cloudflare Email Sending, with a sending domain already

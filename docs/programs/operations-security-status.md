@@ -1,5 +1,33 @@
 # Operations/security implementation status and agent handoff
 
+## Incident-email acceptance preparation — 24 October 2026
+
+- Owner authorized continued unattended build/integration and an isolated opened /
+  resolved email test. The Railway connector currently requires reauthentication;
+  no deployed runtime or provider credentials are accessible through that connection.
+- Read-only production counts confirm the owner exists, email is verified, eight
+  rules are enabled, and notification counts are zero in all four states. No test
+  message has been sent and no production inventory or rule was changed.
+  Stored rule observations are healthy: three event-count, three heartbeat and two
+  probe rules. These observations do not prove incident email delivery.
+- Added deployment-local `tools/check-incident-email.ts`: validates actual runtime
+  config, uses the application connection with configured CA, checks schema, reads
+  only per-recipient verification/rule/notification aggregates in a read-only
+  transaction, and emits fixed metadata. No account address or provider error is
+  printed. It distinguishes email enablement from identity mail and refuses to call
+  historical portal delivery proof of email delivery.
+- Verification: `npm run check` passed 1085 tests (3 skipped). Seven new readiness
+  tests cover each missing prerequisite, secret exclusion and delivery-evidence
+  limits; bypassing the email flag was caught by a deliberate mutation, then restored.
+  The six existing simulated email lifecycle tests passed. The aggregate SQL was
+  independently executed read-only against production. Invalid CLI arguments exit 2
+  with a fixed message and no database access.
+- Local lifecycle tests use the existing fake provider; they do not establish real
+  Cloudflare acceptance. Next live step: run the preflight inside the deployment,
+  then the isolated acceptance procedure in the automation guide with authenticated
+  inventory access and a fresh-MFA scoped credential. Preserve all eight live rules.
+  Inbox acknowledgement remains necessary even after provider acceptance.
+
 ## AI-assisted investigation entry point — 24 October 2026
 
 - Owner authorized the recommendation to start with read-only IT investigation and
