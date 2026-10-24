@@ -762,6 +762,8 @@ Observer publication and live acceptance:
   Eight mutations were each caught: verified-recipient check, redirect refusal,
   recipient acceptance, permanent bounce, account-ID format, flag-requires-provider,
   flag-gates-delivery and stale-heartbeat breach.
+- PostgreSQL: the email suite now also runs in the `db` and `db-approle` projects; full
+  `npm run test:db` passed (727 tests) and the email/automation suites pass on both roles.
 - Not established: no real email was sent; production has no rule or email settings
   from this change. Rollout steps are in the automation guide (Incident email).
 - Next: owner configures Cloudflare Email Sending for Warrior, verifies their Warrior
