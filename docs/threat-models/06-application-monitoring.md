@@ -171,3 +171,19 @@ production validation, authorization and database safeguards still apply. Secret
 are runtime bindings, not image build arguments. This preparation establishes no
 Cloudflare deployment, live scanner path, worker fencing or automatic failover;
 controlled staging and cutover acceptance remain required.
+
+## Incident email notifications (24 October 2026)
+
+| Threat                                               | Control                                                                                               | Negative-path evidence                                                                                 |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Incident details sent to an address nobody proved    | Recipient is the rule creator's account, looked up at send time; unverified address is never emailed  | Unverified creator: no message, notification stays pending and visible (`operations-email.test.ts`).   |
+| Destination or content injected by a source or admin | No destination input anywhere; fixed plain-text template of codes/enums/IDs; envelope CR/LF refusal   | Event/rule destination fields rejected (existing); CR/LF recipient/subject refused before any request. |
+| Misrouted provider request or credential exposure    | Fixed HTTPS endpoint, 32-hex account ID, redirect refusal, 10 s timeout, no body/token echo in errors | Bad account ID and removed redirect refusal are caught by mutation; no body/token echo is tested.      |
+| False "delivered" state                              | Cloudflare success must list this recipient as delivered/queued and not permanently bounced           | Missing, other-recipient, bounced and malformed responses fail and are retried.                        |
+| Provider outage or alert storm floods mail           | Existing outbox: one intent per transition, backoff 1–300 s, 72 h deadline, 2,000 retained intents    | Outage retries with backoff, then `failed`, then no further attempts.                                  |
+| Silent source never alerts                           | A heartbeat rule breaches once its last report is 180 s stale; total silence is not "unknown"         | Healthy then silent component opens one incident after the window and resolves on fresh reports.       |
+
+Residual: a provider timeout after acceptance can repeat a message; mail providers can
+read message content (codes, severity and incident IDs only); a compromised mailbox
+learns incident metadata. Email does not prove Warrior itself is up; the external
+observers remain the independent check.
