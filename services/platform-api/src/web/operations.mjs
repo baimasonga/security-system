@@ -1007,7 +1007,7 @@ export async function operationsView(ui) {
     card.append(
       node(
         'p',
-        "Heartbeat and event rules evaluate committed backend observations; probe rules evaluate Warrior's own checks. Recovery requires fresh healthy evidence. Notifications appear here for the person who created the rule.",
+        "Heartbeat and event rules evaluate committed backend observations; probe rules evaluate Warrior's own checks of operator-configured URLs. Recovery requires fresh healthy evidence. Notifications appear here for the person who created the rule.",
       ),
     );
     card.append(
@@ -1109,7 +1109,7 @@ export async function operationsView(ui) {
             },
             {
               name: 'kind',
-              label: 'Condition (probe: Warrior checks a configured URL)',
+              label: 'Condition',
               options: choices(['heartbeat', 'probe', 'event_count']),
             },
             {
