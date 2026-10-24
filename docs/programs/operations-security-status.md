@@ -1,5 +1,23 @@
 # Operations/security implementation status and agent handoff
 
+## Audit verifier CA support — 24 October 2026
+
+- Next independent prerequisite while live email acceptance is blocked: the offline
+  verifier previously constructed a raw PostgreSQL pool, ignoring the provider CA
+  configuration already supported by the application runtime.
+- It now uses shared CA parsing and verified TLS pool settings, supports inline or
+  file certificates, rejects unconfigured remote plaintext, and preserves local
+  restore-fixture connections. Invalid TLS configuration exits 2 without creating
+  the pool or echoing configuration values. No schema or audit verification algorithm
+  changed; no production audit or credentials were modified.
+- Added connection tests and an actual CLI negative-path test. Removing the CLI's
+  CA wiring was caught by the subprocess test, then restored. `npm run check` passed
+  1093 tests (3 skipped), including eight new verifier connection/CLI tests.
+- External witness remains a prepared specification, not a provisioned independent
+  receiver. No production manifest or tamper-evidence acceptance is claimed from
+  these tests. Next: implement the receiver against the existing manifest contract
+  with local storage-adapter tests before choosing/provisioning an independent account.
+
 ## Incident-email acceptance preparation — 24 October 2026
 
 - Owner authorized continued unattended build/integration and an isolated opened /

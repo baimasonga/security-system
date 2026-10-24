@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import type { AnchorManifest } from '@trust/audit';
 import { PgAuditLog } from '../services/platform-api/src/db/pg-audit-log.ts';
+import { auditVerifierPoolSettings } from './audit-verifier-connection.ts';
 
 const [file] = process.argv.slice(2);
 const url = process.env['DATABASE_URL'];
@@ -50,7 +51,16 @@ try {
   process.exit(2);
 }
 
-const pool = new pg.Pool({ connectionString: url, max: 2 });
+let settings;
+try {
+  settings = auditVerifierPoolSettings(process.env, (path) => readFileSync(path, 'utf8'));
+} catch {
+  console.error(
+    'invalid database TLS configuration: check DATABASE_URL and DATABASE_CA_PEM or DATABASE_CA_FILE',
+  );
+  process.exit(2);
+}
+const pool = new pg.Pool(settings);
 const log = new PgAuditLog(pool, { now: () => new Date() });
 try {
   const v = await log.verifyChain();

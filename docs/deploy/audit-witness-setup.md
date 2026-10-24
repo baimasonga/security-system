@@ -8,6 +8,15 @@ Do not hide the startup warning or substitute a local file for independent evide
 
 ## Recommended trust boundary
 
+The offline verifier now uses the same `DATABASE_CA_PEM` / `DATABASE_CA_FILE`
+handling as the application runtime. Run it from the independently controlled
+verification environment with the provider CA and a read-only database connection.
+It rejects remote connections without TLS configuration, preserves local fixture
+connections, and does not load application workers or email providers. A configured
+CA enables certificate verification and takes precedence over URL TLS options.
+Invalid CA configuration exits 2 before creating a pool. This connection fix does
+not provision a witness or establish that an external manifest has been retained.
+
 Use a separate AWS account for an S3 Object Lock bucket and a small HTTPS witness
 receiver (API Gateway and Lambda). Keep account recovery, retention administration
 and evidence-reading credentials separate from Railway and Supabase. Railway gets
