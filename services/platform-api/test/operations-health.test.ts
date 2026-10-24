@@ -41,6 +41,11 @@ it('serves scoped health/history behind its own flag and current organization au
   expect(health.status).toBe(200);
   expect(health.body.independent_probe).toBe(false);
   expect(health.body.components[0].status).toBe('unknown');
+  expect(health.body.components[0].probe).toEqual({
+    status: 'unknown',
+    occurred_at: null,
+    received_at: null,
+  });
   expect(health.headers['cache-control']).toBe('no-store');
   expect((await env.call('GET', path + '/health', { token: other.token })).status).toBe(404);
   expect((await env.call('GET', path + '/health', { token: 'ops_v1.invalid' })).status).toBe(401);

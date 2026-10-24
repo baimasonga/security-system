@@ -353,7 +353,10 @@ evaluates only Warrior's own outside-in results for the component, recorded by t
 operator-configured probe runner (`OPERATIONS_PROBES_ENABLED`, `OPERATIONS_PROBE_TARGETS`;
 see ADR-029). Freshness, windows, incidents, notifications and recovery match heartbeat
 rules. Probe results never satisfy heartbeat rules and backend reports never satisfy
-probe rules. No route accepts or returns a probe URL.
+probe rules. No route accepts or returns a probe URL. The health read adds a separate
+per-component `probe` object (`status` healthy/unavailable/stale/unknown, `occurred_at`,
+`received_at`) under the same freshness and inventory-change rules; it never changes the
+backend `status`, dependency propagation or `independent_probe`.
 
 Email amendment (24 October 2026): with `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED=true`,
 the delivery port emails the same fixed recipient at their verified account address,

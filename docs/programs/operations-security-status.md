@@ -804,3 +804,18 @@ Observer publication and live acceptance:
 - Next (owner): create `public-site` and `signin` components under Rokela PDF production,
   set the two example targets from the automation guide, create `probe` rules, and confirm
   the rules show `healthy` within two minutes.
+
+### Probe visibility follow-up — 24 October 2026
+
+- During production enablement the owner looked for probe results in **Reported health**,
+  which showed only backend reports (`unknown` for the probe components). Added a separate
+  per-component `probe` object to the health read (OpenAPI updated) and **Warrior check** /
+  **Last checked** columns in the dashboard; it never alters backend status, dependency
+  propagation or `independent_probe`. Startup now logs `operations probes enabled for N
+target(s)` (count only).
+- Production state reported by the owner (not independently verified here): migration 0025
+  applied with all profile checks passing; API, scanner and converter heartbeats arriving
+  `healthy`; heartbeat and probe rules created; probe rule observations still `unknown` at
+  the time of this change, cause not yet established.
+- Verification: health unit test (separation, staleness, inactive and post-change epochs),
+  API wire assertion and browser column assertion; four mutations each caught.

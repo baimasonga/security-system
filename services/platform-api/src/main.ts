@@ -63,6 +63,10 @@ if (config.operationsAutomationEnabled) {
   app.addHook('onClose', () => operationsWorker.stop());
 }
 if (container.operationsProbes) {
+  // A count only: targets, URLs and results are never logged.
+  app.log.info(
+    `operations probes enabled for ${config.operationsProbeTargets?.length ?? 0} target(s)`,
+  );
   const probes = startProbeWorker(container.operationsProbes, {
     // Never log targets, URLs or responses.
     onUnrecorded: () =>
