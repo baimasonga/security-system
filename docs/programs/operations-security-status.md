@@ -715,3 +715,25 @@ Observer publication and live acceptance:
 - Next: after merge, confirm the first scheduled run passes, and confirm failed-run email is
   enabled for the owner account. The Warrior-side features (missing-heartbeat incidents for
   Rokela PDF, outside-in probes run by Warrior, incident email delivery) remain separate work.
+
+### Dependency security updates — 24 October 2026
+
+- New advisories turned the `npm audit --audit-level=high` CI gates red on the base branch
+  (seen on PR #31): zod `GHSA-mrhx-c7xc-m3w5` (high, fixed only in zod 4), undici in the
+  Cloudflare package (high: `GHSA-4qv8-2p9j-2685`, `GHSA-f72v-6w45-q472`,
+  `GHSA-xjj6-f33q-929c`), plus moderate fast-uri and low fastify advisories.
+- Root: zod 3.25.76 → 4.6.7 in `services/platform-api`, fastify 5.12.5 → 5.12.7, and fast-uri
+  4.2.1 → 4.2.3 (plus ajv's nested copy 3.1.8 → 3.1.9). Only one code change was needed:
+  `z.record` now takes an explicit key schema, so the four record schemas in `schemas.ts`
+  are now `z.record(z.string(), …)`.
+- Visible API effect: the `details.issues` entries on a 400 validation error (`path: code`)
+  now use zod 4's issue codes. For example, a bad e-mail or UUID now reports
+  `invalid_format`, not `invalid_string`. No source or test depended on the old names. The
+  error type, status and the strict rejection of unknown fields are unchanged. Zod 4 is also
+  stricter about numbers (it rejects non-finite and unsafe integers).
+- Cloudflare: wrangler stays at 4.151.3. The latest release (4.152.0) still pins undici
+  7.29.1, so `infrastructure/cloudflare/package.json` overrides undici to 7.30.1. Remove the
+  override once a wrangler release ships a patched undici.
+- Verification: both audit gates report 0 vulnerabilities. `npm run check` passed (1006
+  tests, 3 skipped), the Cloudflare bundle builds, and `npm run test:db` was run on
+  PostgreSQL as superuser and as the app role (result below).

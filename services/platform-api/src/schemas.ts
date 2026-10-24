@@ -45,7 +45,7 @@ export const entitlementsQuery = z.object({ org_id: id, license_id: id }).strict
 const entitlementValue = z.union([z.boolean(), z.number()]);
 const overrides = z
   .object({
-    entitlements: z.record(z.union([entitlementValue, z.null()])).optional(),
+    entitlements: z.record(z.string(), z.union([entitlementValue, z.null()])).optional(),
     capabilities: z
       .object({
         add: z.array(str(64)).max(100).optional(),
@@ -95,7 +95,7 @@ export const planBody = z
   .object({
     code: str(64),
     tier: z.enum(TIERS),
-    entitlements: z.record(entitlementValue).default({}),
+    entitlements: z.record(z.string(), entitlementValue).default({}),
     capabilities: z.array(str(64)).max(100).default([]),
     device_limit: z.number().int(),
     reason,
@@ -103,7 +103,7 @@ export const planBody = z
   .strict();
 export const planPatchBody = z
   .object({
-    entitlements: z.record(entitlementValue).optional(),
+    entitlements: z.record(z.string(), entitlementValue).optional(),
     capabilities: z.array(str(64)).max(100).optional(),
     device_limit: z.number().int().optional(),
     reason,
@@ -279,7 +279,7 @@ export const clientTelemetryBody = z
         z
           .object({
             name: z.string().min(1).max(64),
-            attributes: z.record(z.unknown()).default({}),
+            attributes: z.record(z.string(), z.unknown()).default({}),
           })
           .strict(),
       )
