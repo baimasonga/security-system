@@ -819,3 +819,34 @@ target(s)` (count only).
   the time of this change, cause not yet established.
 - Verification: health unit test (separation, staleness, inactive and post-change epochs),
   API wire assertion and browser column assertion; four mutations each caught.
+
+### Recovery acceptance and activation follow-up — 24 October 2026
+
+- Current baseline 40056f6 includes Claude's dependency security updates, incident
+  email and configured-page probes; its CI passes. The separate synthetic recovery
+  workflow failed because its ledger check and output were hardcoded to 24 while
+  migration 0025 is now present.
+- Replace that count with a read-only full ledger comparison against exact current
+  SQL file identities/checksums. Missing, unknown, duplicate, altered or swapped
+  migrations fail; new forward migrations are included automatically. The workflow
+  now tracks changes to this verifier and its regression tests.
+- Prepared production audit-witness deployment specification in
+  docs/deploy/audit-witness-setup.md: separate AWS account, retention-locked S3
+  COMPLIANCE evidence, append-only HTTPS receiver contract, restricted credentials,
+  acceptance and activation steps. No witness or billable resources provisioned.
+- Read-only production metadata showed no successful anchor, no notification
+  records and owner email not verified. Preserve real email verification; do not
+  bypass it or call provider acceptance inbox delivery. No production email sent.
+- Verification: see subsequent evidence below before treating the repair as shipped.
+- Repair evidence: `npm run check` passed 1075 tests (3 skipped). Seven new ledger
+  tests passed; weakening comparison to counts only was caught by wrong-version
+  and wrong-checksum cases, then source restored and tests rerun. The real isolated
+  fsync-on pg_dump/pg_restore drill passed with 25 migrations, application fixture
+  and audit verification, excluding the post-snapshot user (about 2 seconds on this
+  local fixture, not a production recovery-time claim). Production database,
+  anchors, email settings and notification recipients were not changed.
+- Concrete next actions: deploy the repair through GitHub and verify the synthetic
+  recovery job; owner verifies account email and configures/accepts provider email;
+  select independent AWS account and confirm retention before implementing and
+  provisioning the production witness receiver. Do not disable audit warnings or
+  claim anchoring enabled from this specification alone.

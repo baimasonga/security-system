@@ -9,6 +9,8 @@ on:
     paths:
       - .github/workflows/recovery-exercise.yml
       - tools/restore-drill-local.ts
+      - tools/restore-migrations.ts
+      - services/platform-api/test/restore-migrations.test.ts
       - services/platform-api/migrations/**
       - services/platform-api/src/db/**
       - packages/operations/**

@@ -44,20 +44,24 @@ connected. Unknown health means no eligible fresh observation, not healthy.
 
 ## Capability and activation matrix
 
-| Capability                                                 | Source implementation          | External activation/evidence                                                               |
-| ---------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------ |
-| Accounts, organizations, roles, MFA                        | Implemented                    | Each account must finish enrollment; deployment requires a stable MFA key.                 |
-| Passkeys and identity mail                                 | Implemented, optional          | Require their origin/provider configuration; external federation remains separate work.    |
-| Licensing, devices, quotas, seats, signed updates          | Implemented                    | Billing providers, production signing custody and native acceptance remain separate gates. |
-| Application inventory and credentials                      | Implemented                    | Owner/admin scope and MFA required; inventory does not connect a source.                   |
-| Durable events, health/history, incidents, automatic rules | Implemented, feature-gated     | Real source binding and controlled failure/recovery acceptance required.                   |
-| Portal notifications                                       | Implemented                    | Operations email/webhook delivery is not configured by this release.                       |
-| Scan/recovery evidence and collector                       | Implemented                    | Imports remain administrator reports, not independent attestation.                         |
-| Public release observer                                    | Implemented and exercised      | Checks health/readiness and public UI hashes, not authenticated workflows.                 |
-| Recurring isolated restore exercise                        | Implemented and exercised      | Synthetic logical restore is not production PITR, key recovery or RPO/RTO.                 |
-| Sharing and short links                                    | Implemented, optional          | Storage/scanner/provider configuration and independent acceptance required.                |
-| Cloudflare alternative                                     | Prepared with traffic disabled | Requires provider provisioning, secrets and controlled acceptance.                         |
-| Automatic infrastructure remediation                       | Deferred                       | Not enabled by registration, alerts or a factory reset.                                    |
+| Capability                                                 | Source implementation          | External activation/evidence                                                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Accounts, organizations, roles, MFA                        | Implemented                    | Each account must finish enrollment; deployment requires a stable MFA key.                                                                                   |
+| Passkeys and identity mail                                 | Implemented, optional          | Require their origin/provider configuration; external federation remains separate work.                                                                      |
+| Licensing, devices, quotas, seats, signed updates          | Implemented                    | Billing providers, production signing custody and native acceptance remain separate gates.                                                                   |
+| Application inventory and credentials                      | Implemented                    | Owner/admin scope and MFA required; inventory does not connect a source.                                                                                     |
+| Durable events, health/history, incidents, automatic rules | Implemented, feature-gated     | Real source binding and controlled failure/recovery acceptance required.                                                                                     |
+| Portal notifications                                       | Implemented                    | Incident email is implemented behind an opt-in flag; provider settings, verified recipient and inbox acceptance are required. Webhooks remain separate work. |
+| Scan/recovery evidence and collector                       | Implemented                    | Imports remain administrator reports, not independent attestation.                                                                                           |
+| Public release observer                                    | Implemented and exercised      | Checks health/readiness and public UI hashes, not authenticated workflows.                                                                                   |
+| Recurring isolated restore exercise                        | Implemented and exercised      | Synthetic logical restore is not production PITR, key recovery or RPO/RTO.                                                                                   |
+| Sharing and short links                                    | Implemented, optional          | Storage/scanner/provider configuration and independent acceptance required.                                                                                  |
+| Cloudflare alternative                                     | Prepared with traffic disabled | Requires provider provisioning, secrets and controlled acceptance.                                                                                           |
+| Automatic infrastructure remediation                       | Deferred                       | Not enabled by registration, alerts or a factory reset.                                                                                                      |
+
+Audit anchoring requires an independent protected witness; follow the
+[production witness setup](audit-witness-setup.md). A disabled-anchoring warning
+must remain visible until accepted external publication is active.
 
 ## Factory-reset boundary
 

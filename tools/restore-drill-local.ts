@@ -7,6 +7,7 @@ import pg from 'pg';
 import { applyMigrations, MIGRATIONS_DIR } from '../services/platform-api/src/db/migrate.ts';
 import { createContainer } from '../services/platform-api/src/container.ts';
 import { loadConfig } from '../services/platform-api/src/config.ts';
+import { verifyRestoredMigrations } from './restore-migrations.ts';
 const base = 'postgres://postgres@127.0.0.1:55432/postgres';
 const suffix = randomBytes(6).toString('hex'),
   sourceName = 'posture_drill_source_' + suffix,
@@ -141,10 +142,7 @@ try {
     dump,
   );
   target = await createContainer(config, { pool: targetPool });
-  assert.equal(
-    (await targetPool.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n,
-    24,
-  );
+  const schemaMigrations = await verifyRestoredMigrations(targetPool, MIGRATIONS_DIR);
   assert.equal((await targetPool.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 1);
   assert.equal((await sourcePool.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 2);
   assert.equal((await target.audit.verifyChain()).ok, true);
@@ -156,7 +154,7 @@ try {
     JSON.stringify({
       result: 'passed',
       scope: 'isolated synthetic logical backup/restore only',
-      schemaMigrations: 24,
+      schemaMigrations,
       recoveredFindingSnapshots: 1,
       postSnapshotUsersExcluded: 1,
       integrityCheck: 'passed',
