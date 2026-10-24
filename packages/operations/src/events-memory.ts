@@ -1,4 +1,4 @@
-import { HEARTBEAT_RANK, type Heartbeat } from './health.ts';
+import { HEARTBEAT_RANK, type Heartbeat, type ProbeResult } from './health.ts';
 import type { CredentialScope } from './model.ts';
 import type { EventAggregate, EventCounter, OperationEvent } from './events-model.ts';
 const key = (scope: CredentialScope, id: string) =>
@@ -34,6 +34,29 @@ export class MemoryEventRepo {
   }
   async getHeartbeat(scope: CredentialScope, componentId: string) {
     return structuredClone(this.heartbeats.get(key(scope, componentId)));
+  }
+  probeResults = new Map<string, ProbeResult>();
+  async recordProbeResult(row: ProbeResult) {
+    if (
+      !['healthy', 'unavailable'].includes(row.status) ||
+      !Number.isFinite(+row.occurredAt) ||
+      !Number.isFinite(+row.receivedAt) ||
+      row.occurredAt > row.receivedAt ||
+      +row.receivedAt - +row.occurredAt > 120000 ||
+      row.expiresAt <= row.receivedAt
+    )
+      throw new Error('invalid_probe_result');
+    const id = key(row, row.componentId),
+      old = this.probeResults.get(id);
+    if (
+      !old ||
+      row.occurredAt > old.occurredAt ||
+      (+row.occurredAt === +old.occurredAt && row.status === 'unavailable')
+    )
+      this.probeResults.set(id, structuredClone(row));
+  }
+  async getProbeResult(scope: CredentialScope, componentId: string) {
+    return structuredClone(this.probeResults.get(key(scope, componentId)));
   }
   async listHealthHistory(
     scope: CredentialScope,
@@ -107,7 +130,12 @@ export class MemoryEventRepo {
   async pruneEventMetadata(orgId: string, now: Date, limit: number) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 1000)
       throw new Error('invalid retention limit');
-    for (const map of [this.eventCounters, this.eventAggregates, this.heartbeats]) {
+    for (const map of [
+      this.eventCounters,
+      this.eventAggregates,
+      this.heartbeats,
+      this.probeResults,
+    ]) {
       let deleted = 0;
       for (const [id, row] of map)
         if (row.orgId === orgId && row.expiresAt && row.expiresAt <= now && deleted < limit) {
@@ -126,6 +154,7 @@ export class MemoryEventRepo {
           ...this.eventCounters.values(),
           ...this.eventAggregates.values(),
           ...this.heartbeats.values(),
+          ...this.probeResults.values(),
         ]
           .filter((r) => r.expiresAt && r.expiresAt <= now)
           .map((r) => r.orgId),

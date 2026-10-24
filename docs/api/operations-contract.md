@@ -348,6 +348,13 @@ notification but cannot repeat the incident transition. Notification metadata ex
 after 30 days; resolved incidents are pruned only after 365 days. Audit is retained
 independently. External webhook transports are not configured by this slice.
 
+Probe amendment (24 October 2026): a `probe` rule kind (threshold 1, no event type)
+evaluates only Warrior's own outside-in results for the component, recorded by the
+operator-configured probe runner (`OPERATIONS_PROBES_ENABLED`, `OPERATIONS_PROBE_TARGETS`;
+see ADR-029). Freshness, windows, incidents, notifications and recovery match heartbeat
+rules. Probe results never satisfy heartbeat rules and backend reports never satisfy
+probe rules. No route accepts or returns a probe URL.
+
 Email amendment (24 October 2026): with `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED=true`,
 the delivery port emails the same fixed recipient at their verified account address,
 looked up at send time; unverified addresses are retried and become visibly `failed`.

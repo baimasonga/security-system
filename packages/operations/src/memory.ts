@@ -1,5 +1,5 @@
 import type { AlertRule, AlertNotification } from './automation-model.ts';
-import type { Heartbeat } from './health.ts';
+import type { Heartbeat, ProbeResult } from './health.ts';
 import type { Incident } from './incidents.ts';
 import type { OperationEvent } from './events-model.ts';
 import { MemoryPostureRepo } from './posture-memory.ts';
@@ -286,6 +286,12 @@ class Repo extends MemoryPostureRepo implements InventoryRepo {
       throw new Error('heartbeat_parent');
     await super.recordHeartbeat(row);
   }
+  override async recordProbeResult(row: ProbeResult) {
+    const c = await this.find('component', row.orgId, row.componentId);
+    if (!c || c.applicationId !== row.applicationId || c.environmentId !== row.environmentId)
+      throw new Error('probe_parent');
+    await super.recordProbeResult(row);
+  }
   override async insertEvent(row: OperationEvent) {
     const component = await this.find('component', row.orgId, row.componentId);
     const credential = await this.findCredential(row.credentialId);
@@ -431,6 +437,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       repo.eventCounters = structuredClone(this.eventCounters);
       repo.eventAggregates = structuredClone(this.eventAggregates);
       repo.heartbeats = structuredClone(this.heartbeats);
+      repo.probeResults = structuredClone(this.probeResults);
       repo.healthClocks = structuredClone(this.healthClocks);
       repo.incidents = structuredClone(this.incidents);
       repo.rules = structuredClone(this.rules);
@@ -448,6 +455,7 @@ export class InMemoryInventoryStore extends Repo implements InventoryStore {
       this.eventCounters = repo.eventCounters;
       this.eventAggregates = repo.eventAggregates;
       this.heartbeats = repo.heartbeats;
+      this.probeResults = repo.probeResults;
       this.healthClocks = repo.healthClocks;
       this.incidents = repo.incidents;
       this.rules = repo.rules;

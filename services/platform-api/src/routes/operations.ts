@@ -603,7 +603,7 @@ function registerAutomationRoutes(app: FastifyInstance, c: Container) {
       z
         .object({
           component_id: id('opm'),
-          kind: z.enum(['event_count', 'heartbeat']),
+          kind: z.enum(['event_count', 'heartbeat', 'probe']),
           event_type: z.enum(ALERT_EVENTS).nullable(),
           threshold: z.number().int().min(1).max(1000),
           window_seconds: z.number().int().min(60).max(3600),

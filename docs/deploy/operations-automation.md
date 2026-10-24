@@ -51,6 +51,58 @@ for 180 seconds; it opens an incident once the breach lasts the rule window, and
 resolves after fresh healthy reports for a full window. A component that has never
 reported since the rule was created stays `unknown` and does not alert.
 
+## Warrior probes (optional)
+
+Warrior can check public pages itself every 60 seconds and alert through `probe` rules.
+This catches failures an application cannot report, such as a sign-in page that
+redirects in a loop while the application still sends healthy heartbeats.
+
+1. In Applications, create one component per page to check (for example `public-site`
+   and `signin` under Rokela PDF → production). Copy the organization, application,
+   environment and component IDs from the portal.
+2. Set `OPERATIONS_PROBES_ENABLED=true` and `OPERATIONS_PROBE_TARGETS` to a JSON array
+   (at most 10 targets), for example:
+
+   ```json
+   [
+     {
+       "org_id": "org_…",
+       "application_id": "opa_…",
+       "environment_id": "ope_…",
+       "component_id": "opm_…",
+       "url": "https://www.rokelapdf.com/api/v1/health",
+       "content_type": "json",
+       "contains": "\"ok\":true"
+     },
+     {
+       "org_id": "org_…",
+       "application_id": "opa_…",
+       "environment_id": "ope_…",
+       "component_id": "opm_…",
+       "url": "https://www.rokelapdf.com/signin",
+       "content_type": "html",
+       "contains": "<title>Rokela PDF Pro</title>"
+     }
+   ]
+   ```
+
+   Only public HTTPS names on port 443 are accepted; startup fails on anything else and
+   the error names the field, never the value. A probe passes only on a direct 200 of the
+   expected type, not from a cache, containing the expected text, within 10 seconds.
+
+3. Create a `probe` rule (threshold 1) for each probe component. A failing probe breaches
+   at once; probes that stop arriving breach after 180 seconds. The incident opens after
+   the rule window and resolves after a full window of passing probes. With email
+   enabled, the rule creator is emailed as for other automatic rules.
+4. The log line `operations probe results not recorded` means a target's IDs do not
+   match an existing component in that scope; fix the IDs. No target details are logged.
+
+Probes run from the Warrior host, so they share its network: if Railway itself is down,
+neither Warrior nor its probes report. Keep the GitHub external observers for that case.
+Probe rollback: set `OPERATIONS_PROBES_ENABLED=false` and remove `OPERATIONS_PROBE_TARGETS`;
+probe rules then see no fresh results and stay `breaching` until disabled, so disable
+them too. Nothing is deleted.
+
 Rollback: set `OPERATIONS_AUTOMATION_ENABLED=false` and redeploy. Keep migration,
 rules, incidents, notification metadata and audit history; do not down-migrate or
 delete records to roll back. This stops rule evaluation/delivery without changing

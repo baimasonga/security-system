@@ -22,6 +22,7 @@ export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
   operations_alert_rules: RIU,
   operations_alert_notifications: ALL,
   operations_heartbeats: ALL,
+  operations_probe_results: ALL,
   operations_events: ['SELECT', 'INSERT', 'DELETE'],
   operations_event_counters: ALL,
   operations_event_aggregates: ALL, // immutable digests and revocable evidence; no DELETE

@@ -130,6 +130,8 @@ it('forwards the reviewed incident email settings', () => {
     CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32),
     CLOUDFLARE_EMAIL_API_TOKEN: 'fixture-token',
     EMAIL_FROM: 'alerts@example.test',
+    OPERATIONS_PROBES_ENABLED: 'true',
+    OPERATIONS_PROBE_TARGETS: '[]',
   };
   expect(runtimeConfig(bindings(email))).toMatchObject(email);
   // A general Cloudflare deployment token is still not a runtime setting.

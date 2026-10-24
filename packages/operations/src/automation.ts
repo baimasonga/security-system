@@ -81,7 +81,7 @@ export class AutomationService {
   async create(p: UserPrincipal, scope: CredentialScope, input: CreateAlertRule) {
     if (
       input.reason !== 'initial_setup' ||
-      !['event_count', 'heartbeat'].includes(input.kind) ||
+      !['event_count', 'heartbeat', 'probe'].includes(input.kind) ||
       !Number.isInteger(input.threshold) ||
       input.threshold < 1 ||
       input.threshold > 1000 ||
@@ -226,7 +226,11 @@ export class AutomationService {
           +c.updatedAt,
           incident?.state === 'resolved' ? +incident.resolvedAt! : 0,
         );
-        const hb = await tx.getHeartbeat(scope, c.id);
+        // Probe rules read only Warrior's probe results; backend reports cannot satisfy them.
+        const hb =
+          old.kind === 'probe'
+            ? await tx.getProbeResult(scope, c.id)
+            : await tx.getHeartbeat(scope, c.id);
         const eligible =
           hb &&
           +hb.occurredAt >= epoch &&

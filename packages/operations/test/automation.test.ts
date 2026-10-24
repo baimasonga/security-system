@@ -49,6 +49,18 @@ async function setup() {
       }),
     );
   };
+  const probe = async (status: 'healthy' | 'unavailable') => {
+    await f.store.transaction(f.scope.orgId, (tx) =>
+      tx.recordProbeResult({
+        ...f.scope,
+        componentId: f.componentId,
+        status,
+        occurredAt: new Date(now),
+        receivedAt: new Date(now),
+        expiresAt: new Date(now + 86400000),
+      }),
+    );
+  };
   return {
     ...f,
     authority,
@@ -56,6 +68,7 @@ async function setup() {
     service,
     input,
     heartbeat,
+    probe,
     advance: (ms: number) => {
       now += ms;
     },
@@ -354,4 +367,35 @@ it('opens an incident when a component that reported healthy goes silent, and re
   await f.heartbeat('healthy');
   await f.service.evaluate(f.scope);
   expect((await f.store.findIncident(f.scope.orgId, incident!.id))?.state).toBe('resolved');
+});
+it('evaluates probe rules only on Warrior probe results, never on backend reports', async () => {
+  const f = await setup();
+  const rule = await f.service.create(p, f.scope, { ...f.input, kind: 'probe' });
+  const probe = f.probe;
+  const observation = async () =>
+    (await f.store.findAlertRule(f.scope.orgId, rule.id))?.observation;
+  // A healthy backend report says nothing about what Warrior can reach from outside.
+  await f.heartbeat('healthy');
+  await f.service.evaluate(f.scope);
+  expect(await observation()).toBe('unknown');
+  // A failing probe breaches even while the backend keeps reporting healthy.
+  await probe('unavailable');
+  await f.service.evaluate(f.scope);
+  expect(await observation()).toBe('breaching');
+  f.advance(60000);
+  await f.heartbeat('healthy');
+  await f.service.evaluate(f.scope);
+  const [incident] = await f.store.listIncidents(f.scope, { limit: 100 });
+  expect(incident).toMatchObject({ state: 'open', ruleId: rule.id });
+  await probe('healthy');
+  await f.service.evaluate(f.scope);
+  f.advance(60000);
+  await probe('healthy');
+  await f.service.evaluate(f.scope);
+  expect((await f.store.findIncident(f.scope.orgId, incident!.id))?.state).toBe('resolved');
+  // Probes that stop arriving breach like silent heartbeats.
+  f.advance(180000);
+  await f.heartbeat('healthy');
+  await f.service.evaluate(f.scope);
+  expect(await observation()).toBe('breaching');
 });

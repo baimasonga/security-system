@@ -770,3 +770,32 @@ Observer publication and live acceptance:
   account email, creates heartbeat rules for Rokela PDF's components and runs the
   synthetic acceptance in the guide. Then design Warrior-run probes (fixed operator-set
   HTTPS targets, DNS/redirect/private-address refusal) as their own ADR amendment.
+
+### Warrior probes — 24 October 2026
+
+- Step 2, part 2 of the owner's request: Warrior checks public pages itself and alerts
+  through rules, catching failures an application cannot report (the 24 October sign-in
+  redirect loop happened while Rokela PDF still sent healthy heartbeats).
+- Implemented (ADR-029 probe amendment, threat model "Warrior probes", contract, guide):
+  opt-in `OPERATIONS_PROBES_ENABLED` + operator-only `OPERATIONS_PROBE_TARGETS` (≤10;
+  HTTPS:443 public DNS names; every resolved address must be public, checked inside the
+  connection's lookup; no redirects/proxy/credentials; 10 s; 256 KiB; pass/fail only).
+  Results are stored separately in `operations_probe_results` (migration 0025, app-role
+  grants) and evaluated only by the new `probe` rule kind. 60-second runner in `main.ts`.
+  Route schema, OpenAPI enum, dashboard rule form and Cloudflare standby allowlist updated.
+- Local verification: `operations-probes.test.ts` (46 tests, including a real local HTTPS
+  server with a throwaway CA: blocklist table, rebinding-safe lookup, redirect, error,
+  cached, oversized, invalid UTF-8/JSON, stalled body, untrusted certificate, IP literals
+  with zero connections, config refusals that never echo values, wrong-scope recording,
+  and end to end failing probe → incident → email → recovery email); probe-rule evaluator
+  test; probe-result store contract on memory and PostgreSQL. Thirteen mutations were each
+  caught. Load scenarios `automatic-alerts-contention` (1 incident, 1 delivery attempt,
+  2 intents from 20 contenders, audit verified) and `operations-events-contention-retention`
+  (retention batches 1000/101/0, zero remaining bytes, stale after 180 s, audit verified)
+  match their asserted expectations with fsync on.
+- Not established: no probe has run against a real site from Warrior; production has no
+  probe settings. Probes share Railway's network fate; the GitHub observers stay the
+  independent check.
+- Next (owner): create `public-site` and `signin` components under Rokela PDF production,
+  set the two example targets from the automation guide, create `probe` rules, and confirm
+  the rules show `healthy` within two minutes.

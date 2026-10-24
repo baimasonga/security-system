@@ -1,4 +1,5 @@
 import { startOperationsWorker } from './operations-worker.ts';
+import { startProbeWorker } from './operations-probes.ts';
 import { startIdentityMailWorker } from './identity-mail-worker.ts';
 import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
@@ -60,6 +61,14 @@ if (config.operationsAutomationEnabled) {
     onError: () => app.log.error('operations worker failed; durable work remains pending'),
   });
   app.addHook('onClose', () => operationsWorker.stop());
+}
+if (container.operationsProbes) {
+  const probes = startProbeWorker(container.operationsProbes, {
+    // Never log targets, URLs or responses.
+    onUnrecorded: () =>
+      app.log.warn('operations probe results not recorded; check OPERATIONS_PROBE_TARGETS'),
+  });
+  app.addHook('onClose', () => probes.stop());
 }
 if (config.identityMailEncryptionKey) {
   const mail = startIdentityMailWorker(container, {
