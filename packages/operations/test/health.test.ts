@@ -214,3 +214,50 @@ it('retains historical assertions after raw expiry without treating them as curr
   );
   expect(result.items.reduce((n, r) => n + r.count, 0)).toBe(1);
 });
+it('shows Warrior probe results beside backend reports without letting either change the other', async () => {
+  const f = await setup();
+  const row = async () => (await f.get()).components.find((r) => r.id === f.componentId)!;
+  const probe = (status: 'healthy' | 'unavailable') =>
+    f.store.transaction(f.scope.orgId, (tx) =>
+      tx.recordProbeResult({
+        ...f.scope,
+        componentId: f.componentId,
+        status,
+        occurredAt: f.now(),
+        receivedAt: f.now(),
+        expiresAt: new Date(+f.now() + 86400000),
+      }),
+    );
+  expect((await row()).probe).toEqual({ status: 'unknown', occurredAt: null, receivedAt: null });
+  f.advance(1);
+  await probe('unavailable');
+  let r = await row();
+  expect(r.probe).toMatchObject({ status: 'unavailable', receivedAt: f.now() });
+  // A failing probe never rewrites the backend view, and a healthy report never hides the probe.
+  expect(r.status).toBe('unknown');
+  await f.send('healthy');
+  r = await row();
+  expect([r.status, r.probe.status]).toEqual(['healthy', 'unavailable']);
+  f.advance(1000);
+  await probe('healthy');
+  expect((await row()).probe.status).toBe('healthy');
+  f.advance(180000);
+  expect((await row()).probe.status).toBe('stale');
+  f.advance(1);
+  await probe('healthy');
+  // A result from before the component's latest change no longer counts.
+  f.advance(1);
+  await f.store.transaction(f.scope.orgId, async (tx) => {
+    const c = (await tx.find('component', f.scope.orgId, f.componentId))!;
+    await tx.update('component', { ...c, version: c.version + 1, updatedAt: f.now() }, c.version);
+  });
+  expect((await row()).probe.status).toBe('unknown');
+  f.advance(1);
+  await probe('healthy');
+  expect((await row()).probe.status).toBe('healthy');
+  await f.store.transaction(f.scope.orgId, async (tx) => {
+    const c = (await tx.find('component', f.scope.orgId, f.componentId))!;
+    await tx.update('component', { ...c, state: 'disabled', version: c.version + 1 }, c.version);
+  });
+  expect((await row()).probe.status).toBe('unknown');
+});

@@ -150,6 +150,16 @@ it('manages inventory, dependencies and fresh-MFA credentials through the real b
     await form.getByRole('button', { name: 'Add component', exact: true }).click();
     await section(page, 'Components').getByRole('cell', { name, exact: true }).waitFor();
   }
+  // Warrior's own check has its own columns and shows a dash when no probe is configured.
+  const health = section(page, 'Reported health');
+  await health.getByRole('columnheader', { name: 'Warrior check', exact: true }).waitFor();
+  expect(
+    await health
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell', { name: 'web', exact: true }) })
+      .getByRole('cell')
+      .allTextContents(),
+  ).toEqual(['web', 'unknown', 'unknown', '—', '—', '—']);
   await page
     .getByRole('row')
     .filter({ has: page.getByRole('cell', { name: 'web', exact: true }) })

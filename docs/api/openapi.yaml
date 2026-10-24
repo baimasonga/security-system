@@ -6607,6 +6607,7 @@ components:
               - occurred_at
               - received_at
               - last_assertion
+              - probe
               - dependency_ids
               - dependencies
             properties:
@@ -6657,6 +6658,32 @@ components:
                   - unavailable
                   - unknown
                   - null
+              probe:
+                description: Warrior's own latest check of this component (operator-configured probe). Shown separately; it never changes `status`.
+                type: object
+                additionalProperties: false
+                required:
+                  - status
+                  - occurred_at
+                  - received_at
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - healthy
+                      - unavailable
+                      - stale
+                      - unknown
+                  occurred_at:
+                    type:
+                      - string
+                      - 'null'
+                    format: date-time
+                  received_at:
+                    type:
+                      - string
+                      - 'null'
+                    format: date-time
               dependency_ids:
                 type: array
                 items:

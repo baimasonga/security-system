@@ -94,7 +94,11 @@ redirects in a loop while the application still sends healthy heartbeats.
    at once; probes that stop arriving breach after 180 seconds. The incident opens after
    the rule window and resolves after a full window of passing probes. With email
    enabled, the rule creator is emailed as for other automatic rules.
-4. The log line `operations probe results not recorded` means a target's IDs do not
+4. At startup Warrior logs `operations probes enabled for N target(s)` (a count only). The
+   Applications → environment page's **Reported health** table shows each component's
+   **Warrior check** result and **Last checked** time beside the application's own report;
+   `—` means no check has been recorded for that component.
+5. The log line `operations probe results not recorded` means a target's IDs do not
    match an existing component in that scope; fix the IDs. No target details are logged.
 
 Probes run from the Warrior host, so they share its network: if Railway itself is down,

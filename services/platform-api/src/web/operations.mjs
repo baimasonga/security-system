@@ -553,16 +553,25 @@ export async function operationsView(ui) {
         node('h2', 'Reported health'),
         node(
           'p',
-          'Backend assertions, not independent probes. Missing and stale reports do not establish availability. Refresh to update.',
+          "Own report is what the application says about itself; Warrior check is Warrior's own probe of the configured page (— when none is configured). Missing and stale results do not establish availability. Refresh to update.",
         ),
         result.components.length
           ? table(
-              ['Component', 'Health with dependencies', 'Own report', 'Last received'],
+              [
+                'Component',
+                'Health with dependencies',
+                'Own report',
+                'Last received',
+                'Warrior check',
+                'Last checked',
+              ],
               result.components.map((c) => [
                 c.code,
                 c.status,
                 c.reported_status,
                 when(c.received_at),
+                c.probe.received_at ? c.probe.status : '—',
+                when(c.probe.received_at),
               ]),
             )
           : empty('No components to monitor.'),

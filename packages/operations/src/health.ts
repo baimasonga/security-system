@@ -87,21 +87,28 @@ export class HealthService {
       const a = (await tx.find('application', scope.orgId, scope.applicationId))!;
       const e = (await tx.find('environment', scope.orgId, scope.environmentId))!;
       const components = await tx.list('component', scope);
+      // A record counts only if it is unexpired, not from the future and newer than the
+      // latest change to its application, environment and component.
+      const current = <T extends { occurredAt: Date; receivedAt: Date; expiresAt: Date }>(
+        r: T | undefined,
+        c: { version: number; updatedAt: Date },
+      ) =>
+        r &&
+        r.expiresAt > now &&
+        r.receivedAt <= now &&
+        r.occurredAt <= now &&
+        [a, e, c].every((resource) =>
+          resource.version === 1
+            ? r.occurredAt >= resource.updatedAt
+            : r.occurredAt > resource.updatedAt,
+        )
+          ? r
+          : undefined;
       const rows = await Promise.all(
         components.map(async (c) => {
-          const report = await tx.getHeartbeat(scope, c.id);
-          const eligible =
-            report &&
-            report.expiresAt > now &&
-            report.receivedAt <= now &&
-            report.occurredAt <= now &&
-            [a, e, c].every((resource) =>
-              resource.version === 1
-                ? report.occurredAt >= resource.updatedAt
-                : report.occurredAt > resource.updatedAt,
-            )
-              ? report
-              : undefined;
+          const eligible = current(await tx.getHeartbeat(scope, c.id), c);
+          // Warrior's own check, shown beside the backend report; it never changes `status`.
+          const probe = current(await tx.getProbeResult(scope, c.id), c);
           const active = a.state === 'active' && e.state === 'active' && c.state === 'active';
           const status: HealthStatus =
             !active || !eligible
@@ -120,6 +127,15 @@ export class HealthService {
             occurredAt: eligible?.occurredAt ?? null,
             receivedAt: eligible?.receivedAt ?? null,
             lastAssertion: eligible?.status ?? null,
+            probe: {
+              status: (!active || !probe
+                ? 'unknown'
+                : +now - +probe.receivedAt >= 180000
+                  ? 'stale'
+                  : probe.status) as 'healthy' | 'unavailable' | 'stale' | 'unknown',
+              occurredAt: probe?.occurredAt ?? null,
+              receivedAt: probe?.receivedAt ?? null,
+            },
             dependencyIds: c.dependencyIds,
           };
         }),
