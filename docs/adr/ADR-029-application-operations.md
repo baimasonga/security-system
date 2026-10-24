@@ -213,3 +213,33 @@ HTTPS endpoints, refuse redirects, validate envelopes before sending and never e
 response bodies. Cloudflare requires a success response that names this recipient as
 delivered or queued and not permanently bounced. Webhooks, SMS, per-rule recipients and
 configurable network probes remain separate reviewed changes.
+
+### OPS-005 Warrior probe amendment — 24 October 2026
+
+Status: accepted. Warrior may make its own outside-in HTTPS checks, behind the separate
+opt-in `OPERATIONS_PROBES_ENABLED` (requires automation). This resolves the earlier
+"no network probes" gate with these rules:
+
+- **Targets are operator configuration only** (`OPERATIONS_PROBE_TARGETS`, a JSON array
+  of at most 10). Each binds one existing inventory component (organization, application,
+  environment, component IDs) to one URL, an expected content type (`json` or `html`) and
+  a fixed text the response must contain. No route, event, rule, inventory field or tenant
+  can supply or change a target. Unknown fields fail startup; errors never echo values.
+- **Destination policy:** `https:` on the default port only; no credentials, fragment,
+  IP literal, single-label name or `localhost`/`.local`/`.internal`/`.arpa` names. The
+  connection's own DNS lookup refuses the name unless every resolved address is public
+  (loopback, private, CGNAT, link-local, metadata, multicast, reserved, documentation,
+  ULA, NAT64, 6to4, Teredo and IPv4-mapped ranges are refused), so the checked address is
+  the connected one. Redirects are never followed; system CAs only; no proxy, cookies or
+  authorization; 10 s deadline including the body; 256 KiB cap; strict UTF-8.
+- **Pass/fail only:** a probe passes on a direct 200 of the expected type, not served
+  from a cache (`Age` 0), containing the expected text (and valid JSON for `json`). No
+  response body, header, address or error is stored or logged.
+- **Separate provenance:** results go to `operations_probe_results` (latest per
+  component, ordered by occurrence, ties prefer unavailable, 30-day expiry), never to
+  backend heartbeats. A new `probe` rule kind evaluates only these results with the
+  existing freshness (180 s), window, incident, notification and recovery semantics, so
+  a probe and the application's own report can never satisfy each other's rules.
+- Probes run every 60 seconds per instance; several instances may probe concurrently and
+  the ordered upsert keeps the latest outcome. Probes are read-only GETs and never change
+  inventory, licensing or the probed system.

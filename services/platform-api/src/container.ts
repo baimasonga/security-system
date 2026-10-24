@@ -21,6 +21,8 @@ import {
 } from './integrations/billing.ts';
 import { configuredMailDelivery, type MailDelivery } from './integrations/mail.ts';
 import { incidentEmailDelivery } from './operations-mail.ts';
+import { runProbes } from './operations-probes.ts';
+import { checkHttps, type ProbeCheck } from './integrations/probe-http.ts';
 import {
   AuthService,
   InMemoryAuthStore,
@@ -107,6 +109,8 @@ export interface Container {
   operationsIncidents: IncidentService;
   operationsPosture: PostureService;
   operationsAutomation: AutomationService;
+  /** One run of the configured Warrior probes; undefined unless OPERATIONS_PROBES_ENABLED. */
+  operationsProbes: (() => Promise<{ recorded: number; unrecorded: number }>) | undefined;
   readiness(): Promise<boolean>;
   licensing: LicensingService;
   billing: BillingService | undefined;
@@ -148,6 +152,8 @@ export interface ContainerOverrides {
   sharingMailer?: IdentityDelivery;
   /** Test seam: replaces the incident email provider (fake recipients only). */
   operationsMail?: MailDelivery;
+  /** Test seam: replaces the outbound probe transport. */
+  probeCheck?: (target: ProbeCheck) => Promise<boolean>;
   sharingConfig?: Partial<typeof DEFAULT_SHARING_CONFIG>;
 }
 
@@ -629,6 +635,15 @@ export async function createContainer(
     operationsIncidents,
     operationsPosture,
     operationsAutomation,
+    operationsProbes: config.operationsProbeTargets
+      ? () =>
+          runProbes({
+            targets: config.operationsProbeTargets!,
+            store: operationsStore,
+            clock,
+            check: overrides?.probeCheck ?? ((t) => checkHttps(t)),
+          })
+      : undefined,
     readiness,
     licensing,
     billing,

@@ -6752,6 +6752,7 @@ components:
           enum:
             - event_count
             - heartbeat
+            - probe
         event_type: &id004
           type:
             - string

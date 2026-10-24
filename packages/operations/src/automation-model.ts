@@ -17,7 +17,8 @@ export const RUNBOOKS = [
 export interface AlertRule extends CredentialScope {
   id: string;
   componentId: string;
-  kind: 'event_count' | 'heartbeat';
+  /** `probe` evaluates Warrior's own outside-in checks, never the application's reports. */
+  kind: 'event_count' | 'heartbeat' | 'probe';
   eventType: (typeof ALERT_EVENTS)[number] | null;
   threshold: number;
   windowSeconds: number;

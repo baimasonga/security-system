@@ -1007,7 +1007,7 @@ export async function operationsView(ui) {
     card.append(
       node(
         'p',
-        'Rules evaluate committed backend observations. Recovery requires fresh healthy evidence. Notifications appear here for the person who created the rule.',
+        "Heartbeat and event rules evaluate committed backend observations; probe rules evaluate Warrior's own checks of operator-configured URLs. Recovery requires fresh healthy evidence. Notifications appear here for the person who created the rule.",
       ),
     );
     card.append(
@@ -1016,7 +1016,7 @@ export async function operationsView(ui) {
             ['Component', 'Rule', 'Observation', 'Maintenance', 'Actions'],
             rules.map((r) => [
               components.find((c) => c.id === r.component_id)?.code || r.component_id,
-              `${r.kind === 'heartbeat' ? 'Heartbeat' : r.event_type} · ${r.threshold} / ${r.window_seconds}s · ${r.severity}`,
+              `${r.kind === 'heartbeat' ? 'Heartbeat' : r.kind === 'probe' ? 'Warrior probe' : r.event_type} · ${r.threshold} / ${r.window_seconds}s · ${r.severity}`,
               `${r.enabled ? r.observation : 'Disabled'}${r.kind === 'event_count' ? ` (${r.observed_count})` : ''}`,
               when(r.maintenance_until),
               (() => {
@@ -1107,7 +1107,11 @@ export async function operationsView(ui) {
               label: 'Alert component',
               options: components.filter((c) => c.state === 'active').map((c) => [c.id, c.code]),
             },
-            { name: 'kind', label: 'Condition', options: choices(['heartbeat', 'event_count']) },
+            {
+              name: 'kind',
+              label: 'Condition',
+              options: choices(['heartbeat', 'probe', 'event_count']),
+            },
             {
               name: 'event_type',
               label: 'Failure event (event count only)',
@@ -1121,7 +1125,7 @@ export async function operationsView(ui) {
             },
             {
               name: 'threshold',
-              label: 'Failure count (heartbeat: 1)',
+              label: 'Failure count (heartbeat or probe: 1)',
               type: 'number',
               value: '1',
             },
@@ -1150,7 +1154,7 @@ export async function operationsView(ui) {
           ],
           'Create rule',
           async (data, n) => {
-            data.event_type = data.kind === 'heartbeat' ? null : data.event_type;
+            data.event_type = data.kind === 'event_count' ? data.event_type : null;
             await ui.api(`${path}/rules`, 'POST', { ...data, reason: 'initial_setup' });
             if (current(n)) await show(reload);
           },

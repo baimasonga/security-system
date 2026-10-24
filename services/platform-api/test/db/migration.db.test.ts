@@ -72,6 +72,7 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
       '0022_operations_incidents',
       '0023_operations_automation',
       '0024_operations_posture',
+      '0025_operations_probes',
     ]);
     const second = await applyMigrations(db, migrationsDir);
     expect(second).toEqual({
@@ -101,8 +102,21 @@ describe.skipIf(!url)('PostgreSQL schema (migration 0001)', () => {
         '0022_operations_incidents',
         '0023_operations_automation',
         '0024_operations_posture',
+        '0025_operations_probes',
       ],
     });
+  });
+
+  it('0025 replaces only the rule kind/event check and keeps the timestamp check', async () => {
+    const defs = (
+      await q(
+        `SELECT pg_get_constraintdef(oid) d FROM pg_constraint WHERE conrelid='operations_alert_rules'::regclass AND contype='c'`,
+      )
+    ).rows.map((r) => String(r.d));
+    expect(defs.filter((d) => d.includes('updated_at >= created_at'))).toHaveLength(1);
+    const kindEvent = defs.filter((d) => d.includes('event_type IS NOT NULL'));
+    expect(kindEvent).toHaveLength(1);
+    expect(kindEvent[0]).toContain("'probe'");
   });
 
   it('refuses to run when an applied migration file has been modified (immutable history)', async () => {

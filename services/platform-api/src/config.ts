@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateHostname } from '@trust/sharing';
 import type { BillingConfig } from './billing.ts';
+import { parseProbeTargets, type ProbeTarget } from './operations-probes.ts';
 import { PaddleCheckoutProvider, PaddleWebhookVerifier } from './integrations/billing.ts';
 import {
   IdentityMailCipher,
@@ -23,6 +24,8 @@ export interface PlatformConfig {
   operationsAutomationEnabled: boolean;
   /** OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED: incident transitions are emailed to the rule creator. */
   operationsEmailNotificationsEnabled: boolean;
+  /** OPERATIONS_PROBES_ENABLED + OPERATIONS_PROBE_TARGETS: Warrior's own outside-in checks. */
+  operationsProbeTargets?: ProbeTarget[];
   operationsPostureEnabled: boolean;
   env: 'development' | 'test' | 'production';
   mfaEncryptionKey?: string;
@@ -483,6 +486,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
         publicOrigin: url.origin,
       };
   }
+  const opsProbes = env['OPERATIONS_PROBES_ENABLED'];
+  if (opsProbes !== undefined && !['true', 'false'].includes(opsProbes))
+    throw new Error('OPERATIONS_PROBES_ENABLED must be true or false');
+  if (opsProbes === 'true' && opsAutomation !== 'true')
+    throw new Error('OPERATIONS_PROBES_ENABLED requires automation');
+  if (opsProbes === 'true' && !env['OPERATIONS_PROBE_TARGETS'])
+    throw new Error('OPERATIONS_PROBE_TARGETS is required with OPERATIONS_PROBES_ENABLED');
+  if (opsProbes !== 'true' && env['OPERATIONS_PROBE_TARGETS'])
+    throw new Error('OPERATIONS_PROBE_TARGETS requires OPERATIONS_PROBES_ENABLED=true');
+  const operationsProbeTargets =
+    opsProbes === 'true' ? parseProbeTargets(env['OPERATIONS_PROBE_TARGETS']!) : undefined;
   const opsEmail = env['OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED'];
   if (opsEmail !== undefined && !['true', 'false'].includes(opsEmail))
     throw new Error('OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED must be true or false');
@@ -602,6 +616,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     operationsIncidentsEnabled: opsIncidents === 'true',
     operationsAutomationEnabled: opsAutomation === 'true',
     operationsEmailNotificationsEnabled: opsEmail === 'true',
+    ...(operationsProbeTargets ? { operationsProbeTargets } : {}),
     operationsPostureEnabled: opsPosture === 'true',
     ...(webauthn ? { webauthn } : {}),
     host: env['HOST'] ?? '127.0.0.1',

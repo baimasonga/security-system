@@ -16,10 +16,21 @@ export interface Heartbeat extends CredentialScope {
   receivedAt: Date;
   expiresAt: Date;
 }
+/** Latest outside-in check made by Warrior itself; never a backend report (ADR-029 probes). */
+export interface ProbeResult extends CredentialScope {
+  componentId: string;
+  status: 'healthy' | 'unavailable';
+  occurredAt: Date;
+  receivedAt: Date;
+  expiresAt: Date;
+}
 export interface HealthRepo {
   observeHealthTime(orgId: string, now: Date): Promise<Date>;
   recordHeartbeat(row: Heartbeat): Promise<void>;
   getHeartbeat(scope: CredentialScope, componentId: string): Promise<Heartbeat | undefined>;
+  /** Latest occurrence wins; equal occurrences prefer unavailable. */
+  recordProbeResult(row: ProbeResult): Promise<void>;
+  getProbeResult(scope: CredentialScope, componentId: string): Promise<ProbeResult | undefined>;
   listHealthHistory(
     scope: CredentialScope,
     componentId: string,
