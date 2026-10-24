@@ -1,5 +1,30 @@
 # Operations/security implementation status and agent handoff
 
+## AI-assisted investigation entry point — 24 October 2026
+
+- Owner authorized the recommendation to start with read-only IT investigation and
+  code review. Added an operator-run diagnostic brief and manual GitHub workflow,
+  reusing the four fixed, bounded public checks for Warrior and Rokela PDF.
+  No model service, remediation permission, database access or email send is added.
+- [Investigation runbook](../runbooks/ai-assisted-investigation.md) records evidence
+  handling, deployment correlation, tests, GitHub publication and live recovery checks.
+  The brief explicitly leaves root cause and authenticated behavior unestablished.
+- Baseline cfcc617 CI, CodeQL and release observation passed; recovery exercise
+  40103008955 passed on 6e4afa0. Latest owner screenshots show verified email and MFA
+  enabled, superseding the older unverified-account observation below. Incident email
+  delivery, production restore acceptance and independent witness remain unverified.
+- The workspace's public-check attempt returned four failures; restricted observer
+  networking means this is not evidence of four production outages. Use the independent
+  GitHub workflow to verify reachable public endpoints after publication.
+- Verification: `npm run check` passed 1078 tests (3 skipped), including three new
+  brief tests for fixed anonymous destinations, mixed outcomes, safe failure output
+  and evidence limits. A deliberate false-root-cause mutation was rejected, restored
+  and the new suite passed again. Manual workflow YAML parsed with read-only permissions.
+  Full checks required network permission for existing local HTTP server tests.
+- Next: run **Actions → IT incident brief → Run workflow** after publication and use
+  its bounded report with the runbook. No live success, model integration or unattended
+  remediation is claimed by the local tests.
+
 Updated: 20 October 2026.
 
 ## Current state
