@@ -736,4 +736,4 @@ Observer publication and live acceptance:
   override once a wrangler release ships a patched undici.
 - Verification: both audit gates report 0 vulnerabilities. `npm run check` passed (1006
   tests, 3 skipped), the Cloudflare bundle builds, and `npm run test:db` was run on
-  PostgreSQL as superuser and as the app role (result below).
+  PostgreSQL as superuser and as the app role: 727 tests passed.
