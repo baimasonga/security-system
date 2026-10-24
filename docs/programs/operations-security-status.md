@@ -693,3 +693,25 @@ Observer publication and live acceptance:
   secret-logging mutations were caught. Current GitHub/source search contains no
   actual project-specific Supabase hostname; DATABASE_URL is deployment config.
   Factory reset remains blocked on verified live target and maintenance access.
+
+### Rokela PDF external availability observer — 24 October 2026
+
+- Requested by the owner after two Rokela PDF outages on 24 October (a startup crash on
+  a malformed monitoring setting, then a production sign-in redirect loop) that no alert
+  caught. Added `tools/check-rokela-availability.mjs` and the separate
+  **Rokela PDF external availability** workflow (every ten minutes, GitHub-hosted, so it
+  also reports when Railway itself is down). It checks `/api/v1/health` for exactly
+  `{"ok":true}` and that `/signin` is served directly (no redirect) as the Rokela PDF page.
+  Warrior's own observer and release check are unchanged.
+- Local verification: `services/platform-api/test/rokela-availability.test.mjs` (17 tests)
+  covers healthy responses, 500/503, wrong or extra JSON, wrong content type, cached and
+  oversized bodies, transport errors, redirect responses and refusal, error and wrong pages,
+  stalled transport and endless bodies. Six deliberate mutations (follow redirects, ignore
+  status, ignore the ok value, ignore the page title, drop the size limit, accept cached
+  responses) were each caught; the source was restored. A live local run against production
+  passed both checks, and a real redirect (`rokelapdf.com/signin` → `www`) was refused.
+- Not established: a live scheduled run on GitHub, or that the failure email reaches the
+  owner. That depends on the owner account's Actions notification settings.
+- Next: after merge, confirm the first scheduled run passes, and confirm failed-run email is
+  enabled for the owner account. The Warrior-side features (missing-heartbeat incidents for
+  Rokela PDF, outside-in probes run by Warrior, incident email delivery) remain separate work.

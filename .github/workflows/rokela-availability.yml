@@ -1,0 +1,30 @@
+name: Rokela PDF external availability
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '2,12,22,32,42,52 * * * *'
+  push:
+    branches: [main, claude/sleepy-carson-l0if1k]
+    paths:
+      - tools/check-rokela-availability.mjs
+      - .github/workflows/rokela-availability.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rokela-external-availability
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Rokela PDF health and sign-in page
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/check-rokela-availability.mjs
