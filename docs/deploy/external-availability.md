@@ -32,6 +32,36 @@ production application flag or data migration to roll back. If the permanent
 Warrior domain changes, review and change both fixed targets in the script and
 its tests; do not replace them with arbitrary environment-supplied destinations.
 
+## Rokela PDF availability
+
+A second, separate workflow, **Rokela PDF external availability**, observes the Rokela PDF
+application the same way: every ten minutes (offset from Warrior's run) or manually through
+**Actions → Rokela PDF external availability → Run workflow**. It exists because Rokela PDF
+and Warrior both run on Railway, so a Railway-wide outage would silence any check running
+inside Warrior; this one runs on GitHub-hosted runners.
+
+`tools/check-rokela-availability.mjs` makes two public read-only requests to the fixed origin
+`https://www.rokelapdf.com`:
+
+- `/api/v1/health` must answer 200 with a JSON body of exactly `{"ok":true}` (the app is up
+  and its database answers), within 1 KiB.
+- `/signin` must answer 200 directly, with an HTML body of at most 256 KiB containing the
+  page title `<title>Rokela PDF Pro</title>`. Any redirect fails, so a sign-in redirect loop
+  like the one of 24 October 2026 is caught, and so is an error page. The sign-in form itself
+  renders in the browser; this check proves the page is served, not that a login succeeds.
+
+The same limits as Warrior's observer apply: ten-second deadlines including the body,
+credentials omitted, redirects refused, a nonzero cache Age fails, TLS verification on, and
+logs carry only check names and passed/failed. Either failed check fails the job.
+
+**Alerting:** a failed run is the alert. GitHub emails failed scheduled runs to the account
+that created the workflow or last changed its schedule, if that account's
+**Settings → Notifications → Actions** allows email for failed workflows. Confirm that setting
+for the owner account after merging. The workflow sends no application messages, opens no
+issues and imports nothing into Warrior; it does not replace Warrior's own heartbeat rules or
+alert delivery. If the canonical Rokela PDF domain or page title changes, update the fixed
+target and its tests together.
+
 ## Release observation
 
 A separate **Warrior release observation** workflow runs on default-branch pushes
