@@ -1103,6 +1103,18 @@ paths:
             schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
           }
       responses: { '200': { description: Audit events (hash-chained) } }
+  /v1/admin/mobile-distribution:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Fixed Rokela PDF Android GitHub asset download counter; operator only
+      description: Metadata only. Cached for up to five minutes (30 seconds on failure). No destination parameters. Downloads apply to the current asset ID, not lifetime installs or unique people. No country or usage evidence is returned.
+      responses:
+        '200':
+          description: status (available or unavailable), checked_at and source; available adds asset_id, downloads, size_bytes, created_at and updated_at. Unavailable never substitutes zero.
+        '400': { description: Unknown query parameters }
+        '401': { description: Authentication required }
+        '403': { description: Operator required }
   /v1/admin/metrics:
     get:
       tags: [admin]

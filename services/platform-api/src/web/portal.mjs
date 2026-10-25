@@ -1550,6 +1550,56 @@ async function operatorView() {
     ),
   );
   await loadOverview();
+  const mobileReport = node('div');
+  mobileReport.setAttribute('aria-live', 'polite');
+  mobileReport.append(
+    node('p', 'Select Refresh APK downloads to retrieve the current release counter.'),
+  );
+  sections.push(
+    panel(
+      node('h2', 'Mobile app downloads'),
+      node('p', 'Rokela PDF for Android · direct APK distribution through GitHub'),
+      button('Refresh APK downloads', async () => {
+        mobileReport.replaceChildren(node('p', 'Loading download evidence…'));
+        try {
+          const result = await api('/v1/admin/mobile-distribution');
+          if (result.status !== 'available') {
+            mobileReport.replaceChildren(
+              node('p', 'Download evidence unavailable. No download count is established.'),
+            );
+            return;
+          }
+          mobileReport.replaceChildren(
+            table(
+              ['Current APK evidence', 'Value'],
+              [
+                ['GitHub download count', result.downloads],
+                ['Asset ID', result.asset_id],
+                ['Asset created', new Date(result.created_at).toLocaleString()],
+                ['Asset updated', new Date(result.updated_at).toLocaleString()],
+                ['Checked', new Date(result.checked_at).toLocaleString()],
+              ],
+            ),
+          );
+        } catch {
+          mobileReport.replaceChildren(
+            node('p', 'Download evidence unavailable. No download count is established.'),
+          );
+        }
+      }),
+      mobileReport,
+      node(
+        'p',
+        'This is GitHub’s counter for the current APK asset, not unique people, verified installs or a lifetime total. Replacing the asset can reset it. Results may be cached for five minutes.',
+      ),
+      node('h3', 'App usage, devices and country'),
+      node(
+        'p',
+        'Not connected. GitHub downloads do not report app launches, active installations, device details or country. These require the mobile reporting integration. Country will be derived from IP only; no GPS collection.',
+      ),
+    ),
+  );
+
   const forms = [
     [
       'Create product',

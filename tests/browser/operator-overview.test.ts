@@ -58,6 +58,35 @@ it('shows live operator evidence, handles unavailable data and preserves existin
   );
   await page.getByRole('button', { name: 'Check audit integrity', exact: true }).click();
   await page.getByText('Audit integrity check failed.', { exact: false }).waitFor();
+  await page.getByLabel('Operator action').selectOption({ label: 'Mobile app downloads' });
+  await page.route('**/v1/admin/mobile-distribution', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'available',
+        downloads: 17,
+        asset_id: 123,
+        created_at: '2026-10-25T00:00:00Z',
+        updated_at: '2026-10-25T00:00:00Z',
+        checked_at: '2026-10-25T00:00:00Z',
+      }),
+    }),
+  );
+  await page.getByRole('button', { name: 'Refresh APK downloads' }).click();
+  await page.getByRole('cell', { name: '17', exact: true }).waitFor();
+  expect(await page.getByText('Not connected.', { exact: false }).isVisible()).toBe(true);
+  await page.unroute('**/v1/admin/mobile-distribution');
+  await page.route('**/v1/admin/mobile-distribution', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{"status":"unavailable"}',
+    }),
+  );
+  await page.getByRole('button', { name: 'Refresh APK downloads' }).click();
+  await page.getByText('Download evidence unavailable.', { exact: false }).waitFor();
+  expect(await page.getByRole('cell', { name: '17', exact: true }).count()).toBe(0);
   await page.getByLabel('Operator action').selectOption({ label: 'Create product' });
   await page.getByRole('heading', { name: 'Create product', exact: true }).waitFor();
   expect(await page.getByRole('heading', { name: 'Operations overview' }).isVisible()).toBe(false);

@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { DomainError } from '@trust/shared-types';
+import { createApkDistributionReader } from '../integrations/apk-distribution.ts';
 import type { Container } from '../container.ts';
 import { operator, parse, principalOf, toWire } from '../http.ts';
 import {
+  emptyBody,
   auditQuery,
   deviceParams,
   anchorManifestBody,
@@ -32,6 +34,11 @@ import {
  */
 export function registerAdminRoutes(app: FastifyInstance, c: Container): void {
   const pre = { preHandler: operator(c) };
+  const readApkDistribution = createApkDistributionReader();
+  app.get('/v1/admin/mobile-distribution', pre, async (req) => {
+    parse(emptyBody, req.query);
+    return readApkDistribution();
+  });
   const actor = (req: Parameters<typeof principalOf>[0], reason: string) => ({
     id: principalOf(req).userId,
     reason,

@@ -1,5 +1,24 @@
 # Operations/security implementation status and agent handoff
 
+## Direct Android APK distribution — 25 October 2026
+
+- Confirmed the mobile source in Rokelapdf-online/mobile (Capacitor) and /android
+  linking directly to the GitHub android release asset. User requested country by
+  IP only, no GPS. No paid service is authorized or provisioned.
+- Added operator-only fixed GitHub metadata read and a Mobile app downloads console
+  section. Displays current asset download counter, identity and times. Replacement
+  can reset the counter; unavailable never becomes zero, installs or unique people.
+- Public GitHub metadata confirms an uploaded APK exists. Runtime outbound access
+  still needs deployed verification. Mobile usage/device/country ingestion remains
+  Not connected, with its separate design in mobile-app-analytics.md.
+- Verification: full checks passed 1138 tests (3 skipped); the operator browser
+  test passed for downloads and unavailable evidence. Nine adapter/API tests passed.
+  Removing authorization or fixed asset URL validation was caught; source restored
+  and targeted tests passed again.
+- No APK or PDF source change shipped in this slice. Next: define and implement
+  the scoped public-mobile collector and trusted IP-country source before adding
+  app reporting; never embed the existing backend credential in the APK.
+
 ## Operator overview in the Warrior portal — 25 October 2026
 
 - Added Operations overview as the initial Operator console section. It reads the
