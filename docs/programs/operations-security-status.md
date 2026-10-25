@@ -1,5 +1,23 @@
 # Operations/security implementation status and agent handoff
 
+## Production-major recovery coverage — 25 October 2026
+
+- GitHub CI, CodeQL, release observation, external availability and synthetic
+  recovery all passed for d267bab.
+- Read-only provider metadata confirms Warrior production is active/healthy on
+  PostgreSQL 17.11. The synthetic restore workflow previously tested only 16.
+- Expanded the recovery workflow to separate PostgreSQL 16 and 17 jobs with
+  fail-fast disabled, retaining the existing isolated fixture and cleanup policy.
+- Local PostgreSQL 17/fsync-on restore passed all 25 migrations, fresh login,
+  credential refusals, recovered application read and audit checks.
+- Provider documentation offers restore-to-new-project for paid projects with
+  physical backups enabled. It creates separately billed resources and copies
+  database roles/data; storage objects and external configuration are not copied.
+  Backup availability, physical backup/PITR enablement and destination costs have
+  not been verified for this project. No clone or production export was created.
+- Next production step remains review of the available backup and quoted isolated
+  destination, followed by the recovery runbook's acceptance checks.
+
 ## Restored authentication acceptance — 25 October 2026
 
 - Extended the synthetic restore exercise to log in against the restored database

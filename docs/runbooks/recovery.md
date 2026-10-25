@@ -24,7 +24,7 @@ quarterly; the first restore drill is a launch prerequisite.
 ## Repeatable synthetic exercise
 
 The **Warrior synthetic recovery exercise** GitHub Actions workflow runs weekly,
-on relevant changes and manually. It creates disposable PostgreSQL 16 databases
+on relevant changes and manually. It creates disposable PostgreSQL 16 and 17 databases
 with fsync enabled and synthetic accounts only. `tools/restore-drill-local.ts`
 exports a consistent snapshot, restores it into a separate database, and checks:
 
