@@ -1,5 +1,24 @@
 # Operations/security implementation status and agent handoff
 
+## Operator overview in the Warrior portal — 25 October 2026
+
+- Added Operations overview as the initial Operator console section. It reads the
+  existing operator-protected anchor endpoint and renders configuration, latest
+  attempt and recent publication records without requiring operators to read JSON.
+- Read-only audit integrity checks now have readable success/failure/unavailable
+  states. Configuration and internally consistent chains do not claim independent
+  retention, retrieval or current protection. Failed refresh clears previous data.
+- Direct navigation to application monitoring and clearly labelled external GitHub
+  investigation/recovery workflows makes their locations visible in the product.
+  It does not claim that external jobs execute inside Warrior or verify production
+  restores. Existing provisioning and audit actions remain in the selector.
+- Browser coverage exercises the default screen, absent/configured witness,
+  failed publication, integrity pass/fail, unavailable status and existing actions.
+- Verification: full checks passed 1129 tests (3 skipped); all 25 Chromium
+  browser tests passed, including the new operator overview.
+- Delivery uses the existing GitHub-connected branch. Railway's connector requires
+  reauthentication, so deployed revision cannot currently be confirmed through it.
+
 ## Readable IT incident evidence — 25 October 2026
 
 - Owner deferred the paid Supabase restore. No new paid resource is authorized by

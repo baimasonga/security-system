@@ -1458,6 +1458,98 @@ async function operatorView() {
       'Provision software access and inspect audit evidence. Every mutation requires a reason.',
     ),
   ];
+  const overview = node('div');
+  overview.setAttribute('aria-live', 'polite');
+  const loadOverview = async () => {
+    overview.replaceChildren(node('p', 'Loading audit status…'));
+    try {
+      const anchors = await api('/v1/admin/audit/anchors?limit=10');
+      overview.replaceChildren(
+        table(
+          ['Audit protection', 'Current evidence'],
+          [
+            ['External witness', anchors.configured ? 'Configured' : 'Not configured'],
+            [
+              'Latest publication attempt',
+              anchors.items[0]
+                ? `${anchors.items[0].status} · ${new Date(anchors.items[0].created_at).toLocaleString()}`
+                : 'No publication recorded',
+            ],
+          ],
+        ),
+        node(
+          'p',
+          'Configuration and publication records do not prove independent retention or retrieval. Missing or old evidence does not establish current protection.',
+        ),
+        node('h3', 'Recent audit publications'),
+        table(
+          ['Received', 'Result', 'Chains', 'Events'],
+          anchors.items.map((item) => [
+            new Date(item.created_at).toLocaleString(),
+            item.status,
+            item.chains,
+            item.events,
+          ]),
+        ),
+      );
+    } catch {
+      overview.replaceChildren(
+        node(
+          'p',
+          'Audit status unavailable. Retry or check your operator access; this is not evidence that protection is active.',
+        ),
+      );
+    }
+  };
+  const chainResult = node('p', 'Audit chains have not been checked in this view.');
+  chainResult.setAttribute('aria-live', 'polite');
+  const investigation = node('a', 'Open IT incident brief in GitHub');
+  investigation.href =
+    'https://github.com/baimasonga/security-system/actions/workflows/it-incident-brief.yml';
+  const recovery = node('a', 'Open synthetic recovery checks in GitHub');
+  recovery.href =
+    'https://github.com/baimasonga/security-system/actions/workflows/recovery-exercise.yml';
+  sections.push(
+    panel(
+      node('h2', 'Operations overview'),
+      node('p', 'Inspect audit protection and open the monitoring and investigation tools.'),
+      button('Refresh audit status', loadOverview),
+      overview,
+      button('Check audit integrity', async () => {
+        chainResult.textContent = 'Checking audit chains…';
+        try {
+          const result = await api('/v1/admin/audit/verify');
+          chainResult.textContent =
+            result.ok === true
+              ? 'Audit chains are internally consistent. This does not replace an independent witness.'
+              : 'Audit integrity check failed. Review the audit evidence before relying on this history.';
+        } catch {
+          chainResult.textContent =
+            'Audit integrity could not be checked. No successful result is established.';
+        }
+      }),
+      chainResult,
+      node('h3', 'Application monitoring'),
+      node(
+        'p',
+        'Open an application to inspect its component reports, Warrior checks, incidents and recovery evidence.',
+      ),
+      button('Open application monitoring', () => navigate('Applications')),
+      node('h3', 'IT investigation'),
+      node(
+        'p',
+        'The independent public checks run in GitHub. Open the workflow, select Run workflow, then read its Summary. They do not test authenticated workflows or establish root cause.',
+      ),
+      investigation,
+      node('h3', 'Recovery readiness'),
+      node(
+        'p',
+        'Synthetic restore tests run separately in GitHub. Their success does not verify a production backup or a production restore. Review application recovery evidence separately.',
+      ),
+      recovery,
+    ),
+  );
+  await loadOverview();
   const forms = [
     [
       'Create product',

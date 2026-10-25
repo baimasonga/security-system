@@ -6,6 +6,16 @@ The assistant collects evidence, explains uncertainty, prepares tested GitHub fi
 and checks recovery. No new model API, production credential or autonomous authority
 is introduced. The owner requested this read-only first step on 24 October 2026.
 
+## Open the operator overview
+
+In Warrior, open **Operator console → Operations overview** (the default section).
+Use **Refresh audit status** for current configuration and recent publication
+attempts, or **Check audit integrity** for a read-only chain consistency check.
+Unavailable results are explicitly shown; neither configuration nor a successful
+chain check proves independent witness retention. **Open application monitoring**
+leads to component health, incidents and recovery evidence. The investigation and
+synthetic recovery links open their separate GitHub workflows.
+
 ## Collect the initial brief
 
 In GitHub, open **Actions → IT incident brief → Run workflow**, then open the
