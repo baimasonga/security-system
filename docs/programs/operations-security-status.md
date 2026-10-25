@@ -1,5 +1,21 @@
 # Operations/security implementation status and agent handoff
 
+## Restored authentication acceptance — 25 October 2026
+
+- Extended the synthetic restore exercise to log in against the restored database
+  and use its newly authenticated principal for the recovered application read.
+  Previously that read reused the source database's principal.
+- Incorrect passwords and accounts created after the snapshot must be rejected.
+  Audit integrity is checked again after restored authentication operations.
+- The isolated PostgreSQL 16/fsync-on exercise passed all 25 migration checks,
+  restored login, both rejection cases, application read and audit verification.
+- Updated the stale recovery runbook and added production rehearsal prerequisites,
+  isolation of restored outboxes/credentials, matching-version validation, secret
+  recovery, authority reconciliation and explicit RPO/RTO evidence requirements.
+- Production backups/PITR and a real isolated production restore remain unverified.
+  Next live step: identify an approved private restore destination and actual
+  provider backup coverage; do not export production data into this workspace.
+
 ## Independent witness receiver implementation — 25 October 2026
 
 - Implemented `tools/audit-witness` receiver/storage core and a separate AWS Lambda

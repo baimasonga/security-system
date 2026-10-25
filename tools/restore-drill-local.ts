@@ -146,10 +146,31 @@ try {
   assert.equal((await targetPool.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 1);
   assert.equal((await sourcePool.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 2);
   assert.equal((await target.audit.verifyChain()).ok, true);
-  const view = await target.operationsPosture.read(p, scope);
+  // Exercise restored credential/session data, not the source's cached principal.
+  await assert.rejects(
+    target.auth.login({
+      email: 'restore-fixture@example.test',
+      password: 'incorrect-synthetic-password',
+    }),
+    { code: 'unauthenticated' },
+  );
+  await assert.rejects(
+    target.auth.login({
+      email: 'after-snapshot@example.test',
+      password: 'synthetic-restore-password',
+    }),
+    { code: 'unauthenticated' },
+  );
+  const restoredLogin = await target.auth.login({
+    email: 'restore-fixture@example.test',
+    password: 'synthetic-restore-password',
+  });
+  const restoredPrincipal = await target.auth.authenticate(restoredLogin.token);
+  const view = await target.operationsPosture.read(restoredPrincipal, scope);
   assert.equal(view.scans.items.length, 1);
   assert.equal(view.findings.items.length, 1);
   assert.equal(view.independentlyVerified, false);
+  assert.equal((await target.audit.verifyChain()).ok, true);
   console.log(
     JSON.stringify({
       result: 'passed',
@@ -159,6 +180,9 @@ try {
       postSnapshotUsersExcluded: 1,
       integrityCheck: 'passed',
       applicationCheck: 'passed',
+      restoredLoginCheck: 'passed',
+      invalidCredentialsRejected: true,
+      postSnapshotLoginRejected: true,
       auditCheck: 'passed',
       snapshotAgeAtRestoreSeconds: Math.floor((+startedAt - +new Date(mark.point)) / 1000),
       recoveryElapsedMs: Math.round(performance.now() - start),
