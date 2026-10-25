@@ -1,5 +1,36 @@
 # Operations/security implementation status and agent handoff
 
+## Independent witness receiver implementation — 25 October 2026
+
+- Implemented `tools/audit-witness` receiver/storage core and a separate AWS Lambda
+  adapter, pinned SDK/bundler lockfile, CloudFormation template and build/acceptance
+  guide in `infrastructure/audit-witness`. No cloud resource has been provisioned.
+- Incoming requests require the dedicated bearer token, strict bounded manifests
+  and the existing anchor digest. Canonical full manifests are conditionally created
+  under content-derived keys. Success requires an exact version receipt and verified
+  COMPLIANCE retention metadata. Retries and concurrent creates converge; earlier
+  manifest objects remain separate from later observations.
+- Default bucket retention avoids giving the receiver retention-edit permission.
+  Template retains evidence on rollback, denies deletion/unconditional overwrite,
+  blocks public access and limits route/rate/concurrency. Receipt version IDs are
+  base64url encoded (S3 IDs may contain slash/plus); real audit shard IDs with `#`
+  are accepted. Receiver has no database, identity, email or licensing access.
+- Local tests cover receiver refusals, storage failures, retries, concurrent calls,
+  template permissions, SDK command wiring, and tampered synthetic history checked
+  against separately retained earlier evidence. Fake S3 tests are not proof of real
+  AWS IAM/Object Lock enforcement. CloudFormation lint and bundle build passed;
+  a built-handler smoke test rejects unauthorized requests without AWS access.
+- Verification: `npm run check` passed 1126 tests (3 skipped), including 33 new
+  receiver/storage/template tests. Five SDK-adapter tests pass. Seven deliberate
+  mutations were caught (authentication, digest, body limit, safe integer, retention
+  mode, exact version and conditional PUT), then restored and checks passed.
+  CloudFormation lint passed, the Lambda bundle built, and its production dependency
+  audit reported zero vulnerabilities. CI now runs adapter tests, bundle and audit.
+- Remaining activation gate: select independent AWS account/region and explicitly
+  approve retention, review a change set and costs, provision, run real-cloud denial /
+  retrieval / retention acceptance, then configure Warrior and verify a publication
+  independently. Existing disabled-anchoring warning must remain until acceptance.
+
 ## Audit verifier CA support — 24 October 2026
 
 - Next independent prerequisite while live email acceptance is blocked: the offline

@@ -1,6 +1,8 @@
 # Production audit witness: recommended setup
 
-Status: prepared deployment specification, **not provisioned or active**. There is
+Status: receiver and deployment template implemented and locally testable,
+**not provisioned or active**. Build and acceptance steps are in
+[the receiver README](../../infrastructure/audit-witness/README.md). There is
 no external witness configured in the inspected deployment, and no successful
 published anchor was found on 24 October 2026. The application's existing
 HTTPS anchor publisher, operator actions and offline verifier implement ADR-010.
@@ -24,9 +26,8 @@ only an append-only receiver token. The receiver must have no credentials for th
 Warrior database. Cloudflare remains the application deployment alternative; its
 ordinary mutable storage is not automatically an immutable audit witness.
 
-This is a deployment specification for a production receiver, not an assertion
-that the development `tools/anchor-witness.ts` is safe for production. The receiver
-must be implemented and accepted against the contract below before activation.
+The separate receiver must pass real cloud acceptance below before activation.
+The development `tools/anchor-witness.ts` still is not safe for production.
 
 ## Resources and controls to provision
 
@@ -40,7 +41,7 @@ must be implemented and accepted against the contract below before activation.
    before deploying; this document does not authorize an irreversible retention
    commitment. Retention, not bucket naming, provides protection against rewrites.
 3. Deploy the receiver on an HTTPS endpoint accepting only `POST /anchors`, with
-   bounded requests (at most 8 MB), authentication, rate limits, body timeout and
+   bounded requests (1 MB and 5,000 chains), authentication, rate limits, body timeout and
    fixed secret-free error responses. No redirect, arbitrary destination, database
    access, general object download, object deletion or retention editing endpoint.
 4. Generate a separate random bearer token in a password manager or Secrets
@@ -119,8 +120,8 @@ reaccepts R-13; it must never delete the witness or be presented as a fix.
 The provider and fenced delivery implementation now exist; see
 [operations automation](operations-automation.md#incident-email-optional). Install
 provider secrets privately, enable `OPERATIONS_EMAIL_NOTIFICATIONS_ENABLED`, and
-verify the rule creator's email through Account. The inspected owner address was
-not yet verified; do not mark it verified directly in SQL. No real notification
+verify the rule creator's email through Account. The owner address has now been
+verified through the normal account flow. No real incident notification
 has been sent as part of this repair. After the owner authorizes an inbox test,
 use isolated synthetic inventory to confirm one opened and one recovery email.
 Provider acceptance alone is not proof of inbox delivery. Never stop production

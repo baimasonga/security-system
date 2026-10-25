@@ -34,7 +34,7 @@ export default tseslint.config(
       ),
     },
   },
-  { ignores: ['**/node_modules/**', '**/.bundle/**', '**/.wrangler/**', 'coverage', 'dist'] },
+  { ignores: ['**/node_modules/**', '**/.bundle/**', '**/.wrangler/**', 'coverage', '**/dist/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   security.configs.recommended,

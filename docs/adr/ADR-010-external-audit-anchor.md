@@ -48,6 +48,21 @@ produce; this ADR decides how it leaves the system and how it is used.
 
 ## What the witness must be
 
+### Separate-account receiver implementation — 25 October 2026
+
+`tools/audit-witness` and `infrastructure/audit-witness` implement a bounded receiver
+and an AWS deployment template, not an activated witness. The threat model is in
+`docs/threat-models/audit-witness-receiver.md`. Strict incoming manifests use the
+existing digest contract with a 1 MB / 5,000-chain cap. A Lambda adapter makes only
+conditional S3 creates and version/retention metadata reads; bucket default
+COMPLIANCE retention supplies the lock without runtime retention-edit privileges.
+Earlier versions and buckets are retained on rollback. Receipts identify canonical
+full-manifest digest and base64url-encoded S3 version ID; exact retries converge.
+Observation time is retained, so a new manifest with the same chain-head digest but
+a different timestamp receives a separate object. Caller idempotency headers do not
+choose object keys. Cloud acceptance, independent administration and retention
+approval remain required before enabling the publisher.
+
 A system the platform operator and a database superuser cannot rewrite: object storage with retention lock / WORM in a
 _separate_ account, a transparency log, a notary or a third party. If the same people can alter both the database and the
 witness, nothing has been added. Publishing from several instances is harmless (same state ⇒ same anchor ⇒ idempotent).
