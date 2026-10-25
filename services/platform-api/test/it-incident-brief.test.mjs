@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { collectIncidentBrief } from '../../../tools/it-incident-brief.mjs';
+import { collectIncidentBrief, renderIncidentSummary } from '../../../tools/it-incident-brief.mjs';
 
 function response(url) {
   if (url.endsWith('/signin'))
@@ -64,4 +64,36 @@ it('preserves mixed outcomes without returning untrusted response bodies', async
     { application: 'warrior', check: 'readiness', outcome: 'failed' },
   ]);
   expect(JSON.stringify(brief)).not.toContain('SECRET');
+});
+
+it('renders mixed results and preserves evidence limits in the workflow summary', async () => {
+  const brief = await collectIncidentBrief(async (url) =>
+    url.endsWith('/readyz') ? new globalThis.Response('', { status: 503 }) : response(url),
+  );
+  const summary = renderIncidentSummary(brief);
+  expect(summary).toContain('| Warrior readiness | Failed |');
+  expect(summary).toContain('| Rokela PDF sign-in page | Passed |');
+  expect(summary).toContain(brief.started_at);
+  expect(summary).toContain('Root cause: not established');
+  expect(summary).toContain('do not verify login/MFA');
+});
+
+it('does not turn missing or duplicated observations into a passing result', () => {
+  const row = { application: 'warrior', check: 'liveness', outcome: 'passed' };
+  const summary = renderIncidentSummary({ observations: [row, row] });
+  expect(summary.match(/Unknown/g)).toHaveLength(4);
+  expect(summary).not.toContain('| Passed |');
+});
+
+it('never interpolates arbitrary evidence or markdown into the summary', () => {
+  const malicious = '<img src="https://example.test/SECRET">';
+  const summary = renderIncidentSummary({
+    started_at: malicious,
+    completed_at: malicious,
+    root_cause: malicious,
+    next_steps: [malicious],
+    observations: [{ application: 'warrior', check: 'liveness', outcome: malicious }],
+  });
+  expect(summary).not.toContain('SECRET');
+  expect(summary).toContain('| Warrior liveness | Unknown |');
 });

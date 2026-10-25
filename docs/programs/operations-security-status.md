@@ -1,5 +1,17 @@
 # Operations/security implementation status and agent handoff
 
+## Readable IT incident evidence — 25 October 2026
+
+- Owner deferred the paid Supabase restore. No new paid resource is authorized by
+  this work; production restore acceptance remains unverified.
+- Added a readable GitHub step summary to the existing manual IT incident brief.
+  JSON output and failure exit status remain available. All four fixed checks are
+  shown with observation times, evidence limits and next investigation steps.
+- Summary uses fixed labels/outcome values; unknown or duplicate evidence cannot
+  become passing, and arbitrary response/error text cannot enter the Markdown.
+- Added mixed-outcome, missing/duplicate evidence and untrusted-text regression tests.
+  No model API, database access, alert recipient or automatic remediation was added.
+
 ## Production-major recovery coverage — 25 October 2026
 
 - GitHub CI, CodeQL, release observation, external availability and synthetic

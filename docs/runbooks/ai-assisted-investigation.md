@@ -9,7 +9,9 @@ is introduced. The owner requested this read-only first step on 24 October 2026.
 ## Collect the initial brief
 
 In GitHub, open **Actions → IT incident brief → Run workflow**, then open the
-**Collect fixed public checks** step for its JSON report. This workflow is manual,
+**Summary** page for a readable results table, or the
+**Collect fixed public checks** step for its JSON report. Failed checks still produce
+the summary and fail the job; the summary never presents them as a diagnosed outage. This workflow is manual,
 has only repository read permission and uses no repository secrets. The workflow's
 commit identifies the diagnostic code, not the deployed application version.
 
