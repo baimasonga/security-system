@@ -4,18 +4,20 @@ import type { Container } from '../container.ts';
 import { operator, parse } from '../http.ts';
 import { emptyBody } from '../schemas.ts';
 import { mobileBatch } from '../mobile-analytics.ts';
-import { mobileClientIp } from '../integrations/mobile-country.ts';
+import { mobileClientIp, railwayClientIp } from '../integrations/mobile-country.ts';
 
 export function registerMobileRoutes(app: FastifyInstance, c: Container) {
   const country = c.mobileCountryLookup;
   const path = '/v1/mobile/rokela-pdf/events';
   const sourceIp = (req: { headers: Record<string, unknown> }) =>
-    mobileClientIp(
-      typeof req.headers['x-forwarded-for'] === 'string'
-        ? req.headers['x-forwarded-for']
-        : undefined,
-      c.config.mobileProxyHops,
-    );
+    c.config.mobileRailwayIp
+      ? railwayClientIp(req.headers)
+      : mobileClientIp(
+          typeof req.headers['x-forwarded-for'] === 'string'
+            ? req.headers['x-forwarded-for']
+            : undefined,
+          c.config.mobileProxyHops,
+        );
   app.options(path, async (req, reply) => {
     if (
       req.headers.origin !== 'https://localhost' ||
@@ -58,7 +60,11 @@ export function registerMobileRoutes(app: FastifyInstance, c: Container) {
     parse(emptyBody, req.query);
     return {
       ...(await c.mobileAnalytics.summary()),
-      country_lookup_configured: !!c.config.mobileCountryDatabase && c.config.mobileProxyHops > 0,
+      country_lookup_configured:
+        !!c.config.mobileCountryDatabase &&
+        (c.config.mobileRailwayIp || c.config.mobileProxyHops > 0),
+      country_database: await c.mobileCountryStatus(),
+      country_ip_source_configured: c.config.mobileRailwayIp || c.config.mobileProxyHops > 0,
     };
   });
 }

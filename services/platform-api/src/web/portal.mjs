@@ -1618,6 +1618,28 @@ async function operatorView() {
               ['Usage evidence', 'Value'],
               [
                 ['Received reports', result.reports],
+                [
+                  'Country database',
+                  {
+                    not_configured: 'No country database configured',
+                    unavailable: 'Country database unavailable',
+                    stale: 'Country database expired',
+                    ready: 'Country database ready',
+                  }[result.country_database?.state] ?? 'Country database unavailable',
+                ],
+                [
+                  'Country database built',
+                  result.country_database?.built_at
+                    ? new Date(result.country_database.built_at).toLocaleString()
+                    : 'Unknown',
+                ],
+                [
+                  'Country IP source',
+                  result.country_ip_source_configured
+                    ? 'Trusted IP source configured'
+                    : 'Trusted IP source not configured',
+                ],
+
                 ['Reporting installations · 24 hours', result.active_installations_1d],
                 ['Reporting installations · 7 days', result.active_installations_7d],
                 ['Reporting installations · 30 days', result.active_installations_30d],
@@ -1630,7 +1652,9 @@ async function operatorView() {
                 [
                   'Country lookup',
                   result.country_lookup_configured
-                    ? 'Configured; unknown results remain possible'
+                    ? result.country_database?.state === 'ready'
+                      ? 'Ready; unmatched IPs remain unknown'
+                      : 'Database unavailable; country is unknown'
                     : 'Not configured; country is unknown',
                 ],
               ],

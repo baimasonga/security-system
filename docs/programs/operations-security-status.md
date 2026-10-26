@@ -1102,3 +1102,29 @@ target(s)` (count only).
   the operator dashboard browser test passed with the cache-coverage disclosure.
   The first local full database run exhausted the workspace disk; the clean rerun
   used a disposable memory-backed PostgreSQL fixture. No production data touched.
+
+### Country setup through GitHub — 26 October 2026
+
+- Preserve the owner's GitHub-only deployment workflow. Docker now prepares a
+  pinned free DB-IP Lite country database, validates format/date/size, and records
+  SHA-256/source/license provenance. Optional build failure removes any artifact
+  and leaves country unavailable without stopping the platform. A separate GitHub
+  workflow performs strict download verification and publishes provenance only.
+- Enable the documented Railway X-Real-IP source only when platform metadata
+  matches the existing project, service, production environment and public domain;
+  require that direct request Host as well. No trust in client country headers or
+  arbitrary forwarding chains. Other deployments stay unknown unless explicitly
+  configured. Reference and remaining boundary assumptions are in the deployment guide.
+- Country readiness now distinguishes missing, broken, expired and usable data;
+  the dashboard shows build date and IP-source configuration without filesystem
+  paths. Data older than 120 days or implausibly future-dated cannot yield country.
+- No GPS, new paid resources or Railway configuration API used. Deployment goes
+  through GitHub. A live country result and real-device acceptance remain separate
+  from fixture tests and a successful build.
+- Verification: seven country-data tests cover the real MMDB reader with a synthetic
+  binary fixture, fixed URL/edition, redirect/size/decompression limits, timeout,
+  optional build failure cleanup, deployment/header restrictions, expiry and the
+  complete ingestion-to-operator-summary path. All 28 applicable PostgreSQL owner
+  and least-privilege tests and the operator browser test passed. Seven deliberate
+  mutations were caught and restored. Full `npm run check` passed; real provider
+  download/deployment evidence will come from the GitHub workflows after publication.

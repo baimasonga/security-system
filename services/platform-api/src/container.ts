@@ -126,6 +126,7 @@ export interface Container {
   keyring: KeyRing;
   mobileAnalytics: MobileAnalytics;
   mobileCountryLookup: (ip: string) => Promise<string | null>;
+  mobileCountryStatus: ReturnType<typeof createCountryLookup>['status'];
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
   metrics: Metrics;
@@ -628,6 +629,7 @@ export async function createContainer(
         })
       : undefined;
 
+  const mobileCountry = createCountryLookup(config.mobileCountryDatabase);
   let closed = false;
   return {
     config,
@@ -662,8 +664,8 @@ export async function createContainer(
       pool ? new PgMobileStore(pool) : new MemoryMobileStore(),
       clock,
     ),
-    mobileCountryLookup:
-      overrides?.mobileCountryLookup ?? createCountryLookup(config.mobileCountryDatabase),
+    mobileCountryLookup: overrides?.mobileCountryLookup ?? mobileCountry,
+    mobileCountryStatus: mobileCountry.status,
     telemetrySink,
     metrics,
     anchorStore,

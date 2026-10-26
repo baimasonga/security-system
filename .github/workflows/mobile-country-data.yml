@@ -1,0 +1,35 @@
+name: Mobile country data verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/sleepy-carson-l0if1k]
+    paths:
+      - Dockerfile
+      - tools/prepare-mobile-country.ts
+      - .github/workflows/mobile-country-data.yml
+  schedule:
+    - cron: '31 6 2 * *'
+permissions:
+  contents: read
+jobs:
+  country-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate the pinned free database
+        run: |
+          edition=$(sed -n 's/^ARG COUNTRY_DATA_EDITION=//p' Dockerfile)
+          node tools/prepare-mobile-country.ts "$RUNNER_TEMP/mobile-country" "$edition"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-country-provenance
+          path: ${{ runner.temp }}/mobile-country/mobile-country.json
+          retention-days: 90
+      - name: Explain scope
+        run: echo 'Country data validated. This does not verify the deployment proxy boundary or a real app report.' >> "$GITHUB_STEP_SUMMARY"

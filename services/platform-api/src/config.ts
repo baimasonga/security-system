@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { railwayCountrySourceEnabled } from './integrations/mobile-country.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateHostname } from '@trust/sharing';
@@ -50,6 +51,7 @@ export interface PlatformConfig {
   /** Behind a reverse proxy/CDN, trust X-Forwarded-For for client IP (rate limiting). */
   trustProxy: boolean;
   mobileProxyHops: number;
+  mobileRailwayIp: boolean;
   mobileCountryDatabase?: string;
   licenseKeyPepper: string;
   pseudonymKey: string;
@@ -628,6 +630,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     port,
     trustProxy: env['TRUST_PROXY'] === '1',
     mobileProxyHops,
+    mobileRailwayIp: railwayCountrySourceEnabled(env),
     ...(env['MOBILE_COUNTRY_DATABASE']
       ? { mobileCountryDatabase: env['MOBILE_COUNTRY_DATABASE'] }
       : {}),

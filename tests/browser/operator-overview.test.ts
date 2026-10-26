@@ -97,6 +97,8 @@ it('shows live operator evidence, handles unavailable data and preserves existin
   await page.getByLabel('Operator action').selectOption({ label: 'Mobile app usage' });
   await page.getByRole('button', { name: 'Refresh mobile usage' }).click();
   await page.getByRole('cell', { name: 'No app reports received', exact: true }).waitFor();
+  await page.getByRole('cell', { name: 'No country database configured', exact: true }).waitFor();
+  await page.getByRole('cell', { name: 'Trusted IP source not configured', exact: true }).waitFor();
   expect(await page.getByText('Not configured; country is unknown', { exact: true }).count()).toBe(
     1,
   );

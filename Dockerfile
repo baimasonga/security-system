@@ -8,11 +8,19 @@ COPY package.json package-lock.json ./
 COPY packages ./packages
 COPY services ./services
 RUN npm ci --omit=dev --ignore-scripts --strict-ssl=true
+COPY tools/prepare-mobile-country.ts ./tools/
+# Free, pinned monthly public data. A provider outage leaves geography unavailable,
+# not a failed security-platform deployment. Update the edition through GitHub.
+ARG COUNTRY_DATA_EDITION=2026-10
+RUN node tools/prepare-mobile-country.ts /app/country-data "$COUNTRY_DATA_EDITION" --optional
 
 FROM node:22-slim
 ENV NODE_ENV=development HOST=0.0.0.0 PORT=8080
+ENV MOBILE_COUNTRY_DATABASE=/app/country-data/mobile-country.mmdb
+ENV MOBILE_USE_RAILWAY_IP=1
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/country-data ./country-data
 COPY package.json ./
 COPY packages ./packages
 COPY services ./services

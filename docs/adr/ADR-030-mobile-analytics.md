@@ -19,10 +19,18 @@ committed reports in a separate bounded PostgreSQL table; the mobile client uses
 bounded offline queue and never waits before a document operation. Queries remain
 platform-operator-only and fixed to Rokela; this adds no cross-tenant authority.
 
-Country is approximate IP geolocation, resolved locally using an operator-supplied country MMDB, such as DB-IP Lite
-(CC BY 4.0; attribution in the dashboard). No data file is bundled. No IP is sent to a third
+Country is approximate IP geolocation, resolved locally using DB-IP Lite country MMDB
+(CC BY 4.0; attribution in the dashboard). The GitHub-controlled Docker build prepares
+a pinned monthly edition from the fixed public DB-IP HTTPS source, with bounded
+download/decompression, format and date validation, and checksum provenance. A data
+provider failure leaves country unavailable without blocking the platform deployment. No IP is sent to a third
 party or persisted in analytics. Derive IP through the explicit mobile trusted
-proxy-hop configuration; never accept an app-provided IP/country field. If that boundary is
+proxy-hop configuration; never accept an app-provided IP/country field. The shipped
+Docker image also supports Railway’s documented X-Real-IP header, only when its
+platform-provided project, service, environment and public domain exactly match
+this Warrior deployment and the request Host is that direct domain. It ignores
+client-supplied country and X-Forwarded-For in that mode. Other deployments must
+explicitly configure their own trusted ingress. If that boundary is
 unconfigured or lookup fails, report Unknown, not a proxy's country. No GPS or OS
 location permission is added. Record the data edition and acknowledge VPN error.
 
@@ -36,3 +44,7 @@ quota/concurrency/retention, clock bounds, authorization, spoofed country inputs
 lookup failures and client queue limits/retry behavior. Audit/identity/license
 features remain independent. Confirm the deployed API, migration/grants, rebuilt
 APK and one real report in Warrior before calling the integration live.
+
+Country readiness exposes only database state and build date, never filesystem paths
+or reader errors. Missing, corrupt, future-dated or older-than-120-day data cannot
+produce country results. These controls do not authenticate anonymous clients.

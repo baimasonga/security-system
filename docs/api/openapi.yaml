@@ -1173,7 +1173,8 @@ paths:
       summary: Aggregate anonymous Rokela Android usage over the last 30 received days
       description: Operator only; no query filters or installation identifiers. Includes generated_at, last_received_at, reports, active_installations_1d/7d/30d and feature/device/version/day/country groups. Country groups below five installations are suppressed. Configuration is not evidence of successful lookup. No per-device or raw report export.
       responses:
-        '200': { description: Aggregate report and country_lookup_configured }
+        '200':
+          description: Aggregate report with country_lookup_configured, country_ip_source_configured and country_database (state not_configured/unavailable/stale/ready and nullable built_at); no paths or errors exposed.
         '401': { description: Authentication required }
         '403': { description: Operator required }
   /v1/admin/mobile-distribution:
