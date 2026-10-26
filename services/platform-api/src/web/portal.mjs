@@ -1558,7 +1558,7 @@ async function operatorView() {
   sections.push(
     panel(
       node('h2', 'Mobile app downloads'),
-      node('p', 'Rokela PDF for Android · direct APK distribution through GitHub'),
+      node('p', 'Rokela PDF for Android · GitHub release asset evidence'),
       button('Refresh APK downloads', async () => {
         mobileReport.replaceChildren(node('p', 'Loading download evidence…'));
         try {
@@ -1590,7 +1590,7 @@ async function operatorView() {
       mobileReport,
       node(
         'p',
-        'This is GitHub’s counter for the current APK asset, not unique people, verified installs or a lifetime total. Replacing the asset can reset it. Results may be cached for five minutes.',
+        'This is GitHub’s counter for the current APK asset, not unique people, verified installs or a lifetime total. Replacing the asset can reset it. Website downloads served from Cloudflare’s cache may not reach GitHub and are not fully counted here. Results may be cached for five minutes.',
       ),
       node('h3', 'App usage, devices and country'),
       node(

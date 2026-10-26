@@ -76,6 +76,11 @@ it('shows live operator evidence, handles unavailable data and preserves existin
   await page.getByRole('button', { name: 'Refresh APK downloads' }).click();
   await page.getByRole('cell', { name: '17', exact: true }).waitFor();
   expect(
+    await page
+      .getByText('Website downloads served from Cloudflare’s cache', { exact: false })
+      .isVisible(),
+  ).toBe(true);
+  expect(
     await page.getByText('GitHub downloads do not report app usage.', { exact: false }).isVisible(),
   ).toBe(true);
   await page.unroute('**/v1/admin/mobile-distribution');

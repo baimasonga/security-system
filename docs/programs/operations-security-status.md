@@ -1077,3 +1077,28 @@ target(s)` (count only).
   OpenAPI explicitly allowlists only the fixed anonymous POST; aggregate reads
   remain authenticated and operator-protected. GitHub deployment and the first
   real-device receipt remain separate from this local verification.
+
+### Release CI repair and download evidence — 26 October 2026
+
+- GitHub run 40282194541 exposed one stale migration expectation in the legacy
+  audit-chain upgrade test: it listed migrations through 0025, excluding 0026.
+  Added the exact new identity while preserving the checks that legacy events
+  remain verifiable and immutable and new events use their own chains. Other
+  database tests passed in that run; the logged port-in-use errors belong to the
+  intentional occupied-port refusal test, which passed.
+- The newly published Rokela website streams APKs through a cacheable route.
+  Warrior now explicitly labels its count as GitHub release-asset evidence and
+  explains that Cloudflare cache hits are not fully counted. No invented website
+  download total or installation count is substituted.
+- Previous release evidence: Android run 40282296266 built and published the APK;
+  Warrior run 40282194532 verified live health/readiness and matching UI assets;
+  synthetic recovery run 40282194485 passed. These do not verify authenticated
+  mobile reports or production country lookup.
+- Railway connection still returns UNAUTHORIZED/requires reauthentication.
+  Country activation remains blocked on deployment access and verified ingress;
+  no infrastructure settings, billing or new paid resources changed.
+- Repair verification: `npm run check` passed 1,145 tests (3 skipped); all 849
+  PostgreSQL owner/app-role tests passed, including the legacy audit upgrade;
+  the operator dashboard browser test passed with the cache-coverage disclosure.
+  The first local full database run exhausted the workspace disk; the clean rerun
+  used a disposable memory-backed PostgreSQL fixture. No production data touched.
