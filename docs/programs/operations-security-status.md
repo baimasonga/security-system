@@ -1126,5 +1126,13 @@ target(s)` (count only).
   optional build failure cleanup, deployment/header restrictions, expiry and the
   complete ingestion-to-operator-summary path. All 28 applicable PostgreSQL owner
   and least-privilege tests and the operator browser test passed. Seven deliberate
-  mutations were caught and restored. Full `npm run check` passed; real provider
-  download/deployment evidence will come from the GitHub workflows after publication.
+  mutations were caught and restored. The full check exposed a deployment-test
+  assumption that the first Docker COPY of tooling belongs to the runtime stage.
+  Corrected the test to inspect the final stage explicitly, preserving its check
+  that migration/grant/profile tools actually ship. Real provider download and live
+  deployment evidence remain separate GitHub workflow checks.
+- Follow-up verification: the complete local check passed (1,152 tests passed,
+  three skipped). GitHub country-data verification run 40325181941 succeeded with
+  the real provider download. CI run 40325182054 passed PostgreSQL and browser
+  jobs but failed the runtime-copy test corrected above. Release observation run
+  40325182046 timed out; current production UI deployment is not yet established.
