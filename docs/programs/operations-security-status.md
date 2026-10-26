@@ -1,5 +1,23 @@
 # Operations/security implementation status and agent handoff
 
+## Portal notification delivery details — 26 October 2026
+
+- Next ready UI slice: expose existing scoped notification delivery timestamps and
+  retry deadlines, with queued/processing/available/failed labels and an attention
+  filter for failures and undelivered notifications past their deadline.
+- Portal availability explicitly does not confirm email delivery. This is a
+  read-only view of the existing authenticated recipient-scoped API; no new
+  recipients, retry actions, infrastructure, schema or email sends are introduced.
+- Browser acceptance covers mixed states, an already-delivered record with a past
+  deadline, attention/delivered filtering and removal of stale evidence after a
+  failed refresh. Full `npm run check` passed 1,152 tests (three skipped), and
+  all 17 application-monitoring browser tests passed. GitHub publication and live
+  release observation remain separate deployment evidence.
+- Previous mobile slice: GitHub CI 40372542896 and release observation 40372542930
+  passed for 7b163d0. Owner screenshot shows one received report and one reporting
+  installation, country database ready and trusted IP source configured. A country
+  match is not established by that screenshot.
+
 ## Direct Android APK distribution — 25 October 2026
 
 - Confirmed the mobile source in Rokelapdf-online/mobile (Capacitor) and /android

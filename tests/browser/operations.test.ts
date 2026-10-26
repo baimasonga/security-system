@@ -935,3 +935,66 @@ it('keeps the approved console shell accessible across desktop, mobile menu and 
   expect(await nav.isVisible()).toBe(false);
   expect(await page.getByLabel('Current organization').isVisible()).toBe(false);
 });
+
+it('separates portal delivery evidence, retry deadlines and attention filters', async () => {
+  const { page } = await setup();
+  await registerApp(page, 'notification-evidence');
+  const past = new Date(Date.now() - 3600000).toISOString();
+  const future = new Date(Date.now() + 3600000).toISOString();
+  let unavailable = false;
+  await page.route(/\/notifications$/, async (route) => {
+    if (unavailable) return route.fulfill({ status: 503, json: { error: 'unavailable' } });
+    await route.fulfill({
+      json: {
+        items: [
+          {
+            state: 'delivered',
+            incident_id: 'delivered-incident',
+            deadline: past,
+            delivered_at: past,
+          },
+          { state: 'failed', incident_id: 'failed-incident', deadline: future },
+          { state: 'pending', incident_id: 'expired-incident', deadline: past },
+          { state: 'pending', incident_id: 'queued-incident', deadline: future },
+          { state: 'claimed', incident_id: 'processing-incident', deadline: future },
+        ].map((n) => ({
+          transition: 'opened',
+          attempts: 2,
+          created_at: past,
+          delivered_at: null,
+          ...n,
+        })),
+      },
+    });
+  });
+  await addEnv(page);
+  const alerts = section(page, 'Automatic alerts');
+  await alerts.getByRole('cell', { name: 'Queued', exact: true }).waitFor();
+  expect(await alerts.getByRole('cell', { name: 'Processing', exact: true }).count()).toBe(1);
+  expect(
+    await alerts.getByRole('cell', { name: 'Retry deadline passed', exact: true }).count(),
+  ).toBe(1);
+  expect(
+    await alerts
+      .getByText('Portal availability does not confirm email delivery.', { exact: false })
+      .count(),
+  ).toBe(1);
+  await alerts.getByLabel('Filter portal notifications').selectOption('attention');
+  expect(await alerts.getByRole('status').textContent()).toContain('2 shown of 5');
+  expect(await alerts.getByRole('cell', { name: 'failed-incident', exact: true }).count()).toBe(1);
+  expect(await alerts.getByRole('cell', { name: 'expired-incident', exact: true }).count()).toBe(1);
+  expect(await alerts.getByRole('cell', { name: 'delivered-incident', exact: true }).count()).toBe(
+    0,
+  );
+  await alerts.getByLabel('Filter portal notifications').selectOption('delivered');
+  expect(await alerts.getByRole('status').textContent()).toContain('1 shown of 5');
+  expect(await alerts.getByRole('cell', { name: 'Available in portal', exact: true }).count()).toBe(
+    1,
+  );
+  unavailable = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await alerts.getByText('Automatic alert state could not be loaded.', { exact: true }).waitFor();
+  expect(await alerts.getByRole('cell', { name: 'delivered-incident', exact: true }).count()).toBe(
+    0,
+  );
+});

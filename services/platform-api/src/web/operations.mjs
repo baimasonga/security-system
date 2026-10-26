@@ -1171,20 +1171,84 @@ export async function operationsView(ui) {
       );
       card.append(setup);
     }
+    const notificationFilter = node('select');
+    notificationFilter.setAttribute('aria-label', 'Filter portal notifications');
+    for (const [value, text] of [
+      ['all', 'All notifications'],
+      ['attention', 'Attention needed'],
+      ['delivered', 'Available in portal'],
+    ]) {
+      const option = node('option', text);
+      option.value = value;
+      notificationFilter.append(option);
+    }
+    const notificationContent = node('div');
+    const renderNotifications = () => {
+      const now = Date.now();
+      const attention = (n) =>
+        n.state === 'failed' || (n.state !== 'delivered' && new Date(n.deadline).getTime() <= now);
+      const matching = notifications.filter((n) =>
+        notificationFilter.value === 'attention'
+          ? attention(n)
+          : notificationFilter.value === 'delivered'
+            ? n.state === 'delivered'
+            : true,
+      );
+      const summary = node(
+        'p',
+        `${matching.length} shown of ${notifications.length} notifications`,
+      );
+      summary.setAttribute('role', 'status');
+      notificationContent.replaceChildren(
+        summary,
+        matching.length
+          ? table(
+              [
+                'Incident',
+                'Transition',
+                'Portal delivery',
+                'Attempts',
+                'Created',
+                'Available since',
+                'Retry deadline',
+              ],
+              matching.map((n) => [
+                n.incident_id,
+                n.transition,
+                n.state === 'delivered'
+                  ? 'Available in portal'
+                  : n.state === 'failed'
+                    ? 'Delivery failed'
+                    : attention(n)
+                      ? 'Retry deadline passed'
+                      : n.state === 'claimed'
+                        ? 'Processing'
+                        : n.state === 'pending'
+                          ? 'Queued'
+                          : 'Unknown',
+                n.attempts,
+                when(n.created_at),
+                n.state === 'delivered' ? when(n.delivered_at) : '—',
+                when(n.deadline),
+              ]),
+            )
+          : empty(
+              notifications.length
+                ? 'No notifications match this filter.'
+                : 'No portal notifications yet.',
+            ),
+      );
+    };
+    notificationFilter.addEventListener('change', renderNotifications);
+    renderNotifications();
     card.append(
       node('h3', 'Your portal notifications'),
-      notifications.length
-        ? table(
-            ['Incident', 'Transition', 'Delivery', 'Attempts', 'Created'],
-            notifications.map((n) => [
-              n.incident_id,
-              n.transition,
-              n.state === 'delivered' ? 'Available in portal' : n.state,
-              n.attempts,
-              when(n.created_at),
-            ]),
-          )
-        : empty('No portal notifications yet.'),
+      node(
+        'p',
+        'Portal availability does not confirm email delivery. Attention needed includes failed notifications and undelivered notifications past their retry deadline. Refresh this application to update delivery evidence.',
+      ),
+      notificationFilter,
+      notificationContent,
     );
     return card;
   }
