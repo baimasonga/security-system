@@ -9,6 +9,14 @@ import type { Container } from './container.ts';
 /** What the platform keeps, why, and for how long. Kept next to the code so it changes with it. */
 export const DATA_CATEGORIES = [
   {
+    category: 'Optional Android usage analytics',
+    contents:
+      'App-scoped installation hash, tool categories, app/Android version, device class and approximate IP-derived country; no files, account identity, raw IP or GPS',
+    purpose:
+      'Aggregate Rokela Android usage and compatibility; reports are unverified client assertions',
+    retention: '30 days; mobile settings can stop reporting and clear queued reports',
+  },
+  {
     category: 'Account',
     contents:
       'Email address, password hash (never the password), authenticator and passkey public keys',

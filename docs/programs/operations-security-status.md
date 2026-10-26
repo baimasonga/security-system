@@ -1036,3 +1036,44 @@ target(s)` (count only).
   select independent AWS account and confirm retention before implementing and
   provisioning the production witness receiver. Do not disable audit warnings or
   claim anchoring enabled from this specification alone.
+
+### Android usage collector and dashboard — 25 October 2026
+
+- Added a fixed anonymous Rokela Android collector and operator-only **Mobile app
+  usage** dashboard, separate from the GitHub APK asset download counter. Reports
+  cover app opens and home-screen tool selections, app/Android versions and device
+  class. Counts are client assertions, not verified people, installs or completed
+  document operations. No document/account fields, GPS or advertising IDs accepted.
+- Migration 0026 adds a dedicated table with SELECT/INSERT/DELETE runtime grants;
+  retries deduplicate transactionally, conflicts roll back the batch, retained rows
+  cap at 100,000, and maintenance deletes expired 30-day reports in batches of 1,000.
+- Companion Android client has a 100-event offline queue, stable retry IDs, bounded
+  batches/backoff and a visible usage-sharing switch that clears unsent reports.
+  Existing APKs cannot report; a rebuilt APK must be installed.
+- Local cross-repository transport test passed against real PostgreSQL: the actual
+  Android reporter submitted through the API and the operator summary returned one
+  reporting installation; disabling sharing prevented another report. No production
+  reports or accounts used. Quota test seeded 100,000 synthetic records, rejected
+  overflow, deleted exactly 1,000 expired records and accepted one new event.
+- Country lookup remains unconfigured by default. See the deployment guide below;
+  no paid services/resources provisioned. Runtime deployment and a real-device
+  report remain acceptance steps, not established by local tests.
+- Verification follow-up (26 October): 41 PostgreSQL migration, managed-profile,
+  least-privilege and mobile collector tests passed on a clean isolated database.
+  The 25 portal browser tests passed. Four Android queue/privacy tests and the
+  mobile PDF-tool smoke passed; the client was rebased over the newer Google Play
+  work, with reporting explicitly excluded from Play builds. Five server mutations
+  (operator guard, strict fields, conflict rejection, proxy-hop selection, quota)
+  and one client opt-out mutation were caught; original controls restored.
+- Retention regression: existing `purge-micro` with 100,000 synthetic rows and
+  fsync on completed cleanly (indexed mean 2.37 ms, unindexed 20.19 ms), consistent
+  with the indexed-retention advantage in the performance baseline. This is a local
+  fixture comparison, not a production throughput or response-time guarantee.
+- Isolated logical backup/restore also passed with all 26 migrations, audit
+  integrity, restored login and rejected invalid/post-snapshot credentials.
+  This remains synthetic recovery evidence, not a production backup verification.
+- Final `npm run check` passed with local networking enabled (format, lint,
+  architecture boundaries, TypeScript and the full unit/integration suite).
+  OpenAPI explicitly allowlists only the fixed anonymous POST; aggregate reads
+  remain authenticated and operator-protected. GitHub deployment and the first
+  real-device receipt remain separate from this local verification.

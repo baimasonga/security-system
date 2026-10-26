@@ -67,6 +67,8 @@ describe('OpenAPI ↔ implementation drift', () => {
         'post /v1/auth/passkeys/login/finish',
         'post /v1/billing/webhooks/paddle',
         'post /v1/auth/register',
+        // Fixed anonymous analytics collector (ADR-030); no identity authority.
+        'post /v1/mobile/rokela-pdf/events',
         'post /v1/auth/password/request',
         'post /v1/auth/password/reset',
         'post /v1/auth/email/verify',

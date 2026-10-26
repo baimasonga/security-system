@@ -1595,11 +1595,81 @@ async function operatorView() {
       node('h3', 'App usage, devices and country'),
       node(
         'p',
-        'Not connected. GitHub downloads do not report app launches, active installations, device details or country. These require the mobile reporting integration. Country will be derived from IP only; no GPS collection.',
+        'GitHub downloads do not report app usage. Choose Mobile app usage in this console to inspect reports from compatible Android builds. Country uses a separately configured local IP-country lookup; no GPS is collected.',
       ),
     ),
   );
 
+  const usageReport = node('div');
+  usageReport.setAttribute('aria-live', 'polite');
+  usageReport.append(node('p', 'Select Refresh mobile usage to load received app reports.'));
+  const geoCredit = node('a', 'IP Geolocation by DB-IP');
+  geoCredit.href = 'https://db-ip.com/';
+  sections.push(
+    panel(
+      node('h2', 'Mobile app usage'),
+      node('p', 'Rokela Android · anonymous client reports · rolling 30-day window'),
+      button('Refresh mobile usage', async () => {
+        usageReport.replaceChildren(node('p', 'Loading mobile reports…'));
+        try {
+          const result = await api('/v1/admin/mobile-analytics');
+          usageReport.replaceChildren(
+            table(
+              ['Usage evidence', 'Value'],
+              [
+                ['Received reports', result.reports],
+                ['Reporting installations · 24 hours', result.active_installations_1d],
+                ['Reporting installations · 7 days', result.active_installations_7d],
+                ['Reporting installations · 30 days', result.active_installations_30d],
+                [
+                  'Last report received',
+                  result.last_received_at
+                    ? new Date(result.last_received_at).toLocaleString()
+                    : 'No app reports received',
+                ],
+                [
+                  'Country lookup',
+                  result.country_lookup_configured
+                    ? 'Configured; unknown results remain possible'
+                    : 'Not configured; country is unknown',
+                ],
+              ],
+            ),
+            ...[
+              ['Home-screen tool selections and launches', result.features],
+              ['Device classes', result.devices],
+              ['App versions', result.versions],
+              ['Android major versions', result.android_versions],
+              ['Reports by received day', result.daily_reports],
+              ['Countries (at least five installations)', result.countries],
+            ].map(([heading, rows]) =>
+              panel(
+                node('h3', heading),
+                table(
+                  ['Category', 'Reports', 'Reporting installations'],
+                  rows.map((row) => [row.label, row.events, row.installations]),
+                ),
+              ),
+            ),
+          );
+        } catch {
+          usageReport.replaceChildren(
+            node('p', 'Mobile reports unavailable. No usage count is established.'),
+          );
+        }
+      }),
+      usageReport,
+      node(
+        'p',
+        'Reports are unverified app assertions, not unique people, verified devices or completed document operations. Reinstallation can create a new identifier. Offline delivery can be delayed. Version 0 and unknown device values mean metadata was unavailable. Country is approximate and can be affected by VPNs; small country groups are not shown.',
+      ),
+      node(
+        'p',
+        'No GPS, document contents, account details or raw IP addresses are stored in these analytics. Reports expire after 30 days. Device/version categories can overlap and must not be added to estimate unique people.',
+      ),
+      geoCredit,
+    ),
+  );
   const forms = [
     [
       'Create product',

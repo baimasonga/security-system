@@ -1103,6 +1103,79 @@ paths:
             schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
           }
       responses: { '200': { description: Audit events (hash-chained) } }
+  /v1/mobile/rokela-pdf/events:
+    options:
+      tags: [mobile]
+      summary: Preflight for the Rokela Android WebView origin only
+      responses:
+        '204': { description: Allowed native origin and POST method }
+        '403': { description: Origin or method refused }
+    post:
+      tags: [mobile]
+      summary: Receive bounded anonymous Rokela Android reports (not authoritative devices or people)
+      description: Public fixed-app collector; 16 KiB body limit, 20 events, 120 requests per minute per ingress-derived IP, 100000 retained events. Events older than seven days or more than five minutes ahead are rejected. UUID retries deduplicate within 30-day retention; country is server-derived only. No credentials, tenant selection, GPS, raw IP or free text in payload.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id, events]
+              properties:
+                installation_id: { type: string, format: uuid }
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [id, occurred_at, feature, app_version, os_major, device_class]
+                    properties:
+                      id: { type: string, format: uuid }
+                      occurred_at: { type: string, format: date-time }
+                      feature:
+                        {
+                          type: string,
+                          enum:
+                            [
+                              app_open,
+                              open,
+                              scan,
+                              sign,
+                              edit,
+                              pages,
+                              merge,
+                              photos,
+                              compress,
+                              protect,
+                              unlock,
+                              ocr,
+                              fill,
+                              convert,
+                            ],
+                        }
+                      app_version: { type: string, maxLength: 19 }
+                      os_major: { type: [integer, 'null'], minimum: 1, maximum: 99 }
+                      device_class: { type: string, enum: [phone, tablet, unknown] }
+      responses:
+        '202': { description: Committed or already accepted; accepted is the batch item count }
+        '400': { description: Invalid schema or event time }
+        '403': { description: Browser origin refused }
+        '409': { description: Conflicting event identity; whole batch rolled back }
+        '413': { description: Body too large }
+        '429': { description: Request or retained-event capacity limit }
+  /v1/admin/mobile-analytics:
+    get:
+      tags: [admin]
+      security: [{ bearer: [] }]
+      summary: Aggregate anonymous Rokela Android usage over the last 30 received days
+      description: Operator only; no query filters or installation identifiers. Includes generated_at, last_received_at, reports, active_installations_1d/7d/30d and feature/device/version/day/country groups. Country groups below five installations are suppressed. Configuration is not evidence of successful lookup. No per-device or raw report export.
+      responses:
+        '200': { description: Aggregate report and country_lookup_configured }
+        '401': { description: Authentication required }
+        '403': { description: Operator required }
   /v1/admin/mobile-distribution:
     get:
       tags: [admin]

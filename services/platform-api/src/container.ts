@@ -1,3 +1,6 @@
+import { createCountryLookup } from './integrations/mobile-country.ts';
+import { MobileAnalytics, MemoryMobileStore } from './mobile-analytics.ts';
+import { PgMobileStore } from './db/pg-mobile-store.ts';
 import { PostureService } from '@trust/operations';
 import {
   AutomationService,
@@ -121,6 +124,8 @@ export interface Container {
   /** Dual control, JIT grants, freeze and break-glass (ADR-022). */
   privileged: PrivilegedService;
   keyring: KeyRing;
+  mobileAnalytics: MobileAnalytics;
+  mobileCountryLookup: (ip: string) => Promise<string | null>;
   telemetry: Telemetry;
   telemetrySink: TelemetrySink;
   metrics: Metrics;
@@ -154,6 +159,7 @@ export interface ContainerOverrides {
   operationsMail?: MailDelivery;
   /** Test seam: replaces the outbound probe transport. */
   probeCheck?: (target: ProbeCheck) => Promise<boolean>;
+  mobileCountryLookup?: (ip: string) => Promise<string | null>;
   sharingConfig?: Partial<typeof DEFAULT_SHARING_CONFIG>;
 }
 
@@ -652,6 +658,12 @@ export async function createContainer(
     privileged,
     keyring,
     telemetry,
+    mobileAnalytics: new MobileAnalytics(
+      pool ? new PgMobileStore(pool) : new MemoryMobileStore(),
+      clock,
+    ),
+    mobileCountryLookup:
+      overrides?.mobileCountryLookup ?? createCountryLookup(config.mobileCountryDatabase),
     telemetrySink,
     metrics,
     anchorStore,

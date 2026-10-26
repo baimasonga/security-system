@@ -15,6 +15,7 @@ const RIU: Priv[] = ['SELECT', 'INSERT', 'UPDATE'];
 const ALL: Priv[] = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 
 export const TABLE_PRIVILEGES: Record<string, Priv[]> = {
+  mobile_analytics_events: ['SELECT', 'INSERT', 'DELETE'],
   operations_security_evidence: ['SELECT', 'INSERT'],
   operations_security_findings: RIU,
   operations_credentials: RIU,

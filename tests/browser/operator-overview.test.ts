@@ -75,7 +75,9 @@ it('shows live operator evidence, handles unavailable data and preserves existin
   );
   await page.getByRole('button', { name: 'Refresh APK downloads' }).click();
   await page.getByRole('cell', { name: '17', exact: true }).waitFor();
-  expect(await page.getByText('Not connected.', { exact: false }).isVisible()).toBe(true);
+  expect(
+    await page.getByText('GitHub downloads do not report app usage.', { exact: false }).isVisible(),
+  ).toBe(true);
   await page.unroute('**/v1/admin/mobile-distribution');
   await page.route('**/v1/admin/mobile-distribution', (route) =>
     route.fulfill({
@@ -87,6 +89,12 @@ it('shows live operator evidence, handles unavailable data and preserves existin
   await page.getByRole('button', { name: 'Refresh APK downloads' }).click();
   await page.getByText('Download evidence unavailable.', { exact: false }).waitFor();
   expect(await page.getByRole('cell', { name: '17', exact: true }).count()).toBe(0);
+  await page.getByLabel('Operator action').selectOption({ label: 'Mobile app usage' });
+  await page.getByRole('button', { name: 'Refresh mobile usage' }).click();
+  await page.getByRole('cell', { name: 'No app reports received', exact: true }).waitFor();
+  expect(await page.getByText('Not configured; country is unknown', { exact: true }).count()).toBe(
+    1,
+  );
   await page.getByLabel('Operator action').selectOption({ label: 'Create product' });
   await page.getByRole('heading', { name: 'Create product', exact: true }).waitFor();
   expect(await page.getByRole('heading', { name: 'Operations overview' }).isVisible()).toBe(false);

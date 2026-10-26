@@ -49,6 +49,8 @@ export interface PlatformConfig {
   port: number;
   /** Behind a reverse proxy/CDN, trust X-Forwarded-For for client IP (rate limiting). */
   trustProxy: boolean;
+  mobileProxyHops: number;
+  mobileCountryDatabase?: string;
   licenseKeyPepper: string;
   pseudonymKey: string;
   /** PKCS#8 PEM of the license-signing key. Required in production; ephemeral in dev/test. */
@@ -601,6 +603,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const port = Number(env['PORT'] ?? 8080);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('invalid PORT');
 
+  const mobileProxyHops = Number(env['MOBILE_TRUSTED_PROXY_HOPS'] ?? '0');
+  if (!Number.isInteger(mobileProxyHops) || mobileProxyHops < 0 || mobileProxyHops > 5)
+    throw new Error('MOBILE_TRUSTED_PROXY_HOPS must be 0 to 5');
   return {
     env: mode,
     emailDelivery,
@@ -622,6 +627,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     host: env['HOST'] ?? '127.0.0.1',
     port,
     trustProxy: env['TRUST_PROXY'] === '1',
+    mobileProxyHops,
+    ...(env['MOBILE_COUNTRY_DATABASE']
+      ? { mobileCountryDatabase: env['MOBILE_COUNTRY_DATABASE'] }
+      : {}),
     licenseKeyPepper,
     pseudonymKey,
     signingKeyPem,
