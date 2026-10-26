@@ -1,5 +1,22 @@
 # Operations/security implementation status and agent handoff
 
+## Security overview evidence gaps — 26 October 2026
+
+- Add a separate latest shown backup column and a next-review summary for open
+  findings, failed/missing/stale scan and recovery reports, missed recovery targets
+  and truncated evidence. Backup failures enter the existing failure priority.
+- Backup, restore and rollback remain distinct. Even current successful reports
+  remain administrator evidence requiring independent verification. No production
+  restore, paid resource, email or security mutation is performed by this view.
+- Tests cover newer failed backup versus older success, missing restore, missed
+  targets despite succeeded outcome, truncated evidence and the verification caveat.
+  Browser coverage checks columns, evidence gaps and narrow-screen containment.
+- Verification: full checks passed 1,155 tests (three skipped); all 17 application
+  browser tests passed, including mobile containment and unavailable evidence.
+  Publish through the existing GitHub deployment branch; live acceptance remains
+  separate. Previous notification release c616d12 passed GitHub CI, CodeQL and
+  live release observation.
+
 ## Portal notification delivery details — 26 October 2026
 
 - Next ready UI slice: expose existing scoped notification delivery timestamps and

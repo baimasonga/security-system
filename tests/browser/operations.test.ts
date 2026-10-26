@@ -730,6 +730,16 @@ it('security overview prioritizes open critical findings and opens their real sc
   expect(await reports.getByText('1 shown · 1 critical · 0 high', { exact: true }).count()).toBe(1);
   expect(await reports.getByText('No scan report shown', { exact: true }).count()).toBe(1);
   expect(await reports.getByText('No restore report shown', { exact: true }).count()).toBe(2);
+  expect(
+    await reports.getByRole('columnheader', { name: 'Latest shown backup', exact: true }).count(),
+  ).toBe(1);
+  expect(await reports.getByText('No backup report shown', { exact: true }).count()).toBe(2);
+  expect(
+    await reports
+      .getByRole('cell')
+      .filter({ hasText: 'Backup report missing; Restore report missing' })
+      .count(),
+  ).toBe(2);
   if (process.env['PORTAL_ARTIFACTS'])
     await page.screenshot({
       path: join(process.env['PORTAL_ARTIFACTS'], 'security-overview-desktop.png'),
@@ -759,7 +769,7 @@ it('security overview keeps unavailable reporting unknown and never substitutes 
   await page.getByRole('heading', { name: 'Security overview', exact: true }).waitFor();
   const reports = section(page, 'Environment reports');
   expect(await reports.getByText('Reporting unavailable', { exact: true }).count()).toBe(1);
-  expect(await reports.getByText('Unknown', { exact: true }).count()).toBe(2);
+  expect(await reports.getByText('Unknown', { exact: true }).count()).toBe(3);
   expect(await reports.getByText(/^0 shown/).count()).toBe(0);
   expect(await section(page, 'Coverage').textContent()).toContain('Coverage is partial');
   await reports

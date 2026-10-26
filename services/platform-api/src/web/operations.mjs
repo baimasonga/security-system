@@ -39,6 +39,8 @@ export function summarizePosture(view) {
       findingText: 'Unknown',
       scanText: 'Reporting unavailable',
       restoreText: 'Unknown',
+      backupText: 'Unknown',
+      attentionText: 'Reporting unavailable; open the environment to investigate.',
       partial: true,
     };
   const latest = (items) =>
@@ -48,6 +50,7 @@ export function summarizePosture(view) {
     );
   const scan = latest(view.scans.items);
   const restore = latest(view.recovery.items.filter((r) => r.kind === 'restore'));
+  const backup = latest(view.recovery.items.filter((r) => r.kind === 'backup'));
   const open = view.findings.items.filter((f) => ['open', 'acknowledged'].includes(f.state));
   const critical = open.filter((f) => f.severity === 'critical').length;
   const high = open.filter((f) => f.severity === 'high').length;
@@ -55,13 +58,30 @@ export function summarizePosture(view) {
     ? 0
     : high
       ? 1
-      : scan?.outcome === 'failed' || restore?.outcome === 'failed'
+      : scan?.outcome === 'failed' || restore?.outcome === 'failed' || backup?.outcome === 'failed'
         ? 2
         : !scan || !restore || scan.freshness !== 'current' || restore.freshness !== 'current'
           ? 3
           : open.length
             ? 4
             : 5;
+  const attention = [];
+  if (open.length) attention.push(`Review ${open.length} open finding snapshots`);
+  for (const [label, report] of [
+    ['Scan', scan],
+    ['Backup', backup],
+    ['Restore', restore],
+  ]) {
+    if (!report) attention.push(`${label} report missing`);
+    else {
+      if (report.outcome === 'failed') attention.push(`${label} reported failure`);
+      if (report.freshness !== 'current') attention.push(`${label} evidence is not current`);
+      if (label !== 'Scan' && report.target_met === false)
+        attention.push(`${label} recovery targets not met`);
+    }
+  }
+  if (view.scans.truncated || view.findings.truncated || view.recovery.truncated)
+    attention.push('Review omitted evidence in the environment');
   const describe = (r) => `${r.outcome} · ${r.freshness} · ${when(r.completed_at)}`;
   return {
     available: true,
@@ -69,6 +89,10 @@ export function summarizePosture(view) {
     findingText: `${open.length} shown · ${critical} critical · ${high} high${view.findings.truncated ? ' · more findings not shown' : ''}`,
     scanText: scan ? describe(scan) : 'No scan report shown',
     restoreText: restore ? describe(restore) : 'No restore report shown',
+    backupText: backup ? describe(backup) : 'No backup report shown',
+    attentionText: attention.length
+      ? attention.join('; ')
+      : 'No gaps flagged in shown reports; independent verification remains required.',
     partial: view.scans.truncated || view.findings.truncated || view.recovery.truncated,
   };
 }
@@ -371,7 +395,9 @@ export async function operationsView(ui) {
         `${r.app.state} / ${r.env.state}`,
         r.findingText,
         r.scanText,
+        r.backupText,
         r.restoreText,
+        r.attentionText,
         action,
       ];
     });
@@ -416,7 +442,9 @@ export async function operationsView(ui) {
                 'Inventory state',
                 'Open finding snapshots',
                 'Latest shown scan',
+                'Latest shown backup',
                 'Latest shown restore',
+                'Attention / next review',
                 '',
               ],
               rows,

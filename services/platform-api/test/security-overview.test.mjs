@@ -101,3 +101,56 @@ it('keeps stale and missing scan/restore reports ahead of current reported evide
   expect(summarizePosture(view).rank).toBeLessThan(current.rank);
   expect(JSON.stringify(current)).not.toMatch(/independently_verified|secure|healthy/i);
 });
+
+it('shows backup failures separately and never substitutes backup success for restore evidence', () => {
+  const view = blank();
+  view.recovery.items = [
+    { kind: 'backup', outcome: 'failed', freshness: 'stale', completed_at: '2026-10-25T12:00:00Z' },
+    {
+      kind: 'backup',
+      outcome: 'succeeded',
+      freshness: 'current',
+      completed_at: '2026-10-24T12:00:00Z',
+    },
+  ];
+  const result = summarizePosture(view);
+  expect(result.backupText).toContain('failed · stale');
+  expect(result.restoreText).toBe('No restore report shown');
+  expect(result.attentionText).toContain('Backup reported failure');
+  expect(result.attentionText).toContain('Backup evidence is not current');
+  expect(result.attentionText).toContain('Restore report missing');
+  expect(result.rank).toBe(2);
+});
+
+it('calls out missed recovery targets and incomplete evidence despite a succeeded outcome', () => {
+  const view = blank();
+  view.recovery.items = [
+    {
+      kind: 'restore',
+      outcome: 'succeeded',
+      freshness: 'current',
+      target_met: false,
+      completed_at: '2026-10-25T12:00:00Z',
+    },
+  ];
+  view.findings.truncated = true;
+  const result = summarizePosture(view);
+  expect(result.attentionText).toContain('Restore recovery targets not met');
+  expect(result.attentionText).toContain('Review omitted evidence');
+  expect(result.attentionText).toContain('Backup report missing');
+});
+
+it('keeps independent verification caveat even when all shown reports are current', () => {
+  const view = blank();
+  const report = {
+    outcome: 'succeeded',
+    freshness: 'current',
+    target_met: true,
+    completed_at: '2026-10-25T12:00:00Z',
+  };
+  view.scans.items = [{ ...report, outcome: 'completed' }];
+  view.recovery.items = ['backup', 'restore'].map((kind) => ({ ...report, kind }));
+  expect(summarizePosture(view).attentionText).toBe(
+    'No gaps flagged in shown reports; independent verification remains required.',
+  );
+});
