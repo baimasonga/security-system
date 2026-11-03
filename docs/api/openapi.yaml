@@ -2446,6 +2446,16 @@ paths:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
         '302': { description: Redirect }
+  /releases.mjs:
+    get:
+      summary: Public release console asset
+      security: []
+      responses:
+        '200':
+          description: Static module without account or product data
+          content:
+            text/javascript:
+              schema: { type: string }
   /operations.mjs:
     get:
       summary: Application inventory and credential management browser module

@@ -101,11 +101,36 @@ Delivery: draft review branch `codex/signed-release-publication`, stacked on reg
 PR #41. Production flags, migrations, signing keys and installed client roots remain
 unchanged. Next: release-console UI, then native C# verifier/stager parity.
 
+## Release console — third slice, 3 November 2026
+
+The existing Operator console includes Product releases with public-root and target
+registration, historical floor attestation, retry-preserving sequence reservations,
+externally signed publication/pause, bounded history and anonymous no-store feed reads.
+Registry rows distinguish reserved counters from latest historical publications.
+Errors clear prior results, unavailable history stays unknown, and leaving the
+account/view prevents late responses from replacing the current page. Signing,
+artifact fetching, client trust roots and native installation remain outside the UI.
+No production flag, signing key, schema or account state is changed by this slice.
+
+Real Chromium acceptance covers an API commit followed by a lost reservation
+response, exact UUID retry with no sequence consumption, invalid-signature refusal,
+verified signed pause publication, history/current reads, expired-feed semantics,
+mobile containment, feature-disabled refusal and customer exclusion. Existing MFA
+QR/confirmation/recovery/sign-in browser acceptance is verified separately; that
+is not proof of any owner's production enrollment.
+
+Verification: repository checks passed 1,198 tests (three intentionally skipped);
+all 29 real-browser workflows passed after preserving Operations overview as the
+default operator panel. The focused release browser suite separately verifies
+failed-history-refresh cleanup. Formatting, types and boundaries pass; the existing
+mobile-analytics regular-expression lint warning is unchanged. This UI-only slice
+adds no database or authorization behavior; existing signed publication checks remain
+server-enforced. Production acceptance and owner MFA status are not inferred.
+
 ## Next implementation slices
 
-1. Release console using that API, explicit publish/withdraw state and status for
-   every product/platform/channel. Define rollout-cohort semantics before adding
-   staged percentage rollout; absence of a release is never proof of support.
+1. Review the release-console slice, then define rollout-cohort semantics before
+   adding staged percentage rollout; absence of a release is never proof of support.
 2. Reusable C#/.NET verifier/stager with shared protocol test vectors, protected
    state and cross-process serialization, followed by native installation and
    recovery adapters. Integrate Business Admin and a second product independently.

@@ -86,6 +86,7 @@ describe('OpenAPI ↔ implementation drift', () => {
         'get /d/{code}',
         'get /files.mjs',
         'get /operations.mjs',
+        'get /releases.mjs',
         'get /uploader.mjs',
         'get /share.mjs',
         'get /request.mjs',

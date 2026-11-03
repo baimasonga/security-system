@@ -16,6 +16,7 @@ export function registerPortalRoutes(
   const icon = readFileSync(new URL('../web/rokela-icon.png', import.meta.url));
   const operations = readFileSync(new URL('../web/operations.mjs', import.meta.url), 'utf8');
   const files = readFileSync(new URL('../web/files.mjs', import.meta.url), 'utf8');
+  const releases = readFileSync(new URL('../web/releases.mjs', import.meta.url), 'utf8');
   const shareHtml = readFileSync(new URL('../web/share.html', import.meta.url), 'utf8');
   const shareJs = readFileSync(new URL('../web/share.mjs', import.meta.url), 'utf8');
   const requestHtml = readFileSync(new URL('../web/request.html', import.meta.url), 'utf8');
@@ -34,6 +35,7 @@ export function registerPortalRoutes(
     ['/rokela-icon.png', 'image/png', icon],
     ['/operations.mjs', 'text/javascript; charset=utf-8', operations],
     ['/files.mjs', 'text/javascript; charset=utf-8', files],
+    ['/releases.mjs', 'text/javascript; charset=utf-8', releases],
     ['/uploader.mjs', 'text/javascript; charset=utf-8', uploaderJs],
     ['/public.mjs', 'text/javascript; charset=utf-8', publicJs],
     ['/share.mjs', 'text/javascript; charset=utf-8', shareJs],
@@ -59,6 +61,7 @@ export function registerPortalRoutes(
           '/portal.mjs',
           '/device.mjs',
           '/operations.mjs',
+          '/releases.mjs',
           '/files.mjs',
           '/s/:token',
           '/r/:token',
