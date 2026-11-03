@@ -11,6 +11,7 @@ const assets = [
   ['/portal.css', 'portal.css'],
   ['/portal.mjs', 'portal.mjs'],
   ['/operations.mjs', 'operations.mjs'],
+  ['/releases.mjs', 'releases.mjs'],
 ];
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const expected = assets.map(([path, file]) => [

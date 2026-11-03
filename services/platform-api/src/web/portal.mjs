@@ -1,6 +1,7 @@
 import { BrowserDevice } from './device.mjs';
 import { filesView } from './files.mjs';
 import { operationsView } from './operations.mjs';
+import { releaseConsole } from './releases.mjs';
 const $ = (id) => document.getElementById(id);
 const state = {
   token: '',
@@ -47,6 +48,7 @@ const navigationIcons = {
   Account: 'M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10 M3 22a9 9 0 0 1 18 0z',
   'Security center': 'M12 2l9 4v6c0 5-5 8-9 10-4-2-9-5-9-10V6z M8 12l3 3 5-6',
   'Operator console': 'M4 5l6 6-6 6 M12 19h8',
+  'Software updates': 'M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4',
 };
 function navigationButton(view) {
   const item = button(view, async () => {
@@ -451,7 +453,8 @@ function renderShell() {
     'Account',
     'Security center',
   ];
-  if (state.principal.platform_role === 'platform_admin') views.push('Operator console');
+  if (state.principal.platform_role === 'platform_admin')
+    views.push('Operator console', 'Software updates');
   $('navigation').replaceChildren(...views.map(navigationButton));
 }
 $('organization').addEventListener('change', async () => {
@@ -824,6 +827,11 @@ async function renderView(view) {
       await passkeyPanel(),
     ];
   if (view === 'Operator console') return operatorView();
+  if (view === 'Software updates')
+    return [
+      title('Software updates', 'Manage signed releases for each product and update channel.'),
+      productReleasesPanel(),
+    ];
   return [];
 }
 async function securityCenterView() {
@@ -1483,6 +1491,20 @@ async function deviceView() {
 }
 const reason = { name: 'reason', label: 'Reason (required for the audit log)', min: 3 };
 const ids = (name, label) => ({ name, label });
+function productReleasesPanel() {
+  if (state.principal.platform_role !== 'platform_admin')
+    throw new Error('Operator permission required');
+  const version = state.version;
+  const token = state.token;
+  return releaseConsole({
+    api,
+    node,
+    panel,
+    fieldsForm,
+    table,
+    current: () => state.version === version && state.token === token,
+  });
+}
 async function operatorView() {
   if (state.principal.platform_role !== 'platform_admin')
     throw new Error('Operator permission required');
@@ -1990,6 +2012,7 @@ async function operatorView() {
       witness,
     ),
   );
+  sections.push(productReleasesPanel());
   const picker = node('select');
   picker.setAttribute('aria-label', 'Operator action');
   const operations = sections.slice(1);
