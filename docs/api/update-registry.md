@@ -1,9 +1,9 @@
 # Update registry and release sequence reservations
 
-This is the first central update-catalog slice (ADR-032), not a software download
+This is the central update catalog (ADR-032/033), not a software download
 or installer service. It applies independently to Business Admin and future
-products. All routes require a platform operator session and are disabled by
-default. Customer licenses never grant registry access.
+products. Registry management requires a platform operator session. The current signed feed
+is anonymous; all catalog routes are disabled by default. Customer licenses never grant registry access.
 
 ## Deployment
 
@@ -59,6 +59,40 @@ catalog counter as authority to downgrade an installed client.
 - No purge endpoint exists for receipts. Operators must plan storage retention;
   deleting history to recover storage can cause unsafe sequence reuse.
 
-Next slices add signed publication tied to an actual reservation, signed root
-rotation, immutable release history and expiry-aware current-feed reads. The
-release console and native Windows installation/recovery remain separate work.
+Signed root rotation, the release console and native Windows installation/recovery
+remain separate work.
+
+## Signed publication and current feeds (ADR-033)
+
+Migration `0028_release_publications` and app-role grants are required before the
+new image starts, even with the flag off. No private signing key belongs in Warrior.
+
+1. Reconcile every historical target before reserving: `POST /sequence-floor`
+   with `platform`, `channel`, `sequence` and mandatory `reason`. Use trusted build
+   records. This attestation must strictly raise the counter and is available only
+   before the first publication for that target; it is not signature proof. Equal
+   floor retries return 409; read the registry to reconcile an uncertain response.
+2. Reserve, sign externally with the registered release authorities, then
+   `POST /releases` with `platform`, `channel`, reservation UUID `request_id`,
+   `envelope: {signatures: [...]}` and `reason`. All strict protocol checks apply.
+   Only the latest reserved sequence can publish; a later reservation abandons older
+   unpublished work. Finish a publication before reserving another for that target.
+3. Retry the exact envelope and request ID after uncertain responses. A published
+   receipt cannot change; exact retries remain readable after expiry but never
+   replace a newer feed. History and its audit event commit atomically.
+4. `GET /releases?platform=windows-x64&channel=stable&limit=20&before=42`
+   is operator-only immutable history; limit is 1–50, before is exclusive.
+5. `GET /v1/updates/{productId}/current?platform=windows-x64&channel=stable`
+   is anonymous, flag-gated, `Cache-Control: no-store` and returns the original
+   signed envelope, not a re-signed or snake-cased payload. The feed origin must be
+   allowed in clients' pinned root for SDK fetches. No root is automatically installed.
+
+Missing/expired newest metadata or expired authority returns 404, never an older
+release. A signed pause stays visible: reserve a higher sequence and publish a
+signed `paused: true` manifest to withdraw distribution. To resume or refresh
+expiry, reserve/sign/publish a higher sequence. Existing offline metadata does not
+vanish from clients; their signature/expiry/checkpoint rules remain authoritative.
+
+The registry proves metadata signature acceptance, not artifact availability,
+SBOM/provenance verification, trusted builds or successful installation. No server
+artifact fetch or installer is implemented by this endpoint.

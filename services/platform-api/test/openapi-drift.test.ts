@@ -62,6 +62,7 @@ describe('OpenAPI ↔ implementation drift', () => {
         'get /portal.mjs',
         'get /v1/auth/options',
         'get /v1/keys/trust-bundle',
+        'get /v1/updates/{productId}/current',
         'post /v1/auth/login',
         'post /v1/auth/passkeys/login/begin',
         'post /v1/auth/passkeys/login/finish',

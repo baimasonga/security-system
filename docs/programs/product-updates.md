@@ -61,21 +61,55 @@ a five-device limit. Both produced exactly five successes, 25 limit refusals and
 zero deadlocks/retries/exhausted transactions. p99 was 224.81 ms before and 175.62 ms
 after; this short local smoke establishes no throughput or latency improvement.
 
+## Signed publication — second slice, 3 November 2026
+
+- Added signature-verified operator publication against the latest reserved sequence,
+  immutable history with bounded cursor reads and an anonymous no-store current feed.
+- Historical target floors can only advance through a reasoned, audited operator
+  attestation. New reservations abandon older unpublished work; numbers are never
+  recycled. Exact publication retries return their original row without another audit.
+- The existing SDK verifies thresholds, purpose, root freshness, exact target binding
+  and allowed artifact origins. No signing key or network fetch is added to Warrior.
+- Current feeds never fall back after newest-release expiry. A higher-sequence signed
+  pause is the withdrawal mechanism; refreshing or resuming needs a new sequence.
+- Migration `0028_release_publications`, owner-side grants and app-role verification
+  are prerequisites. The existing flag remains off by default. Production was not
+  migrated or enabled by this implementation. The feed is not an installer or proof
+  that artifacts/evidence are available.
+- [ADR-033](../adr/ADR-033-release-publication.md) and the
+  [operator API workflow](../api/update-registry.md) define the acceptance boundary.
+
+Verification for the publication slice: `npm run check` passed (1,198 passed,
+three skipped; formatting, types and boundaries passed; one pre-existing
+mobile-analytics regex lint warning). Full PostgreSQL owner/app-role validation
+passed 898 tests. The final stricter floor controls additionally passed all 18
+focused owner/app-role tests. The real Chromium MFA enable/disable/sign-in workflow
+passed one selected test; seven unrelated cases were intentionally unselected.
+Three isolated negative controls (signature verification, latest-reservation floor,
+expired-feed rejection) each caused assertion failures. Changed-file Gitleaks
+scanning found no leaks. No live-account MFA state is inferred from these tests.
+
+The archived c9fabbf licensing herd comparison used separate disposable PostgreSQL
+17 databases, fsync on, pool 10, 30 devices and a limit of five. Both baseline and
+new code produced exactly five successes, 25 limit refusals and zero deadlocks,
+retries or exhausted transactions. p99 was 221.76 ms versus 222.65 ms; this short
+smoke is compatibility evidence, not a performance improvement claim. Concurrent
+publication tests use separate coordinator objects and persistent PostgreSQL state,
+with audit failure rollback and immutable-history rejection coverage.
+
+Delivery: draft review branch `codex/signed-release-publication`, stacked on registry
+PR #41. Production flags, migrations, signing keys and installed client roots remain
+unchanged. Next: release-console UI, then native C# verifier/stager parity.
+
 ## Next implementation slices
 
-1. Continue central release catalog: authenticated operator publication against an
-   actual reservation with reason/audit, immutable release history,
-   verified signed metadata and current-feed reads. Reconcile existing products'
-   historical sequence floors before publishing through a new catalog counter.
-   Serve existing signed envelopes without a server-side signing key. Define how
-   expiry/refresh and higher-sequence signed pause/withdrawal interact with clients.
-2. Release console using that API, explicit publish/withdraw state and status for
+1. Release console using that API, explicit publish/withdraw state and status for
    every product/platform/channel. Define rollout-cohort semantics before adding
    staged percentage rollout; absence of a release is never proof of support.
-3. Reusable C#/.NET verifier/stager with shared protocol test vectors, protected
+2. Reusable C#/.NET verifier/stager with shared protocol test vectors, protected
    state and cross-process serialization, followed by native installation and
    recovery adapters. Integrate Business Admin and a second product independently.
-4. Production signing custody and immutable hosting, platform publisher signatures,
+3. Production signing custody and immutable hosting, platform publisher signatures,
    compromised-key recovery, interrupted-install drills and live acceptance.
 
 ## ADR-031 verification record
