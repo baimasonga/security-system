@@ -44,8 +44,20 @@ This is conditional rollback detection with trustworthy retained state, not dura
 rollback protection, rollback resistance against a local administrator, an installed
 version verdict or permission to install. No existing product update flow changes.
 
-Next slices: persistent rollback/equivocation and clock checkpoints, protected
-cross-process state, dual-threshold root rotation, bounded transport and evidence-
+Windows storage slice: `WindowsUpdateCheckpointStore` protects state with DPAPI
+CurrentUser and purpose/path-specific entropy. A persistent lock file is opened
+with exclusive sharing for the entire load/verify/save transition; lock contention
+has a bounded wait and cancellation. Saves flush a new sibling file before an
+atomic replacement. Metadata is returned only after successful persistence.
+Explicit initialization requires no existing state; ordinary verification never
+initializes missing/corrupt state. Storage exceptions expose no file contents.
+Use a dedicated trusted local directory, not a network/synchronized share. The
+host must retain this path across upgrades and never retry failures as first use.
+DPAPI protects confidentiality/integrity at rest, not deletion or rollback by the
+same Windows user or administrator. Whole-state rollback remains outside this
+threat boundary. No license, customer document or installed updater is modified.
+
+Next slices: dual-threshold root rotation, bounded transport and evidence-
 gated staging. Only then integrate each Windows product independently and implement
 publisher verification, installation/recovery and interrupted-install acceptance.
 Existing customer documents and license state are unaffected by this library.

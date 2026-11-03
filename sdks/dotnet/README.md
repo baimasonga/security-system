@@ -22,8 +22,26 @@ inside that tolerance. State is bound to the exact root JSON bytes and target.
 This is a pure transition, **not persistent rollback protection**. Hosts must
 serialize load/verify/save across processes and atomically save protected state
 before using the result. Missing or corrupt established state must fail closed;
-`null` means explicitly authorized first use, not automatic recovery. No root
-rotation, protected store, installer execution or product integration is supplied.
+`null` means explicitly authorized first use, not automatic recovery.
+
+On Windows, `WindowsUpdateCheckpointStore` supplies DPAPI CurrentUser protection,
+an exclusive file lock across the load/verify/save transaction, bounded lock waits,
+cancellation, and flushed atomic replacement. Give it a stable absolute path in a
+dedicated trusted local directory retained across upgrades. `InitializeAsync` is
+for explicit first use only; use `VerifyAndCommitAsync` on every subsequent call.
+Missing/corrupt established state is an error. Never catch that error and call
+initialization automatically. Only a successfully committed transition returns
+metadata. Non-Windows hosts throw rather than silently writing plaintext.
+
+Keep the original pinned root JSON bytes stable. State cannot be copied to a new
+path, shared between Windows users, or moved to another root/target. The persistent
+`.lock` file is intentional and must not be deleted while any client is running.
+Orphan `.tmp` files from a killed process are not authoritative and are never read
+as state. A failed save preserves existing authoritative state where replacement
+has not completed. After an ambiguous crash, reload the committed file; never
+reset. DPAPI is not a defense against deletion or restoration of an older whole
+checkpoint by the same Windows user/admin. Network and synchronized shares are
+unsupported. No root rotation, installer execution or product integration is supplied.
 
 Run on Linux or Windows:
 
