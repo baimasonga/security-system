@@ -43,6 +43,13 @@ const errors = [];
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (name === 'node_modules' || name === '.git') continue;
+    // Native build outputs contain third-party binaries, not committed SDK source.
+    // NSec includes PEM format markers in its assembly; scan the source, not that dependency.
+    if (
+      ['bin', 'obj'].includes(name) &&
+      relative(root, dir).replaceAll('\\', '/').startsWith('sdks/dotnet/')
+    )
+      continue;
     const p = join(dir, name);
     const s = statSync(p);
     if (s.isDirectory()) walk(p, out);

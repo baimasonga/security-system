@@ -9,3 +9,5 @@ coverage/
 *.p12
 secrets/
 .data/
+sdks/dotnet/**/bin/
+sdks/dotnet/**/obj/

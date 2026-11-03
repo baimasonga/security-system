@@ -19,3 +19,10 @@ condition = "AND"
 regexTarget = "secret"
 regexes = ['''^operation_123456789$''']
 paths = ['''(^|/)packages/sdk-core/test/quota-client\.test\.ts$''']
+
+[[rules]]
+id = "jwt"
+
+[[rules.allowlists]]
+description = "Public cross-language update fixtures signed by discarded ephemeral keys; not account tokens"
+paths = ['''(^|/)docs/api/update-metadata-vectors\.json$''']

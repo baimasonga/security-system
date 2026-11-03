@@ -1,0 +1,1600 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "name": "valid metadata",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": true
+    },
+    {
+      "name": "valid pause",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOnRydWUsImFydGlmYWN0Ijp7InVybCI6Imh0dHBzOi8vdXBkYXRlcy5leGFtcGxlL3NldHVwLmV4ZSIsInNpemUiOjEyMzQsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJzYm9tX3NoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiLCJwcm92ZW5hbmNlX3NoYTI1NiI6ImNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MifX0.ZnRoJOOOjffcjbSKn-FqFg5Gy8hx8o_s2-5nL8s_0bVFFjdkAEkcJP8QgQ6RSlizR_ltQBfDLpRCIrPJt_FqDw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": true
+    },
+    {
+      "name": "two independent release signatures",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 2,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg",
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNDc5ZjI0Y2M2ZmZmZmEzM2NkMzI5Mjk0In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.oX2NIulmFoUQMmvgpBy2FxYsNn6epGispQ-_glA6RzL00Zpw4j10sr9Rntis9KBNucQeKNcPgwVYq7l0PefEDw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": true
+    },
+    {
+      "name": "duplicate signatures do not satisfy threshold",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 2,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg",
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "root key cannot sign a release",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfYjdkNTE1N2U5MjRmZDM0NTdhZjJiNTM5In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.J3bWGsaMNX_iV4I-5gXftIcX0GLbiIWVJX34nQdE_igD7refD85fFcfU-p4QCALsKIdP2Goevo_ZiLfIa5DiAQ"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "conflicting signed payloads",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg",
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNDc5ZjI0Y2M2ZmZmZmEzM2NkMzI5Mjk0In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjozLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.LJpNGYpn42G3jnz0pE0wfNuQln5_weJH-IF-EwRkhoyFTssCm2Os4NJnL5dTWHgYidSXgYpV7i38SgzxnhfKDQ"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "unknown signature does not veto valid threshold",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfYjdkNTE1N2U5MjRmZDM0NTdhZjJiNTM5In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.J3bWGsaMNX_iV4I-5gXftIcX0GLbiIWVJX34nQdE_igD7refD85fFcfU-p4QCALsKIdP2Goevo_ZiLfIa5DiAQ",
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": true
+    },
+    {
+      "name": "wrong purpose",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6ImxlYXNlK2p3cyIsImtpZCI6ImtleV81OTcwZmQ3NjFmMjc5OWM5YzlmMmI3ZjUifQ.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.W2eDnQbOg1OpkTWnMuhOHtd4gYHKrCH3noWgmkkREbPIvzhZprDxMI7thy4iqyupZ4sXyttVQmurNlEpGOW4CA"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "tampered payload",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjo5OSwidmVyc2lvbiI6IjAuMzQuMCIsIm1pbmltdW1fc2VxdWVuY2UiOjEsImlzc3VlZF9hdCI6MTc3MjMyMzIwMCwiZXhwaXJlcyI6MTc3MjMyNjgwMCwicGF1c2VkIjpmYWxzZSwiYXJ0aWZhY3QiOnsidXJsIjoiaHR0cHM6Ly91cGRhdGVzLmV4YW1wbGUvc2V0dXAuZXhlIiwic2l6ZSI6MTIzNCwic2hhMjU2IjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInNib21fc2hhMjU2IjoiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInByb3ZlbmFuY2Vfc2hhMjU2IjoiY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjYyJ9fQ.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "tampered signature",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "wrong product",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "other-product",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "wrong platform",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "linux-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "wrong channel",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "beta",
+      "accepted": false
+    },
+    {
+      "name": "expired manifest at exact boundary",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772326800,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "future issue beyond tolerance",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323139,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "issue at tolerance boundary",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323140,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": true
+    },
+    {
+      "name": "expired pinned root",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1772323200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "invalid lifetime",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyOTI4MDAxLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.xPObrmofe9ib8fXsC0YTOpYy6v6N7vVqAOl3ZM7-jRWzbvbkXdnI9L6kago_84gUaqWJDFL9nENbpn_YvXKWAw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "minimum above sequence",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MywiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.1Cmn23dTPPf-2tPFHwhEKFCOM0iXNX-1V_74eynjNsKIWZFAKGeXz3AQ8jf2TzyoO_x2hrSzT23Ve9b-vZNoDQ"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "unsafe sequence",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjo5MDA3MTk5MjU0NzQwOTkyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.JSHMuJECVBBnclyKLwMDFNQd-rs4h2oi6CHPBTtBl95W-oTnk1o_C3B8Vcovh8NZ_O5oLDJY2fPQB6S8gKRDBw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "fractional size",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxLjUsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJzYm9tX3NoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiLCJwcm92ZW5hbmNlX3NoYTI1NiI6ImNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MifX0.JZ4JGHPSiSKsT-pMfQif_8p3ATvRpHu90TFGMgBRRIWFS5XUAmY77zRFqf8lHpZHsVghlje6IYnRR7RU1MLfDQ"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "unknown manifest member",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn0sImV4dHJhIjp0cnVlfQ.WrsE75YHMT2SnpvR7OSBDO4pHlxJFrMx0_wtJuir9TIAYJvPh5YDfjjxy7Y43Eu3umpoX-pTEdHsv6au4a84Cw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "untrusted artifact URL 22",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwOi8vdXBkYXRlcy5leGFtcGxlL3NldHVwLmV4ZSIsInNpemUiOjEyMzQsInNoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJzYm9tX3NoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiLCJwcm92ZW5hbmNlX3NoYTI1NiI6ImNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MifX0._ogVCS2bXs-aT8GkyZTvjAFSdQeiO1nPjXi1ocEif73BWTWzI08DhYjjnrX6t9Rb0EQO9lnI88GLUFZO_wUECA"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "untrusted artifact URL 23",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL2V2aWwuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.qWYTdW-_TvsmuLD1OiIWnej7rBYrlKua4uw-pVIikAajmMYt49DpDob134QQXMBn8sisk2XKpLdQAEjt3yXPCw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "untrusted artifact URL 24",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VzZXI6cGFzc0B1cGRhdGVzLmV4YW1wbGUvc2V0dXAuZXhlIiwic2l6ZSI6MTIzNCwic2hhMjU2IjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInNib21fc2hhMjU2IjoiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYiIsInByb3ZlbmFuY2Vfc2hhMjU2IjoiY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjYyJ9fQ.1m7irNbw_9KgA_8DWIEucMysSv6v2NWWWuHmXvkLj_DD-0lt74tl-jphs4ifQfVXsgzWjlFT4XwhSV_CXPkHCw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "untrusted artifact URL 25",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUjZnJhZ21lbnQiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.nZAP9PBbT79u6rUSeu7yj8eYwFMK2xQnM-cHsDNcN70_b68twrv6JWNAeNf8gVj4r1cJoLpJfwo2cwCK17k2DQ"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "bad digest",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.-hvdAspXTFvMlI61HpdMaEhmN9O6vL_Hz3sRdPowvX3ldXbonMl81hZr4QiwteJp1d3Vqc3q-9G3xn9SdEaqBw"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "private JWK field",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0",
+                "d": "not-private-material"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "shared root and release key",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "key_479f24cc6ffffa33cd329294",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "OZzjnIHFRQ22yoSNMXW5S7V7qipryJVg7LB88MStZWs"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    },
+    {
+      "name": "duplicate public key under new ID",
+      "root": {
+        "schema": 1,
+        "version": 1,
+        "expires": 1774915200,
+        "root": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_b7d5157e924fd3457af2b539",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "9C0D-RvYmQmhMiCj8CsgXjxfJnZ1feZr5r7pV9QYQg8"
+              }
+            }
+          ]
+        },
+        "release": {
+          "threshold": 1,
+          "keys": [
+            {
+              "kid": "key_5970fd761f2799c9c9f2b7f5",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            },
+            {
+              "kid": "duplicate",
+              "jwk": {
+                "kty": "OKP",
+                "crv": "Ed25519",
+                "x": "ptolZrp0Qu1bfBSspKbUq45i2VVnHCd7OXsirNe8yO0"
+              }
+            }
+          ]
+        },
+        "artifact_origins": ["https://updates.example"]
+      },
+      "envelope": {
+        "signatures": [
+          "eyJhbGciOiJFZERTQSIsInR5cCI6InRydXN0LXVwZGF0ZS1tYW5pZmVzdCtqd3MiLCJraWQiOiJrZXlfNTk3MGZkNzYxZjI3OTljOWM5ZjJiN2Y1In0.eyJzY2hlbWEiOjEsInByb2R1Y3QiOiJzaWVycmEtYnVzaW5lc3MiLCJwbGF0Zm9ybSI6IndpbmRvd3MteDY0IiwiY2hhbm5lbCI6InN0YWJsZSIsInNlcXVlbmNlIjoyLCJ2ZXJzaW9uIjoiMC4zNC4wIiwibWluaW11bV9zZXF1ZW5jZSI6MSwiaXNzdWVkX2F0IjoxNzcyMzIzMjAwLCJleHBpcmVzIjoxNzcyMzI2ODAwLCJwYXVzZWQiOmZhbHNlLCJhcnRpZmFjdCI6eyJ1cmwiOiJodHRwczovL3VwZGF0ZXMuZXhhbXBsZS9zZXR1cC5leGUiLCJzaXplIjoxMjM0LCJzaGEyNTYiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwic2JvbV9zaGEyNTYiOiJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiIiwicHJvdmVuYW5jZV9zaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn19.uq9hVRVIGvH9jHgNISEtmvVNGp8DT0X_NNC6kcFHLlGClzX8DL9ss88VUCffDpMDAk7eY95ZR9YFPXeVeQ20Dg"
+        ]
+      },
+      "now": 1772323200,
+      "product": "sierra-business",
+      "platform": "windows-x64",
+      "channel": "stable",
+      "accepted": false
+    }
+  ]
+}
