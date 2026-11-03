@@ -129,6 +129,34 @@ server-enforced. Production acceptance and owner MFA status are not inferred.
 
 ## Next implementation slices
 
+### Integrated operator access — 3 November 2026
+
+The integration branch brings the previously separate coordination, registry,
+signed-publication and release-console branches together with native metadata and
+Windows checkpoint storage. Operators have a direct **Software updates** navigation
+entry as well as **Operator console → Product releases**. Customers have neither.
+The page reads an operator-only, no-store deployment-availability endpoint; failed
+refreshes clear previous status. Availability describes the server feature flag,
+not an installed client, signing custody or successful artifact verification.
+
+Production rollout requires migrations `0027_release_registry` and
+`0028_release_publications`, owner-side grants and app-role verification from this
+image. Existing Railway startup ordering must continue to stop on migration/grant
+failure. Enable `UPDATE_CATALOG_ENABLED=true` only after deployment acceptance.
+Without that flag, the screen remains visible and explicitly reports that release
+management is not enabled. No signing private key is accepted or provisioned, and
+no desktop installer gains automatic updates merely by deploying the portal.
+
+Local integration checks: 1,229 repository tests passed (three skipped); the full
+initial browser integration passed 34 workflows and the final release/overview
+subset passed five workflows. Owner/app-role tests for the final status endpoint
+passed 18 tests. Removing its operator guard was caught by assertions; original
+source was restored. A 30-device, five-seat licensing herd yielded exactly five
+successes and 25 device-limit refusals, with zero deadlocks/retries/exhaustion,
+matching the earlier registry/publication correctness baseline. This is not a
+throughput improvement claim. Full clean PostgreSQL acceptance and GitHub release
+checks must complete before rollout; live configuration remains separate evidence.
+
 1. Review the release-console slice, then define rollout-cohort semantics before
    adding staged percentage rollout; absence of a release is never proof of support.
 2. Reusable C#/.NET verifier/stager with shared protocol test vectors, protected

@@ -219,8 +219,39 @@ export function releaseConsole({ api, node, panel, fieldsForm, table, current })
   });
   const label = node('label', 'Choose a release operation');
   label.append(action);
+  const availability = node('p', 'Checking release management availability…');
+  availability.setAttribute('aria-live', 'polite');
+  let statusVersion = 0;
+  const refreshStatus = async () => {
+    const version = ++statusVersion;
+    availability.textContent = 'Checking release management availability…';
+    output.replaceChildren();
+    try {
+      const status = await api('/v1/admin/update-catalog/status');
+      if (!current() || version !== statusVersion) return;
+      availability.textContent =
+        status.enabled === true
+          ? 'Release management is enabled on this deployment.'
+          : status.enabled === false
+            ? 'Release management is not enabled on this deployment. Ask the deployment owner to enable it.'
+            : 'Release management availability could not be confirmed.';
+    } catch {
+      if (current() && version === statusVersion)
+        availability.textContent = 'Release management availability could not be confirmed.';
+    }
+  };
+  const refresh = node('button', 'Refresh release availability');
+  refresh.type = 'button';
+  refresh.addEventListener('click', refreshStatus);
+  void refreshStatus();
   return panel(
     node('h2', 'Product releases'),
+    availability,
+    refresh,
+    node(
+      'p',
+      'These controls manage signed release metadata. They do not install updates or confirm that desktop installations support automatic updates.',
+    ),
     node(
       'p',
       'Manage each product/platform/channel independently. Catalog access requires UPDATE_CATALOG_ENABLED on the server. A 404 can mean the feature or registry is unavailable; it does not establish support.',

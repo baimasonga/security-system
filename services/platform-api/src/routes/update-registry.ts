@@ -15,6 +15,11 @@ import {
 } from '../release-registry.ts';
 
 export function registerUpdateRegistryRoutes(app: FastifyInstance, c: Container) {
+  app.get('/v1/admin/update-catalog/status', { preHandler: operator(c) }, async (req, reply) => {
+    parse(emptyBody, req.query);
+    reply.header('Cache-Control', 'no-store');
+    return { enabled: c.config.updateCatalogEnabled };
+  });
   const pre = {
     bodyLimit: 32768,
     preHandler: [

@@ -45,6 +45,16 @@ it('is explicitly disabled by default; validates the configuration flag', async 
   const { call } = await setup(false);
   expect((await call('', { root: root(), reason: 'Initial root registration' })).status).toBe(404);
 });
+it('reports deployment availability only to operators without claiming installation status', async () => {
+  const { token, user } = await setup(false);
+  const path = '/v1/admin/update-catalog/status';
+  expect((await env.call('GET', path)).status).toBe(401);
+  expect((await env.call('GET', path, { token: user.token })).status).toBe(403);
+  const status = await env.call('GET', path, { token });
+  expect(status.body).toEqual({ enabled: false });
+  expect(status.headers['cache-control']).toBe('no-store');
+  expect((await env.call('GET', path + '?unknown=1', { token })).status).toBe(400);
+});
 it('requires an operator, strict fields and a reason; never replaces a registered root', async () => {
   const { call, path, user, token } = await setup();
   expect((await env.call('GET', path)).status).toBe(401);

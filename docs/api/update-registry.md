@@ -7,11 +7,14 @@ is anonymous; all catalog routes are disabled by default. Customer licenses neve
 
 ## Deployment
 
-1. Prepare the new source/image and apply `0027_release_registry` using the existing
+1. Prepare the new source/image and apply `0027_release_registry` and
+   `0028_release_publications` using the existing
    owner migration connection, then run `npm run db:grants` and `npm run db:check`
    with the application connection. The API start command is not a substitute for
    deployment preparation. The startup guard requires this migration even if the
-   feature flag is false.
+   feature flag is false. **Software updates** reports the deployment's flag state
+   through an operator-only, no-store status read. It does not report installation
+   success or infer that a desktop client supports automatic updates.
 2. Verify in staging before setting `UPDATE_CATALOG_ENABLED=true`. Keep signing
    private keys outside Warrior. No new paid service or provider is needed.
 3. Keep the flag false to leave these routes unavailable. It does not remove
@@ -99,7 +102,8 @@ artifact fetch or installer is implemented by this endpoint.
 
 ## Operator release console
 
-In **Operator console → Product releases**, choose a release operation. The console
+Open **Software updates** in operator navigation, or use **Operator console →
+Product releases**, then choose a release operation. The console
 uses the existing operator APIs and does not sign, fetch or install artifacts.
 It supports public root and target registration, historical floor attestation,
 sequence reservation, externally signed publication (including a signed pause),

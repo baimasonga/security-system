@@ -610,6 +610,23 @@ paths:
                     items: { type: string }
         '400': { description: 'Invalid strict query' }
         '404': { description: 'Disabled catalog, inactive product, absent or expired metadata' }
+  /v1/admin/update-catalog/status:
+    get:
+      summary: Read release management deployment availability
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Operator-only deployment configuration; not installation evidence
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                additionalProperties: false
+                properties:
+                  enabled: { type: boolean }
+        '401': { description: Authentication required }
+        '403': { description: Operator permission required }
   /v1/admin/products/{productId}/update-registry/sequence-floor:
     parameters:
       - in: path

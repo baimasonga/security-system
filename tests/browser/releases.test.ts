@@ -193,4 +193,30 @@ it('does not offer release administration to a customer', async () => {
   const { page } = await setup(true, false);
   expect(await page.getByRole('button', { name: 'Operator console', exact: true }).count()).toBe(0);
   expect(await page.getByLabel('Release operation', { exact: true }).count()).toBe(0);
+  expect(await page.getByRole('button', { name: 'Software updates', exact: true }).count()).toBe(0);
+});
+
+it('opens release management directly from operator navigation', async () => {
+  const f = await setup();
+  await f.page.getByRole('button', { name: 'Software updates', exact: true }).click();
+  await f.page.getByRole('heading', { name: 'Software updates', exact: true }).waitFor();
+  await f.card.getByRole('heading', { name: 'Product releases', exact: true }).waitFor();
+  await f.card
+    .getByText('Release management is enabled on this deployment.', { exact: true })
+    .waitFor();
+  expect(await f.card.getByLabel('Release operation').count()).toBe(1);
+  await f.page.route('**/v1/admin/update-catalog/status', (route) =>
+    route.fulfill({ status: 503, json: {} }),
+  );
+  await f.card.getByRole('button', { name: 'Refresh release availability' }).click();
+  await f.card
+    .getByText('Release management availability could not be confirmed.', { exact: true })
+    .waitFor();
+  expect(
+    await f.card
+      .getByText('Release management is enabled on this deployment.', { exact: true })
+      .count(),
+  ).toBe(0);
+  await f.page.setViewportSize({ width: 390, height: 844 });
+  expect(await f.page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
 });

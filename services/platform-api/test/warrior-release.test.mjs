@@ -25,6 +25,7 @@ it('requires live health and exact source bytes from fixed public destinations',
     origin + '/portal.css',
     origin + '/portal.mjs',
     origin + '/operations.mjs',
+    origin + '/releases.mjs',
   ]);
   for (const [, options] of request.mock.calls) {
     expect(options.credentials).toBe('omit');
