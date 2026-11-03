@@ -574,6 +574,134 @@ paths:
           content:
             text/javascript:
               schema: { type: string }
+  /v1/admin/products/{productId}/update-registry:
+    parameters:
+      - in: path
+        name: productId
+        required: true
+        schema: { type: string, pattern: '^prd_[a-f0-9]{24}$' }
+    get:
+      summary: Read operator-only registered public root and bounded update targets
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Operator update registry or original reservation receipt
+        '400':
+          description: Invalid strict request or public root
+        '401':
+          description: Session required
+        '403':
+          description: Operator or configured MFA required; writes also respect platform freeze
+        '404':
+          description: Feature disabled or product/registry/target not found
+        '409':
+          description: Existing registry/target, conflicting request ID, expired root or exhausted sequence
+    post:
+      summary: Register an initial public version-one update root; does not publish software
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Operator update registry or original reservation receipt
+        '400':
+          description: Invalid strict request or public root
+        '401':
+          description: Session required
+        '403':
+          description: Operator or configured MFA required; writes also respect platform freeze
+        '404':
+          description: Feature disabled or product/registry/target not found
+        '409':
+          description: Existing registry/target, conflicting request ID, expired root or exhausted sequence
+        '201':
+          description: Registry or target registered (reservation returns 200)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [root, reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+                root:
+                  {
+                    type: object,
+                    description: Public UpdateRoot from ADR-019 with separate root and release key roles; private keys and unknown fields rejected,
+                  }
+  /v1/admin/products/{productId}/update-registry/targets:
+    parameters:
+      - in: path
+        name: productId
+        required: true
+        schema: { type: string, pattern: '^prd_[a-f0-9]{24}$' }
+    post:
+      summary: Register one exact platform and channel; at most 32 per product
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Operator update registry or original reservation receipt
+        '400':
+          description: Invalid strict request or public root
+        '401':
+          description: Session required
+        '403':
+          description: Operator or configured MFA required; writes also respect platform freeze
+        '404':
+          description: Feature disabled or product/registry/target not found
+        '409':
+          description: Existing registry/target, conflicting request ID, expired root or exhausted sequence
+        '201':
+          description: Registry or target registered (reservation returns 200)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [platform, channel, reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+                platform: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' }
+                channel: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' }
+  /v1/admin/products/{productId}/update-registry/reservations:
+    parameters:
+      - in: path
+        name: productId
+        required: true
+        schema: { type: string, pattern: '^prd_[a-f0-9]{24}$' }
+    post:
+      summary: Reserve a never-recycled target sequence; UUID retries return the original receipt
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Operator update registry or original reservation receipt
+        '400':
+          description: Invalid strict request or public root
+        '401':
+          description: Session required
+        '403':
+          description: Operator or configured MFA required; writes also respect platform freeze
+        '404':
+          description: Feature disabled or product/registry/target not found
+        '409':
+          description: Existing registry/target, conflicting request ID, expired root or exhausted sequence
+        '201':
+          description: Registry or target registered (reservation returns 200)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [platform, channel, request_id, reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+                platform: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' }
+                channel: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$' }
+                request_id: { type: string, format: uuid }
   /v1/catalog/products:
     get:
       operationId: catalogProducts
