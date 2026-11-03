@@ -16,6 +16,7 @@ import { validateAnchorUrl } from './anchors.ts';
 import { assertSchemaName, readCaPem, tlsProblem } from './db/connection.ts';
 
 export interface PlatformConfig {
+  updateCatalogEnabled: boolean;
   /** Staged OPS-002 rollout; disabled unless explicitly enabled. */
   operationsInventoryEnabled: boolean;
   operationsCredentialsEnabled: boolean;
@@ -277,6 +278,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
   const mode = (env['NODE_ENV'] ?? 'development') as PlatformConfig['env'];
   if (!['development', 'test', 'production'].includes(mode)) throw new Error('invalid NODE_ENV');
   const prod = mode === 'production';
+  const updates = env['UPDATE_CATALOG_ENABLED'];
+  if (updates !== undefined && !['true', 'false'].includes(updates))
+    throw new Error('UPDATE_CATALOG_ENABLED must be true or false');
   const mfaEncryptionKey = env['MFA_ENCRYPTION_KEY'];
   if (mfaEncryptionKey) new MfaCipher(mfaEncryptionKey);
   const requireOperatorMfa = env['REQUIRE_OPERATOR_MFA'] === 'true';
@@ -610,6 +614,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PlatformConfig
     throw new Error('MOBILE_TRUSTED_PROXY_HOPS must be 0 to 5');
   return {
     env: mode,
+    updateCatalogEnabled: updates === 'true',
     emailDelivery,
     identityMailEncryptionKey,
     billing,

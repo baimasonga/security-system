@@ -1,6 +1,7 @@
 import { BrowserDevice } from './device.mjs';
 import { filesView } from './files.mjs';
 import { operationsView } from './operations.mjs';
+import { releaseConsole } from './releases.mjs';
 const $ = (id) => document.getElementById(id);
 const state = {
   token: '',
@@ -1989,6 +1990,18 @@ async function operatorView() {
       ),
       witness,
     ),
+  );
+  const releaseVersion = state.version;
+  const releaseToken = state.token;
+  sections.push(
+    releaseConsole({
+      api,
+      node,
+      panel,
+      fieldsForm,
+      table,
+      current: () => state.version === releaseVersion && state.token === releaseToken,
+    }),
   );
   const picker = node('select');
   picker.setAttribute('aria-label', 'Operator action');

@@ -95,3 +95,78 @@ parameters. The server must permit those parameters for sibling objects; artifac
 need a different host transport. Evidence verification rechecks manifest/root expiry and clock rollback after the
 last download and records completion time in the protected checkpoint. It holds the same instance lock as staging
 and root rotation.
+
+## Several products and update targets
+
+`ProductUpdateManager` coordinates the same verifier for a trusted local host that
+manages several products. Import it from `@trust/sdk-core`. Each registration has
+its own public root, approved builder identities and explicit platform/channel feeds.
+Installed sequences come from the installed applications' trusted build metadata.
+The product code must match the signed manifest exactly; it is not a display name.
+
+```ts
+const updates = new ProductUpdateManager({
+  store: protectedStore,
+  products: [
+    {
+      product: 'sierra-business',
+      root: businessUpdateRoot,
+      evidence: { trustedBuilders: ['https://build.example/business'] },
+      targets: [
+        {
+          platform: 'windows-x64',
+          channel: 'stable',
+          feedUrl: 'https://updates.example/business/windows-x64/stable.json',
+          installedSequence: BUSINESS_BUILD_SEQUENCE,
+        },
+      ],
+    },
+    {
+      product: 'rokela-pdf',
+      root: pdfUpdateRoot,
+      evidence: { trustedBuilders: ['https://build.example/pdf'] },
+      targets: [
+        {
+          platform: 'windows-x64',
+          channel: 'stable',
+          feedUrl: 'https://updates.example/pdf/windows-x64/stable.json',
+          installedSequence: PDF_BUILD_SEQUENCE,
+        },
+      ],
+    },
+  ],
+});
+const checks = await updates.checkAll();
+// Each item is checked (with update status) or unavailable. Never present unavailable
+// as current/supported. Display the product/platform/channel from item.target.
+```
+
+These names, origins and builder URLs are illustrative, not production configuration.
+Public roots must be distributed independently of the feeds they authorize. Configure
+only installed products/targets. `listTargets()` returns copies of the registered
+identifiers; `check(target)` returns one verified `UpdateStatus`. `verifyManifest`
+handles externally fetched envelopes without bypassing the same signature/binding
+checks. `checkAll()` limits network concurrency to four and returns results in
+registration order; one failed product does not hide successful checks for others.
+Exceptions/private URL details are omitted from unavailable batch results. Individual
+calls reject on failure, for host-controlled error handling.
+
+After explicit user approval, call `stageArtifact(target, envelope, stagingDirectory)`.
+The coordinator requires a newer, unpaused release and always verifies evidence using
+that product's registered builder policy before downloading installer bytes. Caller
+arguments cannot override that policy. Changing configuration after construction has
+no effect. Recreate the coordinator after an installation to supply the new trusted
+installed sequence. Staging never installs or executes software; the host must still
+verify platform signatures and provide atomic installation/recovery.
+
+`rotateRoot(productCode, signedRootEnvelope)` rotates only that product; it applies
+across its channels/platforms without clearing their release watermarks. All manager
+instances sharing the **same SecureStore object in one SDK module/process** serialize
+operations per product. Different products use independent checkpoints and can progress
+concurrently. Retain the same store object for all those instances. Separate processes,
+store wrappers, separately loaded SDK copies or standalone `SecureUpdateClient` callers
+must use a host-owned broker/OS lock; the manager does not supply a distributed lock.
+
+This is the shared Node/Electron integration layer. Central operator release publishing,
+release history/withdrawal UI, production signing/hosting and a compatible C#/.NET
+installer remain separate implementation and operational work (ADR-031).

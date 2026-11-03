@@ -1,3 +1,4 @@
+import { registerUpdateRegistryRoutes } from './routes/update-registry.ts';
 import { registerMobileRoutes } from './routes/mobile.ts';
 import { registerOperationsRoutes } from './routes/operations.ts';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -101,6 +102,7 @@ export async function buildApp(c: Container, opts: AppOptions = {}): Promise<Fas
   registerLicenseRoutes(app, c);
   registerDeviceRoutes(app, c);
   registerAdminRoutes(app, c);
+  registerUpdateRegistryRoutes(app, c);
   registerMobileRoutes(app, c);
   registerPrivilegedRoutes(app, c);
   registerSharingRoutes(app, c, pages);
