@@ -3,7 +3,16 @@ import { DomainError } from '@trust/shared-types';
 import type { Container } from '../container.ts';
 import { operator, parse, principalOf, toWire } from '../http.ts';
 import { emptyBody } from '../schemas.ts';
-import { registerRootBody, registryParams, targetBody, reserveBody } from '../release-registry.ts';
+import {
+  registerRootBody,
+  registryParams,
+  targetBody,
+  reserveBody,
+  publicationBody,
+  floorBody,
+  releaseQuery,
+  historyQuery,
+} from '../release-registry.ts';
 
 export function registerUpdateRegistryRoutes(app: FastifyInstance, c: Container) {
   const pre = {
@@ -36,6 +45,30 @@ export function registerUpdateRegistryRoutes(app: FastifyInstance, c: Container)
     return reply
       .status(201)
       .send(toWire(await c.updateRegistry.addTarget(productId, b, principalOf(req).userId)));
+  });
+  app.post(path + '/sequence-floor', pre, async (req) => {
+    const { productId } = parse(registryParams, req.params);
+    const b = parse(floorBody, req.body);
+    await c.privileged.assertWritable(null);
+    return toWire(await c.updateRegistry.raiseFloor(productId, b, principalOf(req).userId));
+  });
+  app.post(path + '/releases', { ...pre, bodyLimit: 524288 }, async (req) => {
+    const { productId } = parse(registryParams, req.params);
+    const b = parse(publicationBody, req.body);
+    await c.privileged.assertWritable(null);
+    return toWire(await c.updateRegistry.publish(productId, b, principalOf(req).userId));
+  });
+  app.get(path + '/releases', pre, async (req) => {
+    const { productId } = parse(registryParams, req.params);
+    const b = parse(historyQuery, req.query);
+    return { items: toWire(await c.updateRegistry.history(productId, b)) };
+  });
+  app.get('/v1/updates/:productId/current', async (req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    if (!c.config.updateCatalogEnabled) throw new DomainError('not_found', 'not found');
+    const { productId } = parse(registryParams, req.params);
+    const b = parse(releaseQuery, req.query);
+    return c.updateRegistry.current(productId, b);
   });
   app.post(path + '/reservations', pre, async (req) => {
     const { productId } = parse(registryParams, req.params);

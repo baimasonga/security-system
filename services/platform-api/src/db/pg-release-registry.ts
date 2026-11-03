@@ -4,6 +4,7 @@ import type {
   RegistryStore,
   RegistryTx,
   ReleaseRegistry,
+  PublishedRelease,
   ReleaseReservation,
 } from '../release-registry.ts';
 import { appendAuditInTx } from './pg-audit-log.ts';
@@ -27,6 +28,14 @@ function receipt(row: Record<string, unknown>): ReleaseReservation {
     channel: row.channel as string,
     sequence: Number(row.sequence),
     createdAt: row.created_at as Date,
+  };
+}
+function publication(row: Record<string, unknown>): PublishedRelease {
+  return {
+    ...receipt(row),
+    envelope: row.envelope as PublishedRelease['envelope'],
+    manifest: row.manifest as PublishedRelease['manifest'],
+    publishedAt: row.published_at as Date,
   };
 }
 export class PgRegistryStore implements RegistryStore {
@@ -85,6 +94,38 @@ export class PgRegistryStore implements RegistryStore {
             `INSERT INTO update_reservations(product_id,request_id,platform,channel,sequence,created_at)
             VALUES($1,$2,$3,$4,$5,$6)`,
             [productId, row.requestId, row.platform, row.channel, row.sequence, row.createdAt],
+          );
+        },
+        published: async (id) => {
+          const r = await q.query(
+            'SELECT * FROM update_publications WHERE product_id=$1 AND request_id=$2',
+            [productId, id],
+          );
+          return r.rows[0] ? publication(r.rows[0]) : undefined;
+        },
+        history: async (platform, channel, before, limit) => {
+          const r = await q.query(
+            `SELECT * FROM update_publications WHERE product_id=$1 AND platform=$2 AND channel=$3
+            AND ($4::bigint IS NULL OR sequence<$4) ORDER BY sequence DESC LIMIT $5`,
+            [productId, platform, channel, before ?? null, limit],
+          );
+          return r.rows.map(publication);
+        },
+        appendRelease: async (row) => {
+          await q.query(
+            `INSERT INTO update_publications(product_id,request_id,platform,channel,sequence,created_at,envelope,manifest,published_at)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            [
+              productId,
+              row.requestId,
+              row.platform,
+              row.channel,
+              row.sequence,
+              row.createdAt,
+              JSON.stringify(row.envelope),
+              JSON.stringify(row.manifest),
+              row.publishedAt,
+            ],
           );
         },
         audit: async (event) => {
