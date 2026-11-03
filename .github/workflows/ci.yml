@@ -49,7 +49,8 @@ jobs:
 
   portal:
     name: Browser operations workflows
-    runs-on: ubuntu-latest
+    # Match the Ubuntu release supported by the locked Playwright browser/dependency bundle.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
