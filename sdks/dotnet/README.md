@@ -13,6 +13,18 @@ var metadata = verifier.Verify(envelopeJson, "sierra-business", "windows-x64",
 // Authenticated metadata only: do not install or claim rollback protection.
 ```
 
+`UpdateCheckpointVerifier.Verify` additionally accepts a host-protected
+`UpdateCheckpoint` and returns metadata plus the next immutable checkpoint. It
+detects older sequence numbers, conflicting signed payloads at the same sequence,
+and clock rollback beyond 60 seconds. It keeps the highest observed time even
+inside that tolerance. State is bound to the exact root JSON bytes and target.
+
+This is a pure transition, **not persistent rollback protection**. Hosts must
+serialize load/verify/save across processes and atomically save protected state
+before using the result. Missing or corrupt established state must fail closed;
+`null` means explicitly authorized first use, not automatic recovery. No root
+rotation, protected store, installer execution or product integration is supplied.
+
 Run on Linux or Windows:
 
 ```sh

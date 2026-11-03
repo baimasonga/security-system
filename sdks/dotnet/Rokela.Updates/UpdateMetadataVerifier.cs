@@ -12,7 +12,11 @@ public sealed class UpdateVerificationException(string reason) : Exception("Upda
 /// <summary>Authenticated metadata only. This result does not authorize installation or establish rollback safety.</summary>
 public sealed record VerifiedUpdateMetadata(string Product, string Platform, string Channel, long Sequence,
     string Version, long MinimumSequence, bool Paused, string ArtifactUrl, long ArtifactSize,
-    string Sha256, string SbomSha256, string ProvenanceSha256, long Expires);
+    string Sha256, string SbomSha256, string ProvenanceSha256, long Expires)
+{
+  /// <summary>SHA-256 of the canonical authenticated payload, including all signed fields.</summary>
+  public string PayloadSha256 { get; init; } = "";
+}
 
 /// <summary>
 /// Stateless metadata inspection using an independently pinned public root. No network, storage, installation,
@@ -123,7 +127,10 @@ public sealed class UpdateMetadataVerifier
       Require(origins.Contains(Https(url).GetLeftPart(UriPartial.Authority)), "artifact origin");
       var size = Integer(a.GetProperty("size"));
       var hash = Digest(a.GetProperty("sha256")); var sbom = Digest(a.GetProperty("sbom_sha256")); var provenance = Digest(a.GetProperty("provenance_sha256"));
-      return new(p, pl, c, sequence, version, minimum, paused.GetBoolean(), url, size, hash, sbom, provenance, expires);
+      return new(p, pl, c, sequence, version, minimum, paused.GetBoolean(), url, size, hash, sbom, provenance, expires)
+      {
+        PayloadSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical!))).ToLowerInvariant()
+      };
     }
     catch (Exception e) when (Malformed(e)) { throw new UpdateVerificationException("malformed metadata"); }
   }
