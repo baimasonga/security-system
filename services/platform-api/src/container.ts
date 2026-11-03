@@ -1,3 +1,5 @@
+import { MemoryRegistryStore, ReleaseRegistryService } from './release-registry.ts';
+import { PgRegistryStore } from './db/pg-release-registry.ts';
 import { createCountryLookup } from './integrations/mobile-country.ts';
 import { MobileAnalytics, MemoryMobileStore } from './mobile-analytics.ts';
 import { PgMobileStore } from './db/pg-mobile-store.ts';
@@ -101,6 +103,7 @@ import {
 } from '@trust/privileged';
 
 export interface Container {
+  updateRegistry: ReleaseRegistryService;
   config: PlatformConfig;
   clock: Clock;
   audit: AuditLog;
@@ -653,6 +656,11 @@ export async function createContainer(
           })
       : undefined,
     readiness,
+    updateRegistry: new ReleaseRegistryService(
+      pool ? new PgRegistryStore(pool, clock, shards) : new MemoryRegistryStore(audit),
+      clock,
+      (id) => licensingStore.findProductById(id),
+    ),
     licensing,
     billing,
     sharing,
