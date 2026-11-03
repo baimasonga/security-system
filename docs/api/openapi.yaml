@@ -34,27 +34,27 @@ paths:
       summary: Isolated Paddle payment-link page; no account session stored here
       security: []
       responses:
-        '200': { description: 'Payment HTML shell' }
-        '404': { description: 'Not the configured payment host or billing is disabled' }
+        '200': { description: Payment HTML shell }
+        '404': { description: Not the configured payment host or billing is disabled }
   /checkout.mjs:
     get:
       summary: Payment-page JavaScript
       security: []
       responses:
-        '200': { description: 'Public payment integration' }
+        '200': { description: Public payment integration }
   /v1/billing/checkout-options:
     get:
       summary: Public Paddle.js client token and environment; never API credentials
       security: []
       responses:
-        '200': { description: 'Public frontend configuration' }
+        '200': { description: Public frontend configuration }
         '503': { description: Payment page not configured }
   /v1/billing/catalog:
     get:
       summary: Configured checkout plan IDs; empty when billing is disabled
       security: [{ bearer: [] }]
       responses:
-        '200': { description: 'Available local plan IDs' }
+        '200': { description: Available local plan IDs }
   /v1/organizations/{orgId}/licenses/{licenseId}/checkout:
     parameters:
       - { $ref: '#/components/parameters/OrgId' }
@@ -63,8 +63,8 @@ paths:
       summary: Read checkout and subscription state; organization admin or owner required
       security: [{ bearer: [] }]
       responses:
-        '200': { description: 'Checkout state; payment URL only while ready' }
-        '404': { description: 'Not found or another tenant' }
+        '200': { description: Checkout state; payment URL only while ready }
+        '404': { description: Not found or another tenant }
         '503': { description: Billing is not configured }
     post:
       summary: Reserve one checkout for an existing license; organization admin or owner required
@@ -82,8 +82,8 @@ paths:
                 plan_id: { type: string, pattern: '^pln_[A-Za-z0-9_-]+$' }
                 idempotency_key: { type: string, pattern: '^[A-Za-z0-9_-]{16,128}$' }
       responses:
-        '200': { description: 'Existing or newly submitted intent; no entitlement grant' }
-        '409': { description: 'A different checkout already exists' }
+        '200': { description: Existing or newly submitted intent; no entitlement grant }
+        '409': { description: A different checkout already exists }
         '503': { description: Billing is not configured }
   /v1/admin/organizations/{orgId}/licenses/{licenseId}/checkout/reconcile:
     post:
@@ -101,8 +101,8 @@ paths:
                 transaction_id: { type: string, pattern: '^txn_[a-z0-9]{26}$' }
                 reason: { type: string, minLength: 3, maxLength: 500 }
       responses:
-        '200': { description: 'Verified mapped transaction recorded with audit' }
-        '404': { description: 'Intent not found' }
+        '200': { description: Verified mapped transaction recorded with audit }
+        '404': { description: Intent not found }
         '503': { description: Billing is not configured }
   /v1/billing/webhooks/paddle:
     post:
@@ -120,7 +120,7 @@ paths:
             schema: { type: object }
       responses:
         '200': { description: 'Applied, duplicate, older or irrelevant event acknowledged' }
-        '403': { description: 'Invalid signature or mapped price mismatch' }
+        '403': { description: Invalid signature or mapped price mismatch }
         '409': { description: 'Unmapped, ambiguous or conflicting event requires reconciliation' }
         '503': { description: Billing is not configured }
   /v1/organizations/{orgId}/licenses/{licenseId}/usage:
@@ -305,9 +305,9 @@ paths:
               }
       responses:
         {
-          '200': { description: 'PublicKeyCredentialCreationOptions (binary fields base64url)' },
-          '401': { description: 'Wrong password' },
-          '409': { description: 'Passkeys not configured' },
+          '200': { description: PublicKeyCredentialCreationOptions (binary fields base64url) },
+          '401': { description: Wrong password },
+          '409': { description: Passkeys not configured },
         }
   /v1/auth/passkeys/register/finish:
     post:
@@ -339,8 +339,8 @@ paths:
       responses:
         {
           '201': { description: '{ id, name, created_at }' },
-          '400': { description: 'Verification failed' },
-          '409': { description: 'Already registered' },
+          '400': { description: Verification failed },
+          '409': { description: Already registered },
         }
   /v1/auth/passkeys/login/begin:
     post:
@@ -384,7 +384,7 @@ paths:
       responses:
         {
           '200': { $ref: '#/components/responses/SessionResponse' },
-          '401': { description: 'passkey sign-in failed' },
+          '401': { description: passkey sign-in failed },
         }
   /v1/auth/passkeys:
     get:
@@ -416,8 +416,8 @@ paths:
       responses:
         {
           '204': { description: Removed },
-          '401': { description: 'Wrong password' },
-          '404': { description: 'Not yours or unknown' },
+          '401': { description: Wrong password },
+          '404': { description: Not yours or unknown },
         }
   /v1/auth/password/request:
     post:
@@ -862,7 +862,7 @@ paths:
   /healthz:
     get:
       summary: Liveness
-      responses: { '200': { description: 'ok' } }
+      responses: { '200': { description: ok } }
 
   /v1/auth/register:
     post:
@@ -922,7 +922,7 @@ paths:
       security: [{ bearer: [] }]
       responses:
         {
-          '200': { description: 'Current principal' },
+          '200': { description: Current principal },
           '401': { $ref: '#/components/responses/Problem' },
         }
 
@@ -932,7 +932,7 @@ paths:
       security: [{ bearer: [] }]
       responses:
         {
-          '200': { description: 'Organizations the caller belongs to' },
+          '200': { description: Organizations the caller belongs to },
           '401': { $ref: '#/components/responses/Problem' },
         }
     post:
@@ -949,17 +949,14 @@ paths:
       tags: [organizations]
       security: [{ bearer: [] }]
       responses:
-        {
-          '200': { description: 'Organization' },
-          '404': { $ref: '#/components/responses/Problem' },
-        }
+        { '200': { description: Organization }, '404': { $ref: '#/components/responses/Problem' } }
   /v1/organizations/{orgId}/members:
     parameters: [{ $ref: '#/components/parameters/OrgId' }]
     get:
       tags: [organizations]
       security: [{ bearer: [] }]
       responses:
-        { '200': { description: 'Members' }, '404': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Members }, '404': { $ref: '#/components/responses/Problem' } }
     post:
       tags: [organizations]
       security: [{ bearer: [] }]
@@ -1012,7 +1009,7 @@ paths:
       security: [{ bearer: [] }]
       summary: Active and past device activations for a license
       responses:
-        { '200': { description: 'Activations' }, '404': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Activations }, '404': { $ref: '#/components/responses/Problem' } }
   /v1/organizations/{orgId}/activations/{activationId}/deactivate:
     parameters:
       - { $ref: '#/components/parameters/OrgId' }
@@ -1022,7 +1019,7 @@ paths:
       security: [{ bearer: [] }]
       summary: Free a device slot. Owners/admins any device; members only devices they activated. Idempotent.
       responses:
-        '200': { description: 'Deactivated' }
+        '200': { description: Deactivated }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
   /v1/security-center:
@@ -1089,7 +1086,7 @@ paths:
       responses:
         {
           '200': { description: '{ limit, used, items: [{ user_id, assigned_by, assigned_at }] }' },
-          '404': { description: 'Not a member' },
+          '404': { description: Not a member },
         }
     post:
       summary: Give a member a seat (admins and owners; under the license lock)
@@ -1108,7 +1105,7 @@ paths:
       responses:
         {
           '201': { description: '{ user_id, assigned_by, assigned_at, limit, used }' },
-          '403': { description: 'Not an admin' },
+          '403': { description: Not an admin },
           '404': { description: 'Not a member, or the person is not a member' },
           '409': { description: 'Not seat-based, already assigned, or seat_limit_reached' },
           '423': { description: Organization frozen },
@@ -1126,8 +1123,8 @@ paths:
         {
           '200':
             { description: '{ user_id, activations_deactivated, offline_leases_valid_until }' },
-          '403': { description: 'Not an admin' },
-          '404': { description: 'No such seat' },
+          '403': { description: Not an admin },
+          '404': { description: No such seat },
         }
   /v1/organizations/{orgId}/trials:
     parameters: [{ $ref: '#/components/parameters/OrgId' }]
@@ -1193,7 +1190,7 @@ paths:
       summary: Online validation, authenticated by DeviceProof. Returns state, no new lease.
       requestBody: { $ref: '#/components/requestBodies/DeviceProof' }
       responses:
-        '200': { description: 'Valid' }
+        '200': { description: Valid }
         '403': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
   /v1/licenses/refresh:
@@ -1238,7 +1235,7 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/DeviceProof' }
       responses:
         {
-          '200': { description: 'Deactivated' },
+          '200': { description: Deactivated },
           '403': { $ref: '#/components/responses/Problem' },
           '404': { $ref: '#/components/responses/Problem' },
         }
@@ -1280,7 +1277,7 @@ paths:
       security: [{ bearer: [] }]
       summary: Bumps the plan version; reaches devices on their next refresh (no client release)
       responses:
-        { '200': { description: 'Updated' }, '403': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Updated }, '403': { $ref: '#/components/responses/Problem' } }
   /v1/admin/organizations/{orgId}/subscriptions:
     parameters: [{ $ref: '#/components/parameters/OrgId' }]
     post:
@@ -1297,13 +1294,13 @@ paths:
       tags: [admin]
       security: [{ bearer: [] }]
       responses:
-        { '200': { description: 'Updated' }, '403': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Updated }, '403': { $ref: '#/components/responses/Problem' } }
   /v1/admin/organizations/{orgId}/licenses:
     parameters: [{ $ref: '#/components/parameters/OrgId' }]
     get:
       tags: [admin]
       security: [{ bearer: [] }]
-      responses: { '200': { description: 'Licenses (including canaries)' } }
+      responses: { '200': { description: Licenses (including canaries) } }
     post:
       tags: [admin]
       security: [{ bearer: [] }]
@@ -1316,7 +1313,7 @@ paths:
     get:
       tags: [admin]
       security: [{ bearer: [] }]
-      responses: { '200': { description: 'Activations' } }
+      responses: { '200': { description: Activations } }
   /v1/admin/organizations/{orgId}/licenses/{licenseId}/suspend:
     parameters:
       [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
@@ -1324,7 +1321,7 @@ paths:
       tags: [admin]
       security: [{ bearer: [] }]
       responses:
-        { '200': { description: 'Suspended' }, '409': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Suspended }, '409': { $ref: '#/components/responses/Problem' } }
   /v1/admin/organizations/{orgId}/licenses/{licenseId}/reinstate:
     parameters:
       [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
@@ -1332,7 +1329,7 @@ paths:
       tags: [admin]
       security: [{ bearer: [] }]
       responses:
-        { '200': { description: 'Reinstated' }, '409': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Reinstated }, '409': { $ref: '#/components/responses/Problem' } }
   /v1/admin/organizations/{orgId}/licenses/{licenseId}/revoke:
     parameters:
       [{ $ref: '#/components/parameters/OrgId' }, { $ref: '#/components/parameters/LicenseId' }]
@@ -1341,7 +1338,7 @@ paths:
       security: [{ bearer: [] }]
       summary: Terminal. Also revokes all activations of the license.
       responses:
-        { '200': { description: 'Revoked' }, '409': { $ref: '#/components/responses/Problem' } }
+        { '200': { description: Revoked }, '409': { $ref: '#/components/responses/Problem' } }
   /v1/admin/organizations/{orgId}/devices/{deviceId}/passport:
     parameters:
       - { $ref: '#/components/parameters/OrgId' }
@@ -1350,8 +1347,7 @@ paths:
       tags: [admin]
       security: [{ bearer: [] }]
       summary: Device passport for operators (ADR-026)
-      responses:
-        { '200': { description: 'The passport' }, '404': { description: 'Unknown device' } }
+      responses: { '200': { description: The passport }, '404': { description: Unknown device } }
   /v1/admin/audit:
     get:
       tags: [admin]
@@ -1364,14 +1360,14 @@ paths:
             in: query,
             schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
           }
-      responses: { '200': { description: 'Audit events (hash-chained)' } }
+      responses: { '200': { description: Audit events (hash-chained) } }
   /v1/mobile/rokela-pdf/events:
     options:
       tags: [mobile]
       summary: Preflight for the Rokela Android WebView origin only
       responses:
         '204': { description: Allowed native origin and POST method }
-        '403': { description: 'Origin or method refused' }
+        '403': { description: Origin or method refused }
     post:
       tags: [mobile]
       summary: Receive bounded anonymous Rokela Android reports (not authoritative devices or people)
@@ -1423,9 +1419,9 @@ paths:
                       device_class: { type: string, enum: [phone, tablet, unknown] }
       responses:
         '202': { description: Committed or already accepted; accepted is the batch item count }
-        '400': { description: 'Invalid schema or event time' }
-        '403': { description: 'Browser origin refused' }
-        '409': { description: 'Conflicting event identity; whole batch rolled back' }
+        '400': { description: Invalid schema or event time }
+        '403': { description: Browser origin refused }
+        '409': { description: Conflicting event identity; whole batch rolled back }
         '413': { description: Body too large }
         '429': { description: Request or retained-event capacity limit }
   /v1/admin/mobile-analytics:
@@ -1437,8 +1433,8 @@ paths:
       responses:
         '200':
           description: Aggregate report with country_lookup_configured, country_ip_source_configured and country_database (state not_configured/unavailable/stale/ready and nullable built_at); no paths or errors exposed.
-        '401': { description: 'Authentication required' }
-        '403': { description: 'Operator required' }
+        '401': { description: Authentication required }
+        '403': { description: Operator required }
   /v1/admin/mobile-distribution:
     get:
       tags: [admin]
@@ -1448,9 +1444,9 @@ paths:
       responses:
         '200':
           description: status (available or unavailable), checked_at and source; available adds asset_id, downloads, size_bytes, created_at and updated_at. Unavailable never substitutes zero.
-        '400': { description: 'Unknown query parameters' }
-        '401': { description: 'Authentication required' }
-        '403': { description: 'Operator required' }
+        '400': { description: Unknown query parameters }
+        '401': { description: Authentication required }
+        '403': { description: Operator required }
   /v1/admin/metrics:
     get:
       tags: [admin]
@@ -1462,7 +1458,7 @@ paths:
             in: query,
             schema: { type: string, enum: [json, prometheus], default: json },
           }
-      responses: { '200': { description: 'Metrics snapshot' } }
+      responses: { '200': { description: Metrics snapshot } }
   /v1/admin/audit/verify:
     get:
       tags: [admin]
@@ -1517,7 +1513,7 @@ paths:
             {
               description: 'The anchor record (status published or failed), or { status: chain_invalid, chain, broken_at_seq, reason } when the log failed verification and was NOT anchored',
             },
-          '409': { description: 'External anchoring is not configured' },
+          '409': { description: External anchoring is not configured },
         }
   /v1/admin/audit/anchors/check:
     post:
@@ -1661,7 +1657,7 @@ paths:
       responses:
         {
           '200': { $ref: '#/components/responses/PrivilegedRequest' },
-          '401': { description: 'Invalid or replayed code' },
+          '401': { description: Invalid or replayed code },
           '403': { description: 'Own request, or MFA not enabled' },
           '409': { $ref: '#/components/responses/Problem' },
         }
@@ -1674,7 +1670,7 @@ paths:
       responses:
         {
           '200': { $ref: '#/components/responses/PrivilegedRequest' },
-          '403': { description: 'Own request' },
+          '403': { description: Own request },
           '409': { $ref: '#/components/responses/Problem' },
         }
   /v1/admin/privileged/requests/{requestId}/cancel:
@@ -1687,7 +1683,7 @@ paths:
       responses:
         {
           '200': { $ref: '#/components/responses/PrivilegedRequest' },
-          '403': { description: 'Not the requester' },
+          '403': { description: Not the requester },
           '409': { $ref: '#/components/responses/Problem' },
         }
   /v1/admin/privileged/requests/{requestId}/execute:
@@ -1700,7 +1696,7 @@ paths:
       responses:
         {
           '200': { $ref: '#/components/responses/PrivilegedRequest' },
-          '403': { description: 'Not the requester' },
+          '403': { description: Not the requester },
           '409':
             {
               description: 'Not approved, expired, already executed, break-glass not yet witnessed, or the operation itself refused (request becomes failed)',
@@ -1771,7 +1767,7 @@ paths:
         {
           '201': { description: The freeze },
           '404': { $ref: '#/components/responses/Problem' },
-          '409': { description: 'Already frozen' },
+          '409': { description: Already frozen },
         }
 
   /v1/organizations/{orgId}/sharing/overview:
@@ -1782,8 +1778,8 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Limits and usage' }
-        '404': { description: 'Not a member' }
+        '200': { description: Limits and usage }
+        '404': { description: Not a member }
   /v1/organizations/{orgId}/sharing/documents:
     get:
       tags: [sharing]
@@ -1792,7 +1788,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Documents' }
+        '200': { description: Documents }
     post:
       tags: [sharing]
       summary: Create a document; optional require_approval gates publication on an independent approval
@@ -1816,8 +1812,8 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Document' }
-        '404': { description: 'Not found' }
+        '200': { description: Document }
+        '404': { description: Not found }
   /v1/organizations/{orgId}/sharing/documents/{id}/export:
     post:
       tags: [sharing]
@@ -1850,8 +1846,8 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingPublish' }
       responses:
-        '200': { description: 'Published version' }
-        '409': { description: 'Approval required' }
+        '200': { description: Published version }
+        '409': { description: Approval required }
   /v1/organizations/{orgId}/sharing/documents/{id}/delete:
     post:
       tags: [sharing]
@@ -1867,7 +1863,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Deleted' }
+        '200': { description: Deleted }
   /v1/organizations/{orgId}/sharing/documents/{id}/versions/{versionId}/review:
     get:
       tags: [sharing]
@@ -1883,7 +1879,7 @@ paths:
           }
         - { name: versionId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: 'Thread' }
+        '200': { description: Thread }
   /v1/organizations/{orgId}/sharing/transfers:
     get:
       tags: [sharing]
@@ -1892,7 +1888,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Transfers' }
+        '200': { description: Transfers }
     post:
       tags: [sharing]
       summary: Create a temporary (files deleted at expiry) or persistent (plan feature) transfer
@@ -1902,8 +1898,8 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/SharingTransfer' }
       responses:
         '201': { description: Transfer }
-        '403': { description: 'Persistent sharing not in plan' }
-        '409': { description: 'Retention beyond plan limit' }
+        '403': { description: Persistent sharing not in plan }
+        '409': { description: Retention beyond plan limit }
   /v1/organizations/{orgId}/sharing/transfers/{id}:
     get:
       tags: [sharing]
@@ -1918,7 +1914,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Transfer' }
+        '200': { description: Transfer }
     patch:
       tags: [sharing]
       summary: Update title, message or expiry (within plan retention)
@@ -1933,7 +1929,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingTransferPatch' }
       responses:
-        '200': { description: 'Transfer' }
+        '200': { description: Transfer }
   /v1/organizations/{orgId}/sharing/transfers/{id}/revoke:
     post:
       tags: [sharing]
@@ -1949,7 +1945,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/OptionalReason' }
       responses:
-        '200': { description: 'Revoked' }
+        '200': { description: Revoked }
   /v1/organizations/{orgId}/sharing/transfers/{id}/delete:
     post:
       tags: [sharing]
@@ -1965,7 +1961,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Deleted' }
+        '200': { description: Deleted }
   /v1/organizations/{orgId}/sharing/transfers/{id}/files/{fileId}/remove:
     post:
       tags: [sharing]
@@ -1982,7 +1978,7 @@ paths:
         - { name: fileId, in: path, required: true, schema: { type: string } }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Removed' }
+        '200': { description: Removed }
   /v1/organizations/{orgId}/sharing/uploads:
     post:
       tags: [sharing]
@@ -1993,8 +1989,8 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/SharingUpload' }
       responses:
         '201': { description: Upload session (part size and count) }
-        '400': { description: 'File type not permitted' }
-        '409': { description: 'Quota exceeded' }
+        '400': { description: File type not permitted }
+        '409': { description: Quota exceeded }
   /v1/organizations/{orgId}/sharing/uploads/{id}/parts:
     post:
       tags: [sharing]
@@ -2010,7 +2006,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingParts' }
       responses:
-        '200': { description: 'Signed part URLs' }
+        '200': { description: Signed part URLs }
   /v1/organizations/{orgId}/sharing/uploads/{id}:
     get:
       tags: [sharing]
@@ -2025,7 +2021,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Upload status' }
+        '200': { description: Upload status }
   /v1/organizations/{orgId}/sharing/uploads/{id}/complete:
     post:
       tags: [sharing]
@@ -2041,8 +2037,8 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Processing' }
-        '409': { description: 'Missing parts (listed)' }
+        '200': { description: Processing }
+        '409': { description: Missing parts (listed) }
   /v1/organizations/{orgId}/sharing/uploads/{id}/abort:
     post:
       tags: [sharing]
@@ -2058,7 +2054,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Aborted' }
+        '200': { description: Aborted }
   /v1/organizations/{orgId}/sharing/files/download:
     post:
       tags: [sharing]
@@ -2068,7 +2064,7 @@ paths:
         - { $ref: '#/components/parameters/OrgId' }
       requestBody: { $ref: '#/components/requestBodies/SharingOwnerFile' }
       responses:
-        '200': { description: 'Signed URL valid for 60 seconds' }
+        '200': { description: Signed URL valid for 60 seconds }
   /v1/organizations/{orgId}/sharing/links:
     get:
       tags: [sharing]
@@ -2078,7 +2074,7 @@ paths:
         - { $ref: '#/components/parameters/OrgId' }
         - { name: target_id, in: query, schema: { type: string } }
       responses:
-        '200': { description: 'Links' }
+        '200': { description: Links }
     post:
       tags: [sharing]
       summary: Create a share link (unpredictable 256-bit token) - transfer, or document in `latest` (follows explicit publication) or `fixed` (pinned version) mode; view/download/review; optional password, expiry, download limit, members-only or named verified recipients
@@ -2102,7 +2098,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Link' }
+        '200': { description: Link }
     patch:
       tags: [sharing]
       summary: Change expiry, limit, password, recipients, permission or the pinned version (audited)
@@ -2117,7 +2113,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingLinkPatch' }
       responses:
-        '200': { description: 'Link' }
+        '200': { description: Link }
   /v1/organizations/{orgId}/sharing/links/{id}/status:
     post:
       tags: [sharing]
@@ -2133,9 +2129,9 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingStatus' }
       responses:
-        '200': { description: 'Link' }
-        '403': { description: 'Operator hold' }
-        '409': { description: 'Revoked' }
+        '200': { description: Link }
+        '403': { description: Operator hold }
+        '409': { description: Revoked }
   /v1/organizations/{orgId}/sharing/links/{id}/activity:
     get:
       tags: [sharing]
@@ -2150,7 +2146,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Receipts and totals' }
+        '200': { description: Receipts and totals }
   /v1/organizations/{orgId}/sharing/short-links:
     get:
       tags: [sharing]
@@ -2163,7 +2159,7 @@ paths:
         - { name: tag, in: query, schema: { type: string } }
         - { name: status, in: query, schema: { type: string } }
       responses:
-        '200': { description: 'Short links' }
+        '200': { description: Short links }
     post:
       tags: [sharing]
       summary: Create a public marketing link (alias or generated code, external http(s) destination, optional password/sign-in) or a confidential link (unpredictable code to a share link or upload request). Destinations are validated, never fetched
@@ -2173,7 +2169,7 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/SharingShortLink' }
       responses:
         '201': { description: Short link }
-        '409': { description: 'Alias not available' }
+        '409': { description: Alias not available }
   /v1/organizations/{orgId}/sharing/short-links/bulk:
     post:
       tags: [sharing]
@@ -2183,7 +2179,7 @@ paths:
         - { $ref: '#/components/parameters/OrgId' }
       requestBody: { $ref: '#/components/requestBodies/SharingBulk' }
       responses:
-        '200': { description: 'Updated count' }
+        '200': { description: Updated count }
   /v1/organizations/{orgId}/sharing/short-links/{id}:
     get:
       tags: [sharing]
@@ -2198,7 +2194,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Short link' }
+        '200': { description: Short link }
     patch:
       tags: [sharing]
       summary: Edit destination (recorded in history and audit), expiry, password, folder, tags
@@ -2213,7 +2209,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingShortLinkPatch' }
       responses:
-        '200': { description: 'Short link' }
+        '200': { description: Short link }
   /v1/organizations/{orgId}/sharing/short-links/{id}/status:
     post:
       tags: [sharing]
@@ -2229,7 +2225,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingStatus' }
       responses:
-        '200': { description: 'Short link' }
+        '200': { description: Short link }
   /v1/organizations/{orgId}/sharing/short-links/{id}/history:
     get:
       tags: [sharing]
@@ -2244,7 +2240,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'History' }
+        '200': { description: History }
   /v1/organizations/{orgId}/sharing/short-links/{id}/stats:
     get:
       tags: [sharing]
@@ -2259,7 +2255,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Aggregates' }
+        '200': { description: Aggregates }
   /v1/organizations/{orgId}/sharing/short-links/{id}/qr.svg:
     get:
       tags: [sharing]
@@ -2274,7 +2270,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'image/svg+xml attachment' }
+        '200': { description: image/svg+xml attachment }
   /v1/organizations/{orgId}/sharing/upload-requests:
     get:
       tags: [sharing]
@@ -2283,7 +2279,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Requests' }
+        '200': { description: Requests }
     post:
       tags: [sharing]
       summary: Workflow 4 — request files - requirements, deadline, size limits, optional password, retention (plan feature)
@@ -2293,7 +2289,7 @@ paths:
       requestBody: { $ref: '#/components/requestBodies/SharingUploadRequest' }
       responses:
         '201': { description: Request with URL }
-        '403': { description: 'Not in plan' }
+        '403': { description: Not in plan }
   /v1/organizations/{orgId}/sharing/upload-requests/{id}:
     get:
       tags: [sharing]
@@ -2308,7 +2304,7 @@ paths:
             schema: { type: string, pattern: '^[a-z]{2,4}_[0-9a-f]{24}$' },
           }
       responses:
-        '200': { description: 'Request' }
+        '200': { description: Request }
   /v1/organizations/{orgId}/sharing/upload-requests/{id}/status:
     post:
       tags: [sharing]
@@ -2324,7 +2320,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/SharingRequestAction' }
       responses:
-        '200': { description: 'Request' }
+        '200': { description: Request }
   /v1/organizations/{orgId}/sharing/notifications:
     get:
       tags: [sharing]
@@ -2333,7 +2329,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Notifications' }
+        '200': { description: Notifications }
   /v1/organizations/{orgId}/sharing/notifications/read:
     post:
       tags: [sharing]
@@ -2343,7 +2339,7 @@ paths:
         - { $ref: '#/components/parameters/OrgId' }
       requestBody: { $ref: '#/components/requestBodies/SharingIds' }
       responses:
-        '200': { description: 'Count' }
+        '200': { description: Count }
   /v1/organizations/{orgId}/sharing/branding:
     get:
       tags: [sharing]
@@ -2352,7 +2348,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Branding' }
+        '200': { description: Branding }
     put:
       tags: [sharing]
       summary: Set download-page branding (admin/owner; plan feature)
@@ -2361,7 +2357,7 @@ paths:
         - { $ref: '#/components/parameters/OrgId' }
       requestBody: { $ref: '#/components/requestBodies/SharingBranding' }
       responses:
-        '200': { description: 'Branding' }
+        '200': { description: Branding }
   /v1/organizations/{orgId}/sharing/domains:
     get:
       tags: [sharing]
@@ -2370,7 +2366,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/OrgId' }
       responses:
-        '200': { description: 'Domains' }
+        '200': { description: Domains }
     post:
       tags: [sharing]
       summary: Register a custom short-link domain (admin/owner; plan feature)
@@ -2395,7 +2391,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Verification result' }
+        '200': { description: Verification result }
   /v1/organizations/{orgId}/sharing/domains/{id}/remove:
     post:
       tags: [sharing]
@@ -2411,7 +2407,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Removed' }
+        '200': { description: Removed }
   /s/{token}:
     get:
       tags: [sharing]
@@ -2420,7 +2416,7 @@ paths:
       parameters:
         - { name: token, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: 'HTML' }
+        '200': { description: HTML }
   /r/{token}:
     get:
       tags: [sharing]
@@ -2429,7 +2425,7 @@ paths:
       parameters:
         - { name: token, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: 'HTML' }
+        '200': { description: HTML }
   /l/{code}:
     get:
       tags: [sharing]
@@ -2439,7 +2435,7 @@ paths:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses:
         '302': { description: Redirect }
-        '404': { description: 'Unknown' }
+        '404': { description: Unknown }
         '410': { description: 'Expired, suspended or revoked' }
   /d/{code}:
     get:
@@ -2466,42 +2462,42 @@ paths:
       summary: Workspace files-and-links module
       security: []
       responses:
-        '200': { description: 'JavaScript' }
+        '200': { description: JavaScript }
   /uploader.mjs:
     get:
       tags: [sharing]
       summary: Resumable direct-upload helper
       security: []
       responses:
-        '200': { description: 'JavaScript' }
+        '200': { description: JavaScript }
   /share.mjs:
     get:
       tags: [sharing]
       summary: Public share page script
       security: []
       responses:
-        '200': { description: 'JavaScript' }
+        '200': { description: JavaScript }
   /request.mjs:
     get:
       tags: [sharing]
       summary: Public upload-request page script
       security: []
       responses:
-        '200': { description: 'JavaScript' }
+        '200': { description: JavaScript }
   /public.mjs:
     get:
       tags: [sharing]
       summary: Shared helpers for public sharing pages
       security: []
       responses:
-        '200': { description: 'JavaScript' }
+        '200': { description: JavaScript }
   /link.mjs:
     get:
       tags: [sharing]
       summary: Short-link unlock page script
       security: []
       responses:
-        '200': { description: 'JavaScript' }
+        '200': { description: JavaScript }
   /v1/public/short-links/{code}/unlock:
     post:
       tags: [sharing]
@@ -2511,8 +2507,8 @@ paths:
         - { name: code, in: path, required: true, schema: { type: string } }
       requestBody: { $ref: '#/components/requestBodies/PublicPassword' }
       responses:
-        '200': { description: 'Destination' }
-        '401': { description: 'Password or sign-in required' }
+        '200': { description: Destination }
+        '401': { description: Password or sign-in required }
   /v1/public/shares/{token}/open:
     post:
       tags: [sharing]
@@ -2527,9 +2523,9 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/PublicPassword' }
       responses:
-        '200': { description: 'Manifest and grant' }
-        '401': { description: 'Sign-in or password required' }
-        '403': { description: 'Not a permitted recipient' }
+        '200': { description: Manifest and grant }
+        '401': { description: Sign-in or password required }
+        '403': { description: Not a permitted recipient }
         '410': { description: 'Revoked, suspended, expired or not published' }
         '429': { description: Too many attempts }
   /v1/public/shares/{token}/files/url:
@@ -2546,8 +2542,8 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/PublicFileUrl' }
       responses:
-        '200': { description: 'Signed URL on the isolated content origin' }
-        '409': { description: 'Not available yet' }
+        '200': { description: Signed URL on the isolated content origin }
+        '409': { description: Not available yet }
         '410': { description: No longer available }
   /v1/public/shares/{token}/acknowledge:
     post:
@@ -2563,7 +2559,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/PublicAcknowledge' }
       responses:
-        '200': { description: 'Recorded' }
+        '200': { description: Recorded }
   /v1/public/shares/{token}/comments:
     get:
       tags: [sharing]
@@ -2577,7 +2573,7 @@ paths:
             schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
           }
       responses:
-        '200': { description: 'Comments and decisions' }
+        '200': { description: Comments and decisions }
     post:
       tags: [sharing]
       summary: Add a review comment
@@ -2606,7 +2602,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/PublicDecision' }
       responses:
-        '200': { description: 'Decision' }
+        '200': { description: Decision }
   /v1/public/upload-requests/{token}/open:
     post:
       tags: [sharing]
@@ -2621,7 +2617,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/PublicPassword' }
       responses:
-        '200': { description: 'Request' }
+        '200': { description: Request }
         '410': { description: Closed or past deadline }
   /v1/public/upload-requests/{token}/submissions:
     post:
@@ -2651,7 +2647,7 @@ paths:
             schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' },
           }
       responses:
-        '200': { description: 'Own submission' }
+        '200': { description: Own submission }
   /v1/public/upload-requests/{token}/submission/submit:
     post:
       tags: [sharing]
@@ -2666,8 +2662,8 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Submitted' }
-        '409': { description: 'Missing required files' }
+        '200': { description: Submitted }
+        '409': { description: Missing required files }
   /v1/public/upload-requests/{token}/uploads:
     post:
       tags: [sharing]
@@ -2698,7 +2694,7 @@ paths:
         - { name: uploadId, in: path, required: true, schema: { type: string } }
       requestBody: { $ref: '#/components/requestBodies/SharingParts' }
       responses:
-        '200': { description: 'Signed part URLs' }
+        '200': { description: Signed part URLs }
   /v1/public/upload-requests/{token}/uploads/{uploadId}:
     get:
       tags: [sharing]
@@ -2713,7 +2709,7 @@ paths:
           }
         - { name: uploadId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: 'Upload status' }
+        '200': { description: Upload status }
   /v1/public/upload-requests/{token}/uploads/{uploadId}/complete:
     post:
       tags: [sharing]
@@ -2729,7 +2725,7 @@ paths:
         - { name: uploadId, in: path, required: true, schema: { type: string } }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Processing' }
+        '200': { description: Processing }
   /v1/public/upload-requests/{token}/uploads/{uploadId}/abort:
     post:
       tags: [sharing]
@@ -2745,7 +2741,7 @@ paths:
         - { name: uploadId, in: path, required: true, schema: { type: string } }
       requestBody: { $ref: '#/components/requestBodies/Empty' }
       responses:
-        '200': { description: 'Aborted' }
+        '200': { description: Aborted }
   /v1/public/abuse-reports:
     post:
       tags: [sharing]
@@ -2762,7 +2758,7 @@ paths:
       parameters:
         - { name: status, in: query, schema: { type: string } }
       responses:
-        '200': { description: 'Reports' }
+        '200': { description: Reports }
   /v1/admin/sharing/abuse-reports/{id}/resolve:
     post:
       tags: [sharing]
@@ -2772,7 +2768,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
       requestBody: { $ref: '#/components/requestBodies/AdminAbuseResolve' }
       responses:
-        '200': { description: 'Resolved' }
+        '200': { description: Resolved }
   /v1/admin/organizations/{orgId}/sharing/{type}/{id}/hold:
     post:
       tags: [sharing]
@@ -2794,7 +2790,7 @@ paths:
           }
       requestBody: { $ref: '#/components/requestBodies/AdminHold' }
       responses:
-        '200': { description: 'Hold state' }
+        '200': { description: Hold state }
   /v1/organizations/{orgId}/operations/applications:
     get:
       operationId: listApplications
