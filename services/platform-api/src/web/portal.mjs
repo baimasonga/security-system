@@ -99,9 +99,25 @@ async function api(path, method = 'GET', body) {
   const json = response.status === 204 ? null : await response.json();
   if (!response.ok) {
     if (response.status === 401 && token && state.token === token) {
-      state.token = '';
-      state.principal = null;
-      renderAuth();
+      // MFA reauthentication can reject a password/code while the session is still valid.
+      // Keep the pending setup only when the server independently confirms that session.
+      let sessionActive = false;
+      if (['/v1/auth/mfa/begin', '/v1/auth/mfa/confirm', '/v1/auth/mfa/disable'].includes(path)) {
+        try {
+          const session = await fetch('/v1/auth/me', {
+            headers: { authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          });
+          sessionActive = session.ok;
+        } catch {
+          // An unverifiable session does not keep the setup key on screen.
+        }
+      }
+      if (!sessionActive && state.token === token) {
+        state.token = '';
+        state.principal = null;
+        renderAuth();
+      }
     }
     const error = new Error(
       `${json?.message || 'Request failed'}${json?.request_id ? ` · Reference ${json.request_id}` : ''}`,

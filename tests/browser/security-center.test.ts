@@ -198,6 +198,92 @@ it('enables and disables real authenticator protection and sends verification fr
   const token = await env.login('center@example.test');
   expect((await env.call('GET', '/v1/auth/me', { token })).body.mfa_enabled).toBe(false);
 });
+it('keeps pending MFA setup after a rejected code and enables it only after a successful confirmation', async () => {
+  const { page, owner } = await setup();
+  const card = section(page, 'Authenticator protection');
+  await card.getByLabel('Current password', { exact: true }).fill(PW);
+  await card.getByRole('button', { name: 'Set up authenticator', exact: true }).click();
+  const setupKey = page.getByLabel('Authenticator setup key');
+  await setupKey.waitFor();
+  const key = await setupKey.inputValue();
+  const secret = decode(key);
+  const counter = Math.floor(+env.clock.now() / 30000);
+  const accepted = new Set([-1, 0, 1].map((offset) => totpCode(secret, counter + offset)));
+  let invalid = '000000';
+  while (accepted.has(invalid)) invalid = String(Number(invalid) + 1).padStart(6, '0');
+  const confirmation = section(page, 'Confirm your authenticator');
+  await confirmation.getByLabel('Current password', { exact: true }).fill(PW);
+  await confirmation.getByLabel('Six-digit authenticator code', { exact: true }).fill(invalid);
+  await confirmation.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
+  await page.locator('#notice.error').waitFor();
+  expect(await setupKey.count()).toBe(1);
+  expect(await setupKey.inputValue()).toBe(key);
+  expect((await env.call('GET', '/v1/auth/me', { token: owner.token })).body.mfa_enabled).toBe(
+    false,
+  );
+  await confirmation.getByLabel('Current password', { exact: true }).fill('incorrect password');
+  await confirmation
+    .getByLabel('Six-digit authenticator code', { exact: true })
+    .fill(totpCode(secret, counter));
+  await confirmation.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
+  await page.locator('#notice.error').waitFor();
+  expect(await setupKey.inputValue()).toBe(key);
+  await confirmation.getByLabel('Current password', { exact: true }).fill(PW);
+  await confirmation
+    .getByLabel('Six-digit authenticator code', { exact: true })
+    .fill(totpCode(secret, counter));
+  await confirmation.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
+  await page.getByLabel('One-time recovery codes').waitFor();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByLabel('Email', { exact: true }).fill('center@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(PW);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.locator('#notice.error').waitFor();
+  expect(await page.getByRole('heading', { name: 'Welcome back', exact: true }).count()).toBe(1);
+  env.clock.advance(30000);
+  await login(page, totpCode(secret, Math.floor(+env.clock.now() / 30000)));
+  expect(await section(page, 'Your account').textContent()).toContain('authenticator appYes');
+  expect(
+    await page.getByRole('button', { name: 'Disable authenticator', exact: true }).count(),
+  ).toBe(1);
+});
+it('clears MFA setup when the session actually expires', async () => {
+  const { page } = await setup();
+  const card = section(page, 'Authenticator protection');
+  await card.getByLabel('Current password', { exact: true }).fill(PW);
+  await card.getByRole('button', { name: 'Set up authenticator', exact: true }).click();
+  const confirmation = section(page, 'Confirm your authenticator');
+  await page.getByLabel('Authenticator setup key').waitFor();
+  env.clock.advance(13 * 60 * 60 * 1000);
+  await confirmation.getByLabel('Current password', { exact: true }).fill(PW);
+  await confirmation.getByLabel('Six-digit authenticator code', { exact: true }).fill('000000');
+  await confirmation.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
+  await page.getByRole('heading', { name: 'Welcome back', exact: true }).waitFor();
+  expect(await page.getByLabel('Authenticator setup key').count()).toBe(0);
+  expect(await page.getByRole('img', { name: 'Authenticator setup QR code' }).count()).toBe(0);
+});
+it.each(['unavailable', 'network failure'])(
+  'clears MFA setup when session verification has a %s',
+  async (failure) => {
+    const { page } = await setup();
+    const card = section(page, 'Authenticator protection');
+    await card.getByLabel('Current password', { exact: true }).fill(PW);
+    await card.getByRole('button', { name: 'Set up authenticator', exact: true }).click();
+    await page.getByLabel('Authenticator setup key').waitFor();
+    await page.route('**/v1/auth/me', (route) =>
+      failure === 'unavailable'
+        ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' })
+        : route.abort(),
+    );
+    const confirmation = section(page, 'Confirm your authenticator');
+    await confirmation.getByLabel('Current password', { exact: true }).fill('incorrect password');
+    await confirmation.getByLabel('Six-digit authenticator code', { exact: true }).fill('000000');
+    await confirmation.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
+    await page.getByRole('heading', { name: 'Welcome back', exact: true }).waitFor();
+    expect(await page.getByLabel('Authenticator setup key').count()).toBe(0);
+    expect(await page.getByRole('img', { name: 'Authenticator setup QR code' }).count()).toBe(0);
+  },
+);
 it('registers and removes a real WebAuthn passkey without leaving Security center', async () => {
   const { page, owner } = await setup(true);
   const cdp = await page.context().newCDPSession(page);
