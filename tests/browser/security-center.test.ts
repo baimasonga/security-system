@@ -4,6 +4,13 @@ import { createServer } from 'node:net';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import jsQRModule from 'jsqr';
+const jsQR = ((jsQRModule as unknown as { default?: unknown }).default ??
+  jsQRModule) as unknown as (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+) => { data: string } | null;
 import { SoftwareDeviceKey } from '@trust/sdk-core';
 import { buildProofMessage } from '@trust/crypto/verify';
 import { totpCode } from '../../packages/auth/src/mfa.ts';
@@ -112,6 +119,8 @@ it('puts actions first and keeps privacy and role descriptions collapsed on desk
 });
 it('enables and disables real authenticator protection and sends verification from Security center', async () => {
   const { page, mail, owner } = await setup();
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(request.url()));
   await section(page, 'Your account')
     .getByRole('button', { name: 'Send verification email', exact: true })
     .click();
@@ -128,7 +137,41 @@ it('enables and disables real authenticator protection and sends verification fr
   const setupKey = page.getByLabel('Authenticator setup key');
   await setupKey.waitFor();
   const secret = await setupKey.inputValue();
-  const key = decode(secret);
+  const qr = page.getByRole('img', { name: 'Authenticator setup QR code', exact: true });
+  await qr.waitFor();
+  const pixels = await qr.evaluate((element) => {
+    const canvas = element as unknown as {
+      width: number;
+      height: number;
+      getContext(type: string): {
+        getImageData(
+          x: number,
+          y: number,
+          width: number,
+          height: number,
+        ): { data: Uint8ClampedArray };
+      };
+    };
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      data: Array.from(
+        canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data,
+      ),
+    };
+  });
+  const scanned = jsQR(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height);
+  expect(scanned).not.toBeNull();
+  const uri = new URL(scanned!.data);
+  expect(uri.protocol).toBe('otpauth:');
+  expect(uri.hostname).toBe('totp');
+  expect(uri.searchParams.get('issuer')).toBe('Rokela Bai Bureh Warrior');
+  expect(uri.searchParams.get('secret')).toBe(secret);
+  expect(uri.searchParams.get('algorithm')).toBe('SHA1');
+  expect(uri.searchParams.get('digits')).toBe('6');
+  expect(uri.searchParams.get('period')).toBe('30');
+  expect(decodeURIComponent(uri.pathname)).toContain(owner.userId);
+  const key = decode(uri.searchParams.get('secret')!);
   const factor = () => totpCode(key, Math.floor(+env.clock.now() / 30000));
   const confirmation = section(page, 'Confirm your authenticator');
   await confirmation.getByLabel('Current password', { exact: true }).fill(PW);
@@ -136,6 +179,9 @@ it('enables and disables real authenticator protection and sends verification fr
   await confirmation.getByRole('button', { name: 'Enable authenticator', exact: true }).click();
   await page.getByLabel('One-time recovery codes').waitFor();
   expect((await env.call('GET', '/v1/auth/me', { token: owner.token })).status).toBe(401);
+  expect(await page.getByRole('img', { name: 'Authenticator setup QR code' }).count()).toBe(0);
+  expect(requests.every((url) => url.startsWith(new URL(page.url()).origin + '/'))).toBe(true);
+  expect(requests.join(' ')).not.toContain(secret);
   expect(
     await page.evaluate(() => JSON.stringify(localStorage) + JSON.stringify(sessionStorage)),
   ).not.toContain(secret);
@@ -417,7 +463,7 @@ it('guides an unenrolled owner from credential prerequisites to manual-key confi
   await mfa.getByRole('button', { name: 'Set up authenticator', exact: true }).click();
   const confirmation = section(page, 'Confirm your authenticator');
   await confirmation.getByLabel('Authenticator setup key').waitFor();
-  expect(await confirmation.textContent()).toContain('There is no QR code');
+  expect(await confirmation.textContent()).toContain('scan this QR code');
   expect(await confirmation.textContent()).toContain('Starting setup again creates a new key');
   expect(await confirmation.textContent()).toContain('Enter your Warrior password again');
   expect((await env.call('GET', '/v1/auth/me', { token: owner.token })).body.mfa_enabled).toBe(

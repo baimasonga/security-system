@@ -1108,7 +1108,7 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
   card.append(
     node(
       'p',
-      'Protection is not enabled yet. Setup has three steps: generate a manual key, add that key to your authenticator app, then confirm it here with your password and a six-digit code. Keep existing phone entries until the new setup is confirmed.',
+      'Protection is not enabled yet. Setup has three steps: generate a setup key, scan its QR code or enter the key in your authenticator app, then confirm it here with your password and a six-digit code. Keep existing phone entries until the new setup is confirmed.',
     ),
     fieldsForm(
       [{ name: 'password', label: 'Current password', type: 'password' }],
@@ -1117,7 +1117,23 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
         const setup = await api('/v1/auth/mfa/begin', 'POST', data);
         form.reset();
         if (!current()) return;
-        // Setup secret exists only in this view. Navigation removes it; nothing goes to storage or a QR service.
+        // Draw locally: provisioning secrets never go to a QR service, URL, or browser storage.
+        const qr = node('canvas', undefined, 'authenticator-qr');
+        qr.setAttribute('role', 'img');
+        qr.setAttribute('aria-label', 'Authenticator setup QR code');
+        const scale = 4;
+        const quiet = 4;
+        qr.width = qr.height = (setup.setup_qr.size + quiet * 2) * scale;
+        const context = qr.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, qr.width, qr.height);
+        context.fillStyle = '#000000';
+        setup.setup_qr.modules.forEach((row, y) =>
+          row.forEach((dark, x) => {
+            if (dark) context.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+          }),
+        );
+        // Setup secret exists only in this view. Navigation removes it; nothing goes to storage.
         const secret = node('input');
         secret.readOnly = true;
         secret.value = setup.setup_key;
@@ -1126,8 +1142,9 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
           node('h2', 'Confirm your authenticator'),
           node(
             'p',
-            'Step 1: In your authenticator app, add a manual time-based entry named Rokela Bai Bureh Warrior using the key below. Choose six digits and a 30-second period. There is no QR code in this setup.',
+            'Step 1: In your authenticator app, scan this QR code. If you cannot scan it, add a manual time-based entry named Rokela Bai Bureh Warrior using the key below, with six digits and a 30-second period. Keep both the QR code and setup key private.',
           ),
+          qr,
           secret,
           node(
             'p',
@@ -1151,6 +1168,7 @@ function mfaPanel(enabled = state.principal.mfa_enabled) {
               const result = await api('/v1/auth/mfa/confirm', 'POST', confirm);
               confirmForm.reset();
               secret.value = '';
+              qr.width = qr.height = 0;
               if (!current()) return;
               state.token = '';
               state.principal = null;

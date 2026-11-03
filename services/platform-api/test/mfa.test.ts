@@ -37,6 +37,11 @@ const setup = async (enforce = false, mail?: MemoryMailDelivery) => {
 it('requires password to enroll, confirms a first code, revokes sessions and never exposes stored secrets', async () => {
   const { user, call, code, begin } = await setup();
   expect(begin.body.setup_key).toMatch(/^[A-Z2-7]{32}$/);
+  expect(begin.headers['cache-control']).toBe('no-store');
+  expect(begin.body.setup_qr.modules).toHaveLength(begin.body.setup_qr.size);
+  expect((await env.call('POST', '/v1/auth/mfa/begin', { body: { password: PW } })).status).toBe(
+    401,
+  );
   expect((await call('begin', { password: 'incorrect' })).status).toBe(401);
   expect((await call('confirm', { password: PW, code: 'abcdef' })).status).toBe(400);
   expect((await call('confirm', { password: PW, code: '000000' })).status).toBe(401);
