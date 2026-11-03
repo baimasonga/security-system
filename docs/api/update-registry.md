@@ -59,8 +59,8 @@ catalog counter as authority to downgrade an installed client.
 - No purge endpoint exists for receipts. Operators must plan storage retention;
   deleting history to recover storage can cause unsafe sequence reuse.
 
-Signed root rotation, the release console and native Windows installation/recovery
-remain separate work.
+Signed root rotation and native Windows installation/recovery remain separate work.
+The operator release console below uses these existing APIs.
 
 ## Signed publication and current feeds (ADR-033)
 
@@ -96,3 +96,31 @@ vanish from clients; their signature/expiry/checkpoint rules remain authoritativ
 The registry proves metadata signature acceptance, not artifact availability,
 SBOM/provenance verification, trusted builds or successful installation. No server
 artifact fetch or installer is implemented by this endpoint.
+
+## Operator release console
+
+In **Operator console → Product releases**, choose a release operation. The console
+uses the existing operator APIs and does not sign, fetch or install artifacts.
+It supports public root and target registration, historical floor attestation,
+sequence reservation, externally signed publication (including a signed pause),
+bounded immutable history and a no-store anonymous current-feed read.
+
+Enter the existing licensing product ID and exact platform/channel. Registry reads
+show each target's reserved counter separately from the latest publication and its
+historical signed state. Historical release/pause labels do not establish current
+availability, artifact verification or installed-client support. A history failure
+is shown as unknown, never as zero releases. A missing current feed can mean expiry,
+absence, a disabled catalog or a service failure; it is not evidence of revocation.
+
+Generate and save a reservation UUID in trusted release records before submitting.
+The UI retains all form inputs after success or failure, but does not persist them
+across navigation/reloads. After an uncertain response, use the same UUID and target;
+a publication retry must also preserve its exact signed envelope. Reserving another
+sequence abandons older unpublished work. Paste only public roots and signed
+metadata, never private signing keys. Mutation confirmation, required audit reasons,
+freeze enforcement and signature validation remain authoritative on the server.
+Withdraw through a higher-sequence externally signed pause, not a delete/edit action.
+
+The console adds no new feature flag or migration. The registry/publication schema,
+grants and UPDATE_CATALOG_ENABLED prerequisites above still apply. Percentage
+rollouts, root rotation, native C# staging/installation and recovery remain separate.
