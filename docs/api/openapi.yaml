@@ -198,7 +198,7 @@ paths:
                   maxLength: 256
       responses:
         '200':
-          description: Manual setup key and ten-minute expiration
+          description: Manual setup key, locally rendered QR matrix (setup_qr with size and boolean modules), and ten-minute expiration; all provisioning material is private
         '400':
           description: Invalid input
         '401':

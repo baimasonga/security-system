@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.ts';
+import { encodeQr } from '@trust/sharing';
 import { authenticated, parse, principalOf, toWire } from '../http.ts';
 import {
   loginBody,
@@ -25,7 +26,13 @@ export function registerAuthRoutes(app: FastifyInstance, c: Container): void {
   };
   app.post('/v1/auth/mfa/begin', mfaOptions, async (req) => {
     const body = parse(mfaBeginBody, req.body);
-    return toWire(await c.auth.beginMfa(principalOf(req), body.password));
+    const principal = principalOf(req);
+    const setup = await c.auth.beginMfa(principal, body.password);
+    const issuer = 'Rokela Bai Bureh Warrior';
+    // Stable internal ID distinguishes accounts without placing an email address in the QR label.
+    const uri = `otpauth://totp/${encodeURIComponent(`${issuer}:${principal.userId}`)}?secret=${setup.setupKey}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    const { size, modules } = encodeQr(uri);
+    return toWire({ ...setup, setupQr: { size, modules } });
   });
   app.post('/v1/auth/mfa/confirm', mfaOptions, async (req) => {
     const body = parse(mfaConfirmBody, req.body);

@@ -7,9 +7,10 @@ releases and must not be used as step-by-step onboarding instructions.
 
 The Account page reports whether authenticator protection is enabled. Creating an
 entry on a phone is not activation. Start setup with the Warrior account password.
-Warrior displays a manual setup key; this implementation does not render a QR code.
-Add that exact key as a time-based authenticator entry with six digits and a
-30-second period. Confirm on Warrior with the password again and the new entry's
+Warrior displays a QR code and a manual setup key. Scan the QR code inside your
+authenticator app, or add that exact key as a time-based entry with six digits and
+a 30-second period. The QR code is rendered locally; no external QR service receives
+the secret. Confirm on Warrior with the password again and the new entry's
 current code, within ten minutes. Starting setup again replaces the pending key;
 older pending entries will no longer match. An enabled factor cannot be overwritten
 by beginning setup. Keep an existing phone entry until its replacement is confirmed.
