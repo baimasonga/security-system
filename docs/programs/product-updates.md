@@ -249,10 +249,12 @@ the production transport retains normal TLS verification. Native Windows CI rema
 separate from these Linux results. No schema, production setting, key or installed
 product was changed by this slice.
 
-Native CI exposed a cancellation-classification difference during a stalled TLS
-body read. A deterministic I/O-after-cancellation test reproduced the same refusal
-locally, failed before normalization, and passed after the transport preserved the
-deadline/user-cancellation semantics. Native rerun evidence remains separate.
+Windows CI identified an ephemeral test-certificate key that Schannel could not
+use. The disposable test leaf now uses a normal Windows-compatible key context;
+its CA is never installed in system trust. A separate deterministic I/O-after-
+cancellation regression failed before transport normalization and passed afterward,
+preserving deadline/user-cancellation semantics without exposing transport details.
+Native rerun evidence remains separate from local results.
 
 Next: platform publisher verification and native installation/recovery adapters,
 then independently integrate Business Admin and a second Windows product. Production
