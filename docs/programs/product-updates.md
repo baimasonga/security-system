@@ -276,7 +276,7 @@ remain next work; do not auto-run this installer based on the publisher record.
 
 Portable tests cover pins, weak digests, strict layouts/padding and concurrent
 disposal; native Windows tests use temporary code-signing fixtures without executing
-them and clean their CurrentUser test stores/private keys. The end-to-end test uses
+them and clean their machine trust stores and CurrentUser private keys. The end-to-end test uses
 real signatures, DPAPI state, evidence/staging and Windows signature verification.
 Verification and delivery results remain separate from production acceptance.
 

@@ -31,8 +31,9 @@ journaling, explicit confirmation, interrupted-install reconciliation and produc
 recovery adapters remain separate implementation; do not call a successful signature
 check a successful installation. No production keys or installed products change.
 
-Native tests use disposable code-signing certificates in an isolated Windows CI
-user profile, clean their certificate stores/private keys afterward, and never execute
-the signed fixture. Cover approved/wrong pins, SHA-1 policy, untrusted-but-pinned,
+Native tests run only on isolated GitHub-hosted Windows CI VMs. They temporarily
+trust disposable public certificates in machine stores, clean those stores and
+CurrentUser private keys afterward, and never execute the signed fixture.
+Cover approved/wrong pins, SHA-1 policy, untrusted-but-pinned,
 unsigned/tampered PE, padding/overlay refusal and held/disposed leases. Portable
 negative tests and isolated security mutations must accompany the native checks.

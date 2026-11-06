@@ -22,7 +22,7 @@ covered by Authenticode (its checksum/security directory and certificate region 
 defined exclusions). Signed release hashes still bind the complete artifact bytes.
 
 Native tests temporarily trust disposable CI code-signing certificates only in the
-isolated Windows runner's CurrentUser stores, never execute their signed fixture,
+isolated GitHub-hosted Windows runner's machine trust stores, never execute their signed fixture,
 and remove test certificates/private keys. Untrusted-but-pinned and tampered fixtures
 must reach and fail OS signature trust. Portable tests and mutations cover exact
 pins, strong hashes, overlay/padding bounds and concurrent disposal; native controls

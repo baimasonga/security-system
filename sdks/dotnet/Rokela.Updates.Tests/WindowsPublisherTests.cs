@@ -6,6 +6,15 @@ using System.Text.Json;
 using Rokela.Updates;
 using Xunit;
 
+public sealed class HostedWindowsPublisherFactAttribute : FactAttribute
+{
+  public HostedWindowsPublisherFactAttribute()
+  {
+    if (!PublisherFixture.IsHostedWindows)
+      Skip = "Disposable machine trust requires an isolated GitHub-hosted Windows runner";
+  }
+}
+
 [CollectionDefinition("Native publisher", DisableParallelization = true)]
 public sealed class PublisherCollection : ICollectionFixture<PublisherFixture> { }
 
@@ -16,11 +25,14 @@ public sealed class PublisherFixture : IDisposable
   public byte[] Untrusted { get; } = [];
   public string TrustedPin { get; } = "";
   public string UntrustedPin { get; } = "";
+  internal static bool IsHostedWindows => OperatingSystem.IsWindows() &&
+      Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" &&
+      Environment.GetEnvironmentVariable("RUNNER_ENVIRONMENT") == "github-hosted";
   private readonly List<string> thumbprints = [];
   internal static string Quote(string s) => "'"+s.Replace("'", "''")+"'";
   public PublisherFixture()
   {
-    if (!OperatingSystem.IsWindows()) return;
+    if (!IsHostedWindows) return;
     Directory.CreateDirectory(Root);
     string trusted = Path.Combine(Root, "trusted.exe"), untrusted = Path.Combine(Root, "untrusted.exe");
     File.Copy(typeof(WindowsPublisherVerifier).Assembly.Location, trusted);
@@ -33,13 +45,13 @@ public sealed class PublisherFixture : IDisposable
         [Console]::Error.WriteLine('fixture: certificate created')
         $created.Add($cert.Thumbprint)
         if($trust) {
-          # X509Store.Add into CurrentUser Root displays a confirmation dialog.
-          # Certutil's explicit force mode is limited to disposable CI public certificates.
+          # CurrentUser Root requires interactive confirmation, even with certutil -f.
+          # This fixture is restricted to disposable elevated GitHub-hosted Windows VMs.
           $publicPath=$path+'.cer'
           [IO.File]::WriteAllBytes($publicPath,$cert.RawData)
           foreach($name in @('Root','TrustedPublisher')) {
             [Console]::Error.WriteLine('fixture: adding disposable public certificate to '+$name)
-            & "$env:SystemRoot\System32\certutil.exe" -user -f -addstore $name $publicPath | Out-Null
+            & "$env:SystemRoot\System32\certutil.exe" -f -addstore $name $publicPath | Out-Null
             if($LASTEXITCODE -ne 0) {throw 'Synthetic certificate trust setup failed'}
           }
           Remove-Item $publicPath -Force
@@ -54,7 +66,7 @@ public sealed class PublisherFixture : IDisposable
       """ + "\n$a=Sign-Fixture " + Quote(trusted) + " $true\n$b=Sign-Fixture " + Quote(untrusted) + " $false\n" + """
         @{trusted=$a;untrusted=$b}|ConvertTo-Json -Compress; $ok=$true
       } finally {
-        if(!$ok) {foreach($thumb in $created) {foreach($name in @('Root','TrustedPublisher')) {Remove-Item ('Cert:\CurrentUser\'+$name+'\'+$thumb) -ErrorAction SilentlyContinue};Remove-Item ('Cert:\CurrentUser\My\'+$thumb) -DeleteKey -ErrorAction SilentlyContinue}}
+        if(!$ok) {foreach($thumb in $created) {foreach($name in @('Root','TrustedPublisher')) {Remove-Item ('Cert:\LocalMachine\'+$name+'\'+$thumb) -ErrorAction SilentlyContinue};Remove-Item ('Cert:\CurrentUser\My\'+$thumb) -DeleteKey -ErrorAction SilentlyContinue}}
       }
       """;
     try
@@ -109,9 +121,10 @@ public sealed class PublisherFixture : IDisposable
       Run("""
         $ErrorActionPreference='Stop'
         foreach($thumb in @(@PINS@)) {
-          foreach($name in @('Root','TrustedPublisher')) {Remove-Item ('Cert:\CurrentUser\'+$name+'\'+$thumb) -ErrorAction SilentlyContinue}
+          foreach($name in @('Root','TrustedPublisher')) {Remove-Item ('Cert:\LocalMachine\'+$name+'\'+$thumb) -ErrorAction SilentlyContinue}
           Remove-Item ('Cert:\CurrentUser\My\'+$thumb) -DeleteKey -ErrorAction SilentlyContinue
-          foreach($name in @('Root','TrustedPublisher','My')) {if(Test-Path ('Cert:\CurrentUser\'+$name+'\'+$thumb)) {throw 'Synthetic publisher certificate cleanup failed'}}
+          foreach($name in @('Root','TrustedPublisher')) {if(Test-Path ('Cert:\LocalMachine\'+$name+'\'+$thumb)) {throw 'Synthetic publisher certificate cleanup failed'}}
+          if(Test-Path ('Cert:\CurrentUser\My\'+$thumb)) {throw 'Synthetic publisher private key cleanup failed'}
         }
         """.Replace("@PINS@",list));
       thumbprints.Clear();
@@ -123,7 +136,7 @@ public sealed class PublisherFixture : IDisposable
 [Collection("Native publisher")]
 public sealed class WindowsPublisherTests(PublisherFixture fixture)
 {
-  [WindowsFact]
+  [HostedWindowsPublisherFact]
   public async Task SignedMetadataProtectedStagingAndNativePublisherWorkTogether()
   {
     using var h = new StagingHarness(fixture.Trusted);
@@ -135,7 +148,7 @@ public sealed class WindowsPublisherTests(PublisherFixture fixture)
     Assert.Equal(fixture.TrustedPin, new WindowsPublisherVerifier([fixture.TrustedPin]).Verify(artifact).CertificateSha256);
     Assert.Equal(7, artifact.Metadata.Sequence);
   }
-  [WindowsFact]
+  [HostedWindowsPublisherFact]
   public void AcceptsOnlyTheWindowsVerifiedPinnedSignerOnAnExtensionlessLease()
   {
     using var artifact = fixture.Stage(fixture.Trusted);
@@ -146,7 +159,7 @@ public sealed class WindowsPublisherTests(PublisherFixture fixture)
     Assert.Throws<IOException>(() => File.Open(artifact.Path, FileMode.Open, FileAccess.Write, FileShare.Read).Dispose());
     Assert.Throws<UpdateVerificationException>(() => new WindowsPublisherVerifier([fixture.UntrustedPin]).Verify(artifact));
   }
-  [WindowsFact]
+  [HostedWindowsPublisherFact]
   public void AMatchingPinCannotOverrideUntrustedWindowsSignatureState()
   {
     using var artifact = fixture.Stage(fixture.Untrusted);
@@ -154,7 +167,7 @@ public sealed class WindowsPublisherTests(PublisherFixture fixture)
     var error = Assert.Throws<UpdateVerificationException>(() => new WindowsPublisherVerifier([fixture.UntrustedPin]).Verify(artifact));
     Assert.Contains("Windows publisher trust", error.Message);
   }
-  [WindowsFact]
+  [HostedWindowsPublisherFact]
   public void TamperedHashedCodeIsRejectedEvenWhenTheReleaseDigestMatchesIt()
   {
     byte[] tampered = fixture.Trusted.ToArray(); tampered[70] ^= 1;
@@ -162,7 +175,7 @@ public sealed class WindowsPublisherTests(PublisherFixture fixture)
     var error = Assert.Throws<UpdateVerificationException>(() => new WindowsPublisherVerifier([fixture.TrustedPin]).Verify(artifact));
     Assert.Contains("Windows publisher trust", error.Message);
   }
-  [WindowsFact]
+  [HostedWindowsPublisherFact]
   public void MismatchedReleaseHashUnsignedPeAndUnhashedTrailingDataAreRejected()
   {
     var verifier = new WindowsPublisherVerifier([fixture.TrustedPin]);
@@ -173,7 +186,7 @@ public sealed class WindowsPublisherTests(PublisherFixture fixture)
     using var overlay = fixture.Stage([..fixture.Trusted, 1]);
     Assert.Throws<UpdateVerificationException>(() => verifier.Verify(overlay));
   }
-  [WindowsFact]
+  [HostedWindowsPublisherFact]
   public void DisposedLeasesCannotBeUsedForPublisherChecks()
   {
     var artifact = fixture.Stage(fixture.Trusted); artifact.Dispose();
