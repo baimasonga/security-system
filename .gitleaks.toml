@@ -26,3 +26,7 @@ id = "jwt"
 [[rules.allowlists]]
 description = "Public cross-language update fixtures signed by discarded ephemeral keys; not account tokens"
 paths = ['''(^|/)docs/api/update-metadata-vectors\.json$''']
+
+[[rules.allowlists]]
+description = "Public root-rotation fixtures signed by discarded ephemeral keys; not account tokens"
+paths = ['''(^|/)docs/api/update-root-vectors\.json$''']

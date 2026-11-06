@@ -5,6 +5,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <None Include="../../../docs/api/update-root-vectors.json" Link="root-vectors.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../../docs/api/update-metadata-vectors.json" Link="vectors.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

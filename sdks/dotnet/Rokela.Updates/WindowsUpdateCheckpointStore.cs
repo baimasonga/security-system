@@ -36,8 +36,17 @@ public sealed class WindowsUpdateCheckpointStore
       string product, string platform, string channel, DateTimeOffset now, CancellationToken cancellationToken = default) =>
       TransitionAsync(verifier, envelope, product, platform, channel, now, false, cancellationToken);
 
-  private async Task<VerifiedUpdateMetadata> TransitionAsync(UpdateCheckpointVerifier verifier, string envelope,
+  private Task<VerifiedUpdateMetadata> TransitionAsync(UpdateCheckpointVerifier verifier, string envelope,
       string product, string platform, string channel, DateTimeOffset now, bool initialize, CancellationToken cancellationToken)
+      => TransactAsync<UpdateCheckpoint, VerifiedUpdateMetadata>(previous =>
+      {
+        var result = verifier.Verify(envelope, product, platform, channel, now, previous);
+        return (result.Checkpoint, result.Metadata);
+      }, initialize, cancellationToken);
+
+  // The trust store reuses exactly the same DPAPI, lock, cancellation and atomic-file transaction.
+  internal async Task<TResult> TransactAsync<TState, TResult>(Func<TState?, (TState State, TResult Result)> transition,
+      bool initialize, CancellationToken cancellationToken) where TState : class
   {
     if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Windows DPAPI required");
     try
@@ -49,7 +58,7 @@ public sealed class WindowsUpdateCheckpointStore
       RejectLinks(directory);
       await using var gate = await AcquireAsync(cancellationToken);
       RejectLinks(path);
-      UpdateCheckpoint? previous = null;
+      TState? previous = null;
       if (initialize)
       {
         if (File.Exists(path) || Directory.Exists(path)) throw new UpdateCheckpointStorageException();
@@ -57,21 +66,25 @@ public sealed class WindowsUpdateCheckpointStore
       else
       {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (file.Length is < 1 or > 65536) throw new UpdateCheckpointStorageException();
+        if (file.Length is < 1 or > 524288) throw new UpdateCheckpointStorageException();
         var encrypted = new byte[(int)file.Length];
         file.ReadExactly(encrypted);
         var clear = ProtectedData.Unprotect(encrypted, entropy, DataProtectionScope.CurrentUser);
         try
         {
-          previous = JsonSerializer.Deserialize<UpdateCheckpoint>(clear, JsonOptions) ?? throw new UpdateCheckpointStorageException();
+          previous = JsonSerializer.Deserialize<TState>(clear, JsonOptions) ?? throw new UpdateCheckpointStorageException();
         }
         finally { CryptographicOperations.ZeroMemory(clear); }
       }
-      var result = verifier.Verify(envelope, product, platform, channel, now, previous);
+      var result = transition(previous);
       cancellationToken.ThrowIfCancellationRequested();
-      var serialized = JsonSerializer.SerializeToUtf8Bytes(result.Checkpoint, JsonOptions);
+      var serialized = JsonSerializer.SerializeToUtf8Bytes(result.State, JsonOptions);
       byte[] sealedState;
-      try { sealedState = ProtectedData.Protect(serialized, entropy, DataProtectionScope.CurrentUser); }
+      try
+      {
+        if (serialized.Length > 450000) throw new UpdateCheckpointStorageException();
+        sealedState = ProtectedData.Protect(serialized, entropy, DataProtectionScope.CurrentUser);
+      }
       finally { CryptographicOperations.ZeroMemory(serialized); }
       string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
       try
@@ -88,7 +101,7 @@ public sealed class WindowsUpdateCheckpointStore
         else File.Replace(temporary, path, null);
       }
       finally { if (File.Exists(temporary)) File.Delete(temporary); }
-      return result.Metadata;
+      return result.Result;
     }
     catch (Exception e) when (e is IOException or UnauthorizedAccessException or CryptographicException or JsonException)
     {

@@ -36,7 +36,7 @@ try:
         source.write_text(changed, encoding="utf-8")
         run = subprocess.run(
             ["dotnet", "test", "sdks/dotnet/Rokela.Updates.Tests", "--no-restore",
-             "--configuration", "Release", "--filter", "FullyQualifiedName~WindowsStoreTests"],
+             "--configuration", "Release", "--filter", "FullyQualifiedName~WindowsStoreTests|FullyQualifiedName~WindowsTrustStoreTests"],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=180,
         )
         if run.returncode == 0 or not re.search(r"Failed:\s+[1-9]", run.stdout):
