@@ -155,3 +155,38 @@ result after use to close/delete it. Cleanup failures are surfaced for host acti
 The SDK does not fetch update feeds, choose products, auto-initialize trust, install
 software or create production keys. It does not modify license/customer documents.
 See [ADR-035](../../docs/adr/ADR-035-dotnet-evidence-staging.md).
+
+## Windows publisher verification
+
+```csharp
+var publisher = new WindowsPublisherVerifier(approvedPublisherCertificateSha256Pins);
+var signedBy = publisher.Verify(artifact); // Keep artifact alive and undisposed.
+// Evidence of Windows signature trust + exact publisher pin, not an installation grant.
+```
+
+Use SHA-256 of the leaf certificate's DER bytes, for example
+`certificate.GetCertHashString(HashAlgorithmName.SHA256)`. The Windows certificate
+store's ordinary `Thumbprint` is SHA-1 and is **not** this pin. Configure approved
+pins independently of downloaded metadata and certificate subject names. Policy is
+copied, and multiple pins allow an explicitly configured publisher rollover.
+
+While holding the staged read lease, this gate rechecks full-file length/hash,
+strict embedded PE signature layout, Windows `WinVerifyTrust` with revocation checks,
+the actual verified signer's certificate pin and a SHA-256/384/512 signature digest.
+It uses System32 trust APIs, closes native trust state and never unlocks or executes
+the file. A concurrent result disposal waits for verification. The synchronous native
+call can consult Windows revocation/network policy: keep verification/disposal off
+the UI thread. There is no offline-ignore-revocation option.
+
+Support currently covers PE executables/DLLs with one revision-2 PKCS#7 table at EOF
+(maximum 4 MiB), canonical SignedData and zero alignment padding. Unsigned files,
+unhashed trailing data, malformed tables and nonzero PKCS#7 padding fail. MSI,
+PowerShell scripts and alternate signature containers need separate adapters.
+Certificate subject text is informational. Windows trust alone does not satisfy the
+pin, and a pin alone never overrides a Windows trust refusal.
+
+The host must still recheck current release trust before any eventual execution,
+obtain explicit installation confirmation, and provide a product-specific installer
+and data/recovery adapter. The existing Business Admin Inno setup overwrites files
+in place; these checks do not turn it into an atomic installer. No update is installed
+by this SDK. See [ADR-036](../../docs/adr/ADR-036-windows-publisher-verification.md).

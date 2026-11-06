@@ -10,8 +10,9 @@ import tempfile
 root = pathlib.Path(__file__).resolve().parent.parent
 dotnet = os.environ.get("DOTNET_COMMAND", "dotnet")
 staging = sys.argv[1:] == ["--staging"]
-if sys.argv[1:] and not staging:
-    raise SystemExit("Expected no arguments or --staging")
+publisher = sys.argv[1:] == ["--publisher"]
+if sys.argv[1:] and not (staging or publisher):
+    raise SystemExit("Expected no arguments, --staging or --publisher")
 
 def annotate(message):
     text = re.sub(r"[A-Za-z0-9_+/=-]{40,}", "[redacted]", str(message)[:2000])
@@ -32,7 +33,8 @@ with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
     project = str(copy / "sdks/dotnet/Rokela.Updates.Tests")
     subprocess.run([dotnet, "restore", project, "--locked-mode"], check=True)
     command = [dotnet, "test", project, "--no-restore", "--configuration", "Release", "--logger", "trx;LogFileName=negative-controls.trx",
-               "--filter", "FullyQualifiedName~EvidenceTests|FullyQualifiedName~StagingTests|FullyQualifiedName~StagingHttpsTests" if staging else "FullyQualifiedName~TrustStateTests"]
+               "--filter", "FullyQualifiedName~PublisherPolicyTests|FullyQualifiedName~PeSignatureTests|FullyQualifiedName~WindowsPublisherTests" if publisher else
+               "FullyQualifiedName~EvidenceTests|FullyQualifiedName~StagingTests|FullyQualifiedName~StagingHttpsTests" if staging else "FullyQualifiedName~TrustStateTests"]
 
     def run_suite():
         return subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -76,10 +78,24 @@ with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
             mutations["current-user-only ACL"] = ("UpdateArtifactStager.cs",
                 'new FileSystemAccessRule(identity.User!, FileSystemRights.FullControl,',
                 'new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.FullControl,')
+    if publisher:
+        mutations = {
+            "publisher pin": ("WindowsPublisherVerifier.cs", 'if (!pins.Contains(fingerprint))', 'if (false)'),
+            "weak signature digest": ("WindowsPublisherVerifier.cs", '_ => throw new UpdateVerificationException("publisher signature digest")', '_ => "SHA256"'),
+            "unhashed PE overlay": ("EmbeddedPeSignature.cs", 'offset + length != size', 'false'),
+            "PKCS7 padding": ("EmbeddedPeSignature.cs", 'padding.IndexOfAnyExcept((byte)0) >= 0', 'false'),
+            "lease disposal serialization": ("UpdateArtifactStager.cs", 'lock (gate)', 'lock (new object())'),
+        }
+        if sys.platform == "win32":
+            mutations["Windows trust result"] = ("NativeWindowsTrust.cs",
+                'if (status != 0) throw new UpdateVerificationException("Windows publisher trust " + unchecked((uint)status).ToString("x8"));', '')
+            mutations["publisher artifact binding"] = ("WindowsPublisherVerifier.cs",
+                'if (Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant() != artifact.Metadata.Sha256)', 'if (false)')
     for name, (file, before, after) in mutations.items():
         source = copy / "sdks/dotnet/Rokela.Updates" / file
         original = source.read_text()
-        if original.count(before) != 1:
+        expected = 2 if name == "lease disposal serialization" else 1
+        if original.count(before) != expected:
             raise RuntimeError("Mutation anchor must match exactly once: " + name)
         source.write_text(original.replace(before, after))
         run = run_suite()

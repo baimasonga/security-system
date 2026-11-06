@@ -88,7 +88,7 @@ jobs:
   dotnet-update-metadata:
     name: .NET update metadata (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20 # Native signer fixtures and isolated security mutation runs require their own processes.
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +104,8 @@ jobs:
         run: python tools/check-dotnet-trust-mutations.py
       - name: Verify native staging negative controls in an isolated copy
         run: python tools/check-dotnet-trust-mutations.py --staging
+      - name: Verify native publisher negative controls in an isolated copy
+        run: python tools/check-dotnet-trust-mutations.py --publisher
       - name: Verify protected-store negative controls on native Windows
         if: runner.os == 'Windows'
         run: python tools/check-dotnet-store-mutations.py

@@ -7,7 +7,8 @@ using Xunit;
 internal sealed class EvidenceFixture : IDisposable
 {
   public TrustFixture Trust { get; } = new();
-  public byte[] Artifact { get; } = Enumerable.Repeat((byte)42, 1234).ToArray();
+  public byte[] Artifact { get; }
+  public EvidenceFixture(byte[]? artifact = null) => Artifact = artifact?.ToArray() ?? Enumerable.Repeat((byte)42, 1234).ToArray();
   public static string Hash(byte[] b) => Convert.ToHexString(SHA256.HashData(b)).ToLowerInvariant();
   public const string Builder = "https://build.example/approved";
   public byte[] Sbom => Encoding.UTF8.GetBytes(SbomNode().ToJsonString());
@@ -19,7 +20,7 @@ internal sealed class EvidenceFixture : IDisposable
     {"_type":"https://in-toto.io/Statement/v1","predicateType":"https://slsa.dev/provenance/v1","subject":[{"name":"installer","digest":{"sha256":"HASH"}}],"predicate":{"buildDefinition":{"buildType":"https://build.example/type"},"runDetails":{"builder":{"id":"https://build.example/approved"}}}}
     """.Replace("HASH", Hash(Artifact)))!;
   public string Envelope(byte[]? sbom = null, byte[]? provenance = null, long sequence = 7, int root = 1, bool paused = false, string? url = null) =>
-      Trust.Metadata(sequence, root, paused, Hash(Artifact), Hash(sbom ?? Sbom), Hash(provenance ?? Provenance), url);
+      Trust.Metadata(sequence, root, paused, Hash(Artifact), Hash(sbom ?? Sbom), Hash(provenance ?? Provenance), url, Artifact.Length);
   public VerifiedUpdateMetadata Metadata(byte[]? sbom = null, byte[]? provenance = null) =>
       new UpdateMetadataVerifier(Trust.Root()).Verify(Envelope(sbom, provenance), "sierra-business", "windows-x64", "stable", Trust.Now);
   public void Dispose() => Trust.Dispose();
