@@ -74,11 +74,16 @@ public sealed class PublisherFixture : IDisposable
   private static string Run(string script)
   {
     script = "$ErrorActionPreference='Stop'; Import-Module Microsoft.PowerShell.Security -ErrorAction Stop\n" + script;
-    using var process = Process.Start(new ProcessStartInfo("powershell.exe")
+    // CI invokes dotnet from PowerShell 7; its inherited module path is incompatible
+    // with Windows PowerShell 5 certificate-provider/type data. Use only inbox modules.
+    string shellRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0");
+    var start = new ProcessStartInfo(Path.Combine(shellRoot, "powershell.exe"))
     {
       UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
       ArgumentList = { "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes(script)) }
-    })!;
+    };
+    start.Environment["PSModulePath"] = Path.Combine(shellRoot, "Modules");
+    using var process = Process.Start(start)!;
     var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
     if (!process.WaitForExit(60000)) { process.Kill(true); process.WaitForExit(); throw new InvalidOperationException("Synthetic signing timed out"); }
     if (process.ExitCode != 0) throw new InvalidOperationException("Synthetic signing failed: " + error.GetAwaiter().GetResult());
