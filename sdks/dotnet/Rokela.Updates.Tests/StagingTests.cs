@@ -171,7 +171,9 @@ public sealed class StagingTests
     using var s = h.Stager(TimeSpan.FromMilliseconds(80));
     var error = await Assert.ThrowsAsync<UpdateVerificationException>(() => s.StageAsync(h.Fixture.Envelope()).WaitAsync(TimeSpan.FromSeconds(3)));
     Assert.Contains("timeout", error.Message); Assert.Empty(Directory.GetFileSystemEntries(h.DirectoryPath));
-    using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
+    using var cancel = new CancellationTokenSource();
+    h.Send = (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+    { Content = new StreamContent(new StalledBody(cancel.Cancel)) });
     await Assert.ThrowsAnyAsync<OperationCanceledException>(() => s.StageAsync(h.Fixture.Envelope(), cancel.Token));
     Assert.Empty(Directory.GetFileSystemEntries(h.DirectoryPath));
   }
@@ -185,7 +187,9 @@ public sealed class StagingTests
     var error = await Assert.ThrowsAsync<UpdateVerificationException>(() => s.StageAsync(h.Fixture.Envelope()).WaitAsync(TimeSpan.FromSeconds(3)));
     Assert.Contains("timeout", error.Message);
     Assert.DoesNotContain("private", error.Message);
-    using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
+    using var cancel = new CancellationTokenSource();
+    h.Send = (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+    { Content = new StreamContent(new CancelledIoBody(cancel.Cancel)) });
     await Assert.ThrowsAnyAsync<OperationCanceledException>(() => s.StageAsync(h.Fixture.Envelope(), cancel.Token));
     Assert.Empty(Directory.GetFileSystemEntries(h.DirectoryPath));
   }
@@ -275,16 +279,16 @@ public sealed class StagingTests
     finally { Directory.Delete(link); }
   }
 
-  private sealed class StalledBody : MemoryStream
+  private sealed class StalledBody(Action? onRead = null) : MemoryStream
   {
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
-    { await Task.Delay(Timeout.Infinite, token); return 0; }
+    { onRead?.Invoke(); await Task.Delay(Timeout.Infinite, token); return 0; }
   }
-  private sealed class CancelledIoBody : MemoryStream
+  private sealed class CancelledIoBody(Action? onRead = null) : MemoryStream
   {
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
     {
-      try { await Task.Delay(Timeout.Infinite, token); return 0; }
+      try { onRead?.Invoke(); await Task.Delay(Timeout.Infinite, token); return 0; }
       catch (OperationCanceledException) { throw new IOException("private transport marker"); }
     }
   }

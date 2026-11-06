@@ -33,12 +33,16 @@ public sealed class PublisherFixture : IDisposable
         [Console]::Error.WriteLine('fixture: certificate created')
         $created.Add($cert.Thumbprint)
         if($trust) {
-          $public=New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList @(,$cert.RawData)
+          # X509Store.Add into CurrentUser Root displays a confirmation dialog.
+          # Certutil's explicit force mode is limited to disposable CI public certificates.
+          $publicPath=$path+'.cer'
+          [IO.File]::WriteAllBytes($publicPath,$cert.RawData)
           foreach($name in @('Root','TrustedPublisher')) {
-            $store=New-Object System.Security.Cryptography.X509Certificates.X509Store($name,'CurrentUser')
-            try {$store.Open('ReadWrite');$store.Add($public)} finally {$store.Close()}
+            [Console]::Error.WriteLine('fixture: adding disposable public certificate to '+$name)
+            & "$env:SystemRoot\System32\certutil.exe" -user -f -addstore $name $publicPath | Out-Null
+            if($LASTEXITCODE -ne 0) {throw 'Synthetic certificate trust setup failed'}
           }
-          $public.Dispose()
+          Remove-Item $publicPath -Force
         }
         [Console]::Error.WriteLine('fixture: signing PE')
         $result=Set-AuthenticodeSignature -FilePath $path -Certificate $cert -HashAlgorithm SHA256
