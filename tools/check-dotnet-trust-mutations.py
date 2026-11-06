@@ -45,6 +45,11 @@ with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
             "body deadline": ("UpdateDownloadTransport.cs", 'deadline.CancelAfter(timeout);', ""),
             "builder policy copy": ("UpdateArtifactStager.cs", 'builders = trustedBuilders.ToArray();', 'builders = trustedBuilders as string[] ?? trustedBuilders.ToArray();'),
         }
+        if sys.platform == "win32":
+            mutations["artifact read lease"] = ("UpdateArtifactStager.cs",
+                'FileAccess.Read, FileShare.Read, 81920,', 'FileAccess.Read, FileShare.ReadWrite, 81920,')
+            mutations["current-user-only ACL"] = ("UpdateArtifactStager.cs",
+                'security.SetAccessRuleProtection(true, false);', 'security.SetAccessRuleProtection(false, false);')
     for name, (file, before, after) in mutations.items():
         source = copy / "sdks/dotnet/Rokela.Updates" / file
         original = source.read_text()

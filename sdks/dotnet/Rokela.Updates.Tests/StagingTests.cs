@@ -213,6 +213,12 @@ public sealed class StagingTests
     Assert.Throws<IOException>(() => File.Open(staged.Path, FileMode.Open, FileAccess.Write, FileShare.Read).Dispose());
     var acl = new DirectoryInfo(Path.GetDirectoryName(staged.Path)!).GetAccessControl();
     Assert.True(acl.AreAccessRulesProtected);
+    var rules = acl.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+        .Cast<System.Security.AccessControl.FileSystemAccessRule>().ToArray();
+    Assert.Single(rules);
+    using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+    Assert.Equal(identity.User, rules[0].IdentityReference);
+    Assert.Equal(System.Security.AccessControl.AccessControlType.Allow, rules[0].AccessControlType);
     Assert.Equal(7, (await new WindowsUpdateTrustStore(statePath).VerifyAndCommitAsync(h.Fixture.Envelope(), "sierra-business", "windows-x64", "stable", h.Now)).Sequence);
   }
 

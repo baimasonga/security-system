@@ -133,7 +133,8 @@ public sealed class UpdateArtifactStager : IDisposable
     if (OperatingSystem.IsWindows())
     {
       var security = new DirectorySecurity(); security.SetAccessRuleProtection(true, false);
-      security.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User!, FileSystemRights.FullControl,
+      using var identity = WindowsIdentity.GetCurrent();
+      security.AddAccessRule(new FileSystemAccessRule(identity.User!, FileSystemRights.FullControl,
           InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
       new DirectoryInfo(path).Create(security);
     }
