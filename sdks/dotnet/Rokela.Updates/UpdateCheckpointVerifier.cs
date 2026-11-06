@@ -27,6 +27,22 @@ public sealed class UpdateCheckpointVerifier
   public (VerifiedUpdateMetadata Metadata, UpdateCheckpoint Checkpoint) Verify(string envelopeJson,
       string product, string platform, string channel, DateTimeOffset now, UpdateCheckpoint? previous)
   {
+    ValidateCheckpoint(product, platform, channel, now, previous);
+    long seconds = now.ToUnixTimeSeconds();
+    var metadata = verifier.Verify(envelopeJson, product, platform, channel, now);
+    if (previous is not null)
+    {
+      if (metadata.Sequence < previous.Sequence) throw new UpdateVerificationException("rollback");
+      if (metadata.Sequence == previous.Sequence && metadata.PayloadSha256 != previous.PayloadSha256)
+        throw new UpdateVerificationException("equivocation");
+    }
+    return (metadata, new(rootHash, product, platform, channel, metadata.Sequence, metadata.PayloadSha256,
+        Math.Max(seconds, previous?.LastSeen ?? seconds)));
+  }
+
+  internal void ValidateCheckpoint(string product, string platform, string channel, DateTimeOffset now,
+      UpdateCheckpoint? previous)
+  {
     long seconds = now.ToUnixTimeSeconds();
     if (seconds is < 1 or > SafeInteger) throw new UpdateVerificationException("clock");
     if (previous is not null)
@@ -38,15 +54,6 @@ public sealed class UpdateCheckpointVerifier
       if (seconds < previous.LastSeen - 60)
         throw new UpdateVerificationException("clock rollback");
     }
-    var metadata = verifier.Verify(envelopeJson, product, platform, channel, now);
-    if (previous is not null)
-    {
-      if (metadata.Sequence < previous.Sequence) throw new UpdateVerificationException("rollback");
-      if (metadata.Sequence == previous.Sequence && metadata.PayloadSha256 != previous.PayloadSha256)
-        throw new UpdateVerificationException("equivocation");
-    }
-    return (metadata, new(rootHash, product, platform, channel, metadata.Sequence, metadata.PayloadSha256,
-        Math.Max(seconds, previous?.LastSeen ?? seconds)));
   }
 
   private static bool Digest(string? value) => value is { Length: 64 } &&

@@ -20,12 +20,15 @@ public sealed record VerifiedUpdateMetadata(string Product, string Platform, str
 
 /// <summary>
 /// Stateless metadata inspection using an independently pinned public root. No network, storage, installation,
-/// key rotation or rollback checkpoints. Hosts must not use this primitive as a complete update client.
+/// persistence or rollback checkpoints. Hosts must not use this primitive as a complete update client.
 /// </summary>
 public sealed class UpdateMetadataVerifier
 {
   private const long SafeInteger = 9007199254740991;
   private readonly long rootExpiry;
+  private readonly long rootVersion;
+  private readonly int rootThreshold;
+  private readonly Dictionary<string, byte[]> rootKeys;
   private readonly int threshold;
   private readonly Dictionary<string, byte[]> releaseKeys;
   private readonly HashSet<string> origins;
@@ -39,12 +42,14 @@ public sealed class UpdateMetadataVerifier
       var root = doc.RootElement;
       Shape(root, "schema", "version", "expires", "root", "release", "artifact_origins");
       Require(Integer(root.GetProperty("schema")) == 1, "root schema");
-      Integer(root.GetProperty("version"));
+      rootVersion = Integer(root.GetProperty("version"));
       rootExpiry = Integer(root.GetProperty("expires"));
-      var rootKeys = Role(root.GetProperty("root"));
+      var rootRole = Role(root.GetProperty("root"));
+      rootThreshold = rootRole.Threshold;
+      rootKeys = rootRole.Keys;
       var release = Role(root.GetProperty("release"));
-      Require(!rootKeys.Keys.Keys.Intersect(release.Keys.Keys).Any() &&
-          !rootKeys.Keys.Values.Select(Convert.ToHexString).Intersect(release.Keys.Values.Select(Convert.ToHexString)).Any(), "key separation");
+      Require(!rootKeys.Keys.Intersect(release.Keys.Keys).Any() &&
+          !rootKeys.Values.Select(Convert.ToHexString).Intersect(release.Keys.Values.Select(Convert.ToHexString)).Any(), "key separation");
       threshold = release.Threshold;
       releaseKeys = release.Keys;
       var allowed = root.GetProperty("artifact_origins");
@@ -68,46 +73,8 @@ public sealed class UpdateMetadataVerifier
       Require(Label(product) && Label(platform) && Label(channel), "target");
       var seconds = now.ToUnixTimeSeconds();
       Require(rootExpiry > seconds, "expired root");
-      using var envelope = Parse(envelopeJson, 524288);
-      Shape(envelope.RootElement, "signatures");
-      var signatures = envelope.RootElement.GetProperty("signatures");
-      Require(signatures.ValueKind == JsonValueKind.Array && signatures.GetArrayLength() is >= 1 and <= 32, "signature envelope");
-      var verified = new HashSet<string>(StringComparer.Ordinal);
-      JsonElement? payload = null;
-      string? canonical = null;
-      foreach (var entry in signatures.EnumerateArray())
-      {
-        var token = Text(entry);
-        Require(token.Length <= 16384, "signature envelope");
-        JsonElement candidate;
-        string kid;
-        try
-        {
-          var parts = token.Split('.');
-          Require(parts.Length == 3, "signature");
-          using var header = JsonDocument.Parse(Decode(parts[0]));
-          var h = header.RootElement;
-          Unique(h);
-          Require(Text(h.GetProperty("alg")) == "EdDSA" && Text(h.GetProperty("typ")) == "trust-update-manifest+jws", "signature purpose");
-          kid = Text(h.GetProperty("kid"));
-          if (!releaseKeys.TryGetValue(kid, out var bytes)) continue;
-          var signature = Decode(parts[2]);
-          if (signature.Length != 64) continue;
-          var publicKey = PublicKey.Import(SignatureAlgorithm.Ed25519, bytes, KeyBlobFormat.RawPublicKey);
-          if (!SignatureAlgorithm.Ed25519.Verify(publicKey, Encoding.ASCII.GetBytes(parts[0] + "." + parts[1]), signature)) continue;
-          using var parsed = JsonDocument.Parse(Decode(parts[1]));
-          Unique(parsed.RootElement);
-          candidate = parsed.RootElement.Clone();
-        }
-        catch (Exception e) when (Malformed(e) || e is UpdateVerificationException) { continue; }
-        var normalized = Canonical(candidate);
-        Require(canonical is null || canonical == normalized, "conflicting signatures");
-        canonical = normalized;
-        payload = candidate;
-        verified.Add(kid);
-      }
-      Require(verified.Count >= threshold && payload.HasValue, "signature threshold");
-      var m = payload!.Value;
+      var m = SignedPayload(envelopeJson, releaseKeys, threshold, "trust-update-manifest+jws");
+      var canonical = Canonical(m);
       Shape(m, "schema", "product", "platform", "channel", "sequence", "version", "minimum_sequence", "issued_at", "expires", "paused", "artifact");
       Require(Integer(m.GetProperty("schema")) == 1, "manifest schema");
       var p = Text(m.GetProperty("product")); var pl = Text(m.GetProperty("platform")); var c = Text(m.GetProperty("channel"));
@@ -133,6 +100,75 @@ public sealed class UpdateMetadataVerifier
       };
     }
     catch (Exception e) when (Malformed(e)) { throw new UpdateVerificationException("malformed metadata"); }
+  }
+
+  /// <summary>
+  /// Verify the next root under both current and replacement root thresholds. Returns validated root JSON;
+  /// does not mutate trust or persist state. The host must preserve checkpoint history and atomically commit
+  /// trust changes under its cross-process lock before using the new root. Never reset state to rotate keys.
+  /// </summary>
+  public string VerifyRootRotation(string envelopeJson, DateTimeOffset now)
+  {
+    try
+    {
+      var seconds = now.ToUnixTimeSeconds();
+      Require(seconds is >= 1 and <= SafeInteger && rootExpiry > seconds, "expired root or clock");
+      var next = SignedPayload(envelopeJson, rootKeys, rootThreshold, "trust-update-root+jws");
+      var json = next.GetRawText();
+      var replacement = new UpdateMetadataVerifier(json);
+      Require(replacement.rootVersion == rootVersion + 1 && replacement.rootExpiry > seconds,
+          "root version or expiry");
+      var authorized = SignedPayload(envelopeJson, replacement.rootKeys, replacement.rootThreshold,
+          "trust-update-root+jws");
+      Require(Canonical(next) == Canonical(authorized), "conflicting root authorities");
+      return json;
+    }
+    catch (Exception e) when (Malformed(e)) { throw new UpdateVerificationException("malformed root rotation"); }
+  }
+
+  private static JsonElement SignedPayload(string envelopeJson, Dictionary<string, byte[]> keys,
+      int required, string purpose)
+  {
+    using var envelope = Parse(envelopeJson, 524288);
+    Shape(envelope.RootElement, "signatures");
+    var signatures = envelope.RootElement.GetProperty("signatures");
+    Require(signatures.ValueKind == JsonValueKind.Array && signatures.GetArrayLength() is >= 1 and <= 32, "signature envelope");
+    var verified = new HashSet<string>(StringComparer.Ordinal);
+    JsonElement? payload = null;
+    string? canonical = null;
+    foreach (var entry in signatures.EnumerateArray())
+    {
+      var token = Text(entry);
+      Require(token.Length <= 16384, "signature envelope");
+      JsonElement candidate;
+      string kid;
+      try
+      {
+        var parts = token.Split('.');
+        Require(parts.Length == 3, "signature");
+        using var header = JsonDocument.Parse(Decode(parts[0]));
+        var h = header.RootElement;
+        Unique(h);
+        Require(Text(h.GetProperty("alg")) == "EdDSA" && Text(h.GetProperty("typ")) == purpose, "signature purpose");
+        kid = Text(h.GetProperty("kid"));
+        if (!keys.TryGetValue(kid, out var bytes)) continue;
+        var signature = Decode(parts[2]);
+        if (signature.Length != 64) continue;
+        var publicKey = PublicKey.Import(SignatureAlgorithm.Ed25519, bytes, KeyBlobFormat.RawPublicKey);
+        if (!SignatureAlgorithm.Ed25519.Verify(publicKey, Encoding.ASCII.GetBytes(parts[0] + "." + parts[1]), signature)) continue;
+        using var parsed = JsonDocument.Parse(Decode(parts[1]));
+        Unique(parsed.RootElement);
+        candidate = parsed.RootElement.Clone();
+      }
+      catch (Exception e) when (Malformed(e) || e is UpdateVerificationException) { continue; }
+      var normalized = Canonical(candidate);
+      Require(canonical is null || canonical == normalized, "conflicting signatures");
+      canonical = normalized;
+      payload = candidate;
+      verified.Add(kid);
+    }
+    Require(verified.Count >= required && payload.HasValue, "signature threshold");
+    return payload!.Value;
   }
 
   private static (int Threshold, Dictionary<string, byte[]> Keys) Role(JsonElement role)

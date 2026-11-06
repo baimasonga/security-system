@@ -57,7 +57,54 @@ DPAPI protects confidentiality/integrity at rest, not deletion or rollback by th
 same Windows user or administrator. Whole-state rollback remains outside this
 threat boundary. No license, customer document or installed updater is modified.
 
-Next slices: dual-threshold root rotation, bounded transport and evidence-
+Next slices after the combined trust-store work below: bounded transport and evidence-
 gated staging. Only then integrate each Windows product independently and implement
 publisher verification, installation/recovery and interrupted-install acceptance.
 Existing customer documents and license state are unaffected by this library.
+
+## Stateless rotation verification — 3 November 2026
+
+`VerifyRootRotation` now verifies sequential replacement roots against both current
+and replacement root thresholds using the protocol purpose `trust-update-root+jws`.
+It reuses metadata signature parsing, validates strict public-only root policy,
+requires current and new root freshness, distinct signatures per role and identical
+authenticated root payloads across roles. It returns root JSON without mutating the
+verifier or any checkpoint. Fixed errors never echo envelope contents.
+
+The stateless API alone does not close the durable root migration gap. A host cannot replace the
+root and reinitialize its Windows store: root-bound checkpoints must be migrated
+without resetting sequence, payload digest or time history. Use the atomic protected
+root/checkpoint transition described below under the existing cross-process lock before product
+integration. Bounded transport, evidence staging and installation/recovery remain
+later steps. Shared public fixtures contain no private signing keys.
+
+## Atomic protected trust migration — acceptance contract
+
+The next slice adds a versioned trust state containing the exact trusted root JSON
+and its target-bound checkpoint. Rotation must authenticate the sequential root
+under both authorities, preserve sequence and payload history, and advance (never
+lower) the observed clock. Metadata checks always use the root loaded from that
+protected state. Rotate/verify/load/save share one exclusive process-independent
+lock and one flushed atomic replacement; no metadata or new root is returned until
+persistence succeeds. Invalid, absent, legacy or corrupt established state never
+triggers initialization. Explicit first use is separate. Replayed rotations fail.
+No network transport, artifact/evidence staging, installer execution, production
+keys or existing Business Admin integration changes are authorized by this slice.
+
+Acceptance covers immutable pure transitions, root/checkpoint binding, target,
+clock, sequence and equivocation refusals; Windows DPAPI restart, copied/corrupt
+state rejection, save failure, cancellation, and separate-process contention.
+Old checkpoint-only storage remains supported by its existing API; it is not
+silently upgraded into a rotating trust store. The new host integration must choose
+a stable dedicated path and explicitly provision its independently pinned root.
+
+Implementation: `UpdateTrustVerifier` supplies the pure state transitions and
+`WindowsUpdateTrustStore` commits the root and checkpoint as one versioned DPAPI
+record. Both storage APIs reuse one internal file transaction implementation, so
+lock, path binding, cancellation and failed-replacement semantics remain shared.
+Encrypted input is bounded to 512 KiB; clear serialization is bounded before
+protection. Exact old root hashes are replaced only after dual-authority validation.
+Clock tolerance never lowers the recorded time. The storage schema rejects legacy
+checkpoint objects and unknown members; there is no automatic format migration.
+Rotation returns only after commit; failures never expose a newly trusted root.
+There is no live schema/API change, new deployment configuration, or installer.

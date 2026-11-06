@@ -41,7 +41,9 @@ as state. A failed save preserves existing authoritative state where replacement
 has not completed. After an ambiguous crash, reload the committed file; never
 reset. DPAPI is not a defense against deletion or restoration of an older whole
 checkpoint by the same Windows user/admin. Network and synchronized shares are
-unsupported. No root rotation, installer execution or product integration is supplied.
+unsupported. This checkpoint-only API does not rotate roots. For new hosts that
+need rotation, use the combined trust store below. Installer execution and product
+integration are not supplied by either API.
 
 Run on Linux or Windows:
 
@@ -54,3 +56,61 @@ SDK. Regenerate them only alongside protocol changes with
 `node tools/gen-update-vectors.ts > docs/api/update-metadata-vectors.json`.
 The generator outputs public keys and signed fixtures only. No deployment,
 production keys or Business Admin update settings change in this slice.
+
+## Root rotation verification
+
+`UpdateMetadataVerifier.VerifyRootRotation(envelopeJson, now)` authenticates the
+next root with distinct signatures satisfying **both** current and replacement
+root-role thresholds, requires the next sequential version and unexpired roots,
+and returns validated root JSON. Release keys cannot authorize root changes.
+Both authorities must authenticate the same complete root, including origins and
+release policy. Public shared vectors exercise the same decisions in Node and .NET.
+
+This is a stateless verification primitive. It does not update the verifier,
+change installed trust, persist a root, or migrate an existing Windows checkpoint.
+Do not construct a fresh checkpoint or reinitialize Windows storage after rotation:
+that would discard rollback history. No production signing keys, installed products
+or customer/license data are changed by this stateless API.
+
+## Atomic Windows trust store
+
+`WindowsUpdateTrustStore` stores the trusted root JSON **and** checkpoint in one
+versioned DPAPI CurrentUser record. It shares the checkpoint store's exclusive
+cross-process lock, bounded waits/cancellation, flushed temporary-file write and
+atomic replacement. Use a dedicated stable local path; this API deliberately
+rejects an existing checkpoint-only file rather than silently converting it.
+
+```csharp
+var trust = new WindowsUpdateTrustStore(stableAbsoluteTrustStatePath);
+// Explicit provisioning only, after independently obtaining the initial root:
+await trust.InitializeAsync(initialRootJson, firstReleaseEnvelope,
+    "sierra-business", "windows-x64", "stable", DateTimeOffset.UtcNow);
+// Subsequent launches load their root from protected state, not an old build pin:
+var metadata = await trust.VerifyAndCommitAsync(releaseEnvelope,
+    "sierra-business", "windows-x64", "stable", DateTimeOffset.UtcNow);
+// Each rotation must be sequential and signed by both root authorities:
+await trust.RotateRootAndCommitAsync(rotationEnvelope,
+    "sierra-business", "windows-x64", "stable", DateTimeOffset.UtcNow);
+```
+
+Rotation changes only the root binding and highest observed time. Sequence and
+authenticated payload digest survive unchanged, so a new signing authority cannot
+replay an older release or change an existing sequence. Verification and rotation
+operate under the same lock; after restart, the persisted root is authoritative.
+Replayed/skipped rotations, wrong targets, expired roots, clock rollback and corrupt
+state fail without resetting history. A failed replacement returns no success and
+preserves the previous authoritative file. Uncommitted orphan temporary files are
+never read. Missing established state is an error: **never automatically retry it
+as initialization**. Back up/configure host state according to the deployment's
+threat model; DPAPI does not stop whole-file rollback/deletion by the same user or
+an administrator. Network/synchronized directories remain unsupported.
+
+`UpdateTrustVerifier` exposes equivalent pure immutable transitions for testing or
+other integrity-protected host storage. Passing caller-created state to it is not
+proof of trust, and its result must be committed atomically before use. Metadata
+authentication still does not authorize installation: bounded downloads, evidence
+verification/staging, native installation and recovery are the next slices.
+
+Native Windows tests cover restart, failed replacement, corrupt/copied/legacy state,
+concurrent rotations and separate-process lock/cancellation. They are skipped on
+Linux rather than substituting a plaintext or mocked DPAPI implementation.

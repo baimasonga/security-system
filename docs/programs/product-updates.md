@@ -159,8 +159,9 @@ checks must complete before rollout; live configuration remains separate evidenc
 
 1. Review the release-console slice, then define rollout-cohort semantics before
    adding staged percentage rollout; absence of a release is never proof of support.
-2. Reusable C#/.NET verifier/stager with shared protocol test vectors, protected
-   state and cross-process serialization, followed by native installation and
+2. Reusable C#/.NET verifier and atomic rotating trust state are implemented locally
+   (see the acceptance entry below); bounded evidence-gated transport/staging remain,
+   followed by native installation and
    recovery adapters. Integrate Business Admin and a second product independently.
 3. Production signing custody and immutable hosting, platform publisher signatures,
    compromised-key recovery, interrupted-install drills and live acceptance.
@@ -173,3 +174,48 @@ untrusted builder rejection, bounded batch checks, stale/wrong-target metadata,
 paused releases and refusal to stage current/older installed sequences. Verification
 results and any environment limits belong in the delivery report; this document
 does not assert production deployment or Windows acceptance.
+
+## Native rotation verification — 3 November 2026
+
+The .NET metadata verifier now exposes stateless dual-threshold root verification,
+with shared Node/.NET public fixtures for valid rotation and negative authorization,
+version, duplicate-signature, purpose, expiry, role-separation and conflict cases.
+This is not an installed updater or durable root migration. Next: atomically migrate
+the protected root and checkpoint without lowering sequence/time history, then add
+bounded evidence-gated transport and native installer recovery. Existing Business
+Admin updates and live signing/configuration are unchanged. Verification results
+are recorded after running the applicable suites; no production acceptance is inferred.
+
+Local verification for this slice: `npm run check` passed 1,242 tests with three
+intentional skips; formatting, type checks and boundaries passed. The existing
+mobile-analytics regex lint warning remains (zero lint errors). .NET tests passed
+51 with five native Windows storage tests skipped on Linux. The 13 rotation vectors
+are also exercised against Node; existing metadata vectors remain compatible.
+Deliberately reducing either authority threshold or removing cross-authority root
+agreement caused assertion failures; controls were restored and the complete .NET
+suite passed again. No database schema, API route or production setting changed.
+
+## Atomic native trust state — 6 November 2026
+
+Added a versioned combined root/checkpoint record with dual-authority sequential
+rotation, unchanged release sequence/payload history and monotonic clock history.
+The new Windows trust store reuses the existing DPAPI and exclusive cross-process
+file transaction and commits the whole record atomically before returning success.
+Existing checkpoint-only callers retain their API. No installed product, signing
+key, network feed or production state is changed; legacy files are not silently
+converted. Pure transitions and native Windows failure/concurrency tests accompany
+the implementation. Verification results are recorded after the relevant checks;
+Linux skips are not evidence of native DPAPI acceptance.
+
+Local verification: `npm run check` passed 1,242 tests with three intentional
+skips; formatting, types and boundaries passed with the existing mobile-regex
+lint warning. The complete .NET suite passed 55 tests; ten native Windows tests
+were intentionally skipped on Linux. Four isolated negative controls (root binding,
+release sequence, clock watermark and established-state validation) each caused
+assertion failures, and the restored suite passed. Native Windows CI and delivery
+results remain separate acceptance evidence. No database or live product changes
+were made.
+
+Next: bounded transport and evidence verification/staging in .NET, then integrate
+Business Admin and a second Windows product independently. Native installation,
+interrupted-update recovery and production custody/hosting remain later work.
