@@ -242,12 +242,17 @@ Verification and delivery evidence are recorded after running the applicable che
 
 Local verification: `npm run check` passed 1,242 tests with three intentional skips;
 formatting, types and boundaries passed with the existing mobile-regex warning.
-The complete .NET suite passed 98 tests with twelve native Windows cases skipped
+The complete .NET suite passed 99 tests with twelve native Windows cases skipped
 on Linux. Nine isolated staging mutations were caught and the restored suite passed.
 Real HTTPS acceptance uses an ephemeral local CA without changing system trust;
 the production transport retains normal TLS verification. Native Windows CI remains
 separate from these Linux results. No schema, production setting, key or installed
 product was changed by this slice.
+
+Native CI exposed a cancellation-classification difference during a stalled TLS
+body read. A deterministic I/O-after-cancellation test reproduced the same refusal
+locally, failed before normalization, and passed after the transport preserved the
+deadline/user-cancellation semantics. Native rerun evidence remains separate.
 
 Next: platform publisher verification and native installation/recovery adapters,
 then independently integrate Business Admin and a second Windows product. Production
