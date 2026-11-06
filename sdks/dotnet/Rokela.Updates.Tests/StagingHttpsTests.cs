@@ -22,7 +22,10 @@ public sealed class StagingHttpsTests
         server.Handler(trusted), () => h.Now);
     if (trusted)
     {
-      using var file = await stager.StageAsync(h.Fixture.Envelope());
+      StagedUpdateArtifact? staged = null;
+      var error = await Record.ExceptionAsync(async () => staged = await stager.StageAsync(h.Fixture.Envelope()));
+      Assert.True(error is null, "Client: " + error?.Message + "; synthetic TLS server: " + string.Join("; ", server.Failures));
+      using var file = staged!;
       Assert.Equal(h.Fixture.Artifact, File.ReadAllBytes(file.Path)); Assert.Equal(3, server.Paths.Count);
     }
     else
@@ -51,8 +54,10 @@ public sealed class StagingHttpsTests
     await using var server = new HttpsFixture(_ => [], stall: true);
     using var stager = new UpdateArtifactStager(h.Verify, h.DirectoryPath, [EvidenceFixture.Builder], 6, 1234,
         server.Handler(true), () => h.Now, TimeSpan.FromSeconds(2));
-    var error = await Assert.ThrowsAsync<UpdateVerificationException>(() => stager.StageAsync(h.Fixture.Envelope()).WaitAsync(TimeSpan.FromSeconds(5)));
-    Assert.Contains("timeout", error.Message); Assert.Single(server.Paths);
+    var error = await Record.ExceptionAsync(() => stager.StageAsync(h.Fixture.Envelope()).WaitAsync(TimeSpan.FromSeconds(5)));
+    Assert.True(error is UpdateVerificationException && error.Message.Contains("timeout", StringComparison.Ordinal),
+        "Client: " + error?.Message + "; synthetic TLS server: " + string.Join("; ", server.Failures));
+    Assert.Single(server.Paths);
     Assert.Empty(Directory.GetFileSystemEntries(h.DirectoryPath));
   }
 
@@ -66,6 +71,7 @@ public sealed class StagingHttpsTests
     private readonly Func<string, byte[]> content;
     private readonly bool redirect, stall;
     public ConcurrentQueue<string> Paths { get; } = [];
+    public ConcurrentQueue<string> Failures { get; } = [];
     private int connections;
     public int Connections => connections;
     public HttpsFixture(Func<string, byte[]> content, bool redirect = false, bool stall = false)
@@ -137,7 +143,11 @@ public sealed class StagingHttpsTests
           if (stall) await Task.Delay(Timeout.Infinite, stop.Token);
           else await ssl.WriteAsync(body, stop.Token);
         }
-        catch (Exception e) when (e is IOException or AuthenticationException or OperationCanceledException) { }
+        catch (Exception e) when (e is IOException or AuthenticationException or OperationCanceledException)
+        {
+          if (!stop.IsCancellationRequested)
+            Failures.Enqueue(e.GetType().Name + ": " + e.Message + "; " + e.InnerException?.GetType().Name + ": " + e.InnerException?.Message);
+        }
       }
     }
     public async ValueTask DisposeAsync()
