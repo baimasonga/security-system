@@ -11,7 +11,7 @@ internal sealed class StagingHandler(Func<HttpRequestMessage, CancellationToken,
 }
 internal sealed class StagingHarness : IDisposable
 {
-  public EvidenceFixture Fixture { get; } = new();
+  public EvidenceFixture Fixture { get; }
   public string DirectoryPath { get; } = Path.Combine(Path.GetTempPath(), "rokela-staging-test-" + Guid.NewGuid().ToString("N"));
   public UpdateTrustState State;
   public DateTimeOffset Now;
@@ -19,8 +19,9 @@ internal sealed class StagingHarness : IDisposable
   public List<string> Requests { get; } = [];
   public Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? Send;
   public Action<int>? BeforeVerify;
-  public StagingHarness()
+  public StagingHarness(byte[]? artifact = null)
   {
+    Fixture = new(artifact);
     Directory.CreateDirectory(DirectoryPath); Now = Fixture.Trust.Now;
     State = UpdateTrustVerifier.Initialize(Fixture.Trust.Root(), Fixture.Envelope(sequence: 6), "sierra-business", "windows-x64", "stable", Now).State;
   }

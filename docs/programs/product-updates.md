@@ -259,3 +259,28 @@ Native rerun evidence remains separate from local results.
 Next: platform publisher verification and native installation/recovery adapters,
 then independently integrate Business Admin and a second Windows product. Production
 signing/hosting, interrupted-install drills and live acceptance remain required.
+
+## Native publisher gate — 6 November 2026
+
+Added a staged-result-only Windows Authenticode gate: protected file lifetime,
+complete byte binding, bounded PE/PKCS#7 layout, OS signature/chain/revocation trust,
+verified-state signer extraction and independent SHA-256 certificate pins. SHA-1
+signature digests and certificate-store SHA-1 thumbprints cannot grant authority.
+The gate returns evidence only and never installs or changes program/customer data.
+
+The Business Admin installer was reviewed: it overwrites `{app}` in place, prompts
+before ending a running application, and keeps business data elsewhere. Atomic
+recovery or database-compatible rollback is not established by that behavior.
+Installation journaling, explicit confirmation and product/data recovery adapters
+remain next work; do not auto-run this installer based on the publisher record.
+
+Portable tests cover pins, weak digests, strict layouts/padding and concurrent
+disposal; native Windows tests use temporary code-signing fixtures without executing
+them and clean their CurrentUser test stores/private keys. The end-to-end test uses
+real signatures, DPAPI state, evidence/staging and Windows signature verification.
+Verification and delivery results remain separate from production acceptance.
+
+Local verification for this increment: `.NET` passed 113 tests; eighteen native
+Windows tests were intentionally skipped on Linux. Five portable publisher/layout/
+lease mutation controls were caught in an isolated copy and restored-source tests
+passed. Native signer verification must still be proven on Windows CI before merge.

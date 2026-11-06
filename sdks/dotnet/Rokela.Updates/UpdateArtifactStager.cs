@@ -7,6 +7,7 @@ namespace Rokela.Updates;
 /// <summary>A verified file, never installation authority. Dispose after use to close and remove it.</summary>
 public sealed class StagedUpdateArtifact : IDisposable
 {
+  private readonly object gate = new();
   private FileStream? file;
   private readonly string directory;
   public string Path { get; }
@@ -18,10 +19,22 @@ public sealed class StagedUpdateArtifact : IDisposable
   }
   public void Dispose()
   {
-    var lease = Interlocked.Exchange(ref file, null);
-    if (lease is null) return;
-    lease.Dispose();
-    UpdateArtifactStager.Remove(directory);
+    lock (gate)
+    {
+      var lease = file;
+      if (lease is null) return;
+      file = null; lease.Dispose(); UpdateArtifactStager.Remove(directory);
+    }
+  }
+  internal T WithLockedHandle<T>(Func<Microsoft.Win32.SafeHandles.SafeFileHandle, T> action)
+  {
+    lock (gate)
+    {
+      if (file is null) throw new UpdateVerificationException("staged artifact disposed");
+      var handle = file.SafeFileHandle; bool added = false;
+      try { handle.DangerousAddRef(ref added); return action(handle); }
+      finally { if (added) handle.DangerousRelease(); }
+    }
   }
 }
 
@@ -86,7 +99,7 @@ public sealed class UpdateArtifactStager : IDisposable
       // Reopen read-only and rehash under that lease before returning any authority.
       file.Dispose();
       file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920,
-          FileOptions.Asynchronous | FileOptions.SequentialScan);
+          FileOptions.SequentialScan); // OS signature providers require a synchronous read handle.
       if (file.Length != metadata.ArtifactSize) throw new UpdateVerificationException("staged artifact size");
       CheckArtifactHash(Convert.ToHexString(await SHA256.HashDataAsync(file, cancellationToken)).ToLowerInvariant(), metadata.Sha256);
       cancellationToken.ThrowIfCancellationRequested();
