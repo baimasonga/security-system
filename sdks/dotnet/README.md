@@ -1,7 +1,7 @@
-# Rokela .NET update metadata verifier
+# Rokela .NET update verification and staging
 
 `Rokela.Updates` targets .NET 10. It verifies public update metadata with NSec
-Ed25519; it never downloads or runs an installer. See
+Ed25519 and supplies bounded evidence-gated Windows staging; it never runs an installer. See
 [ADR-034](../../docs/adr/ADR-034-dotnet-update-metadata.md) for the current boundary.
 
 ```csharp
@@ -43,7 +43,7 @@ reset. DPAPI is not a defense against deletion or restoration of an older whole
 checkpoint by the same Windows user/admin. Network and synchronized shares are
 unsupported. This checkpoint-only API does not rotate roots. For new hosts that
 need rotation, use the combined trust store below. Installer execution and product
-integration are not supplied by either API.
+integration are not supplied by either storage API.
 
 Run on Linux or Windows:
 
@@ -108,9 +108,50 @@ an administrator. Network/synchronized directories remain unsupported.
 `UpdateTrustVerifier` exposes equivalent pure immutable transitions for testing or
 other integrity-protected host storage. Passing caller-created state to it is not
 proof of trust, and its result must be committed atomically before use. Metadata
-authentication still does not authorize installation: bounded downloads, evidence
-verification/staging, native installation and recovery are the next slices.
+authentication still does not authorize installation. Use the bounded downloader
+below for evidence/staging; native installation and recovery remain separate work.
 
 Native Windows tests cover restart, failed replacement, corrupt/copied/legacy state,
 concurrent rotations and separate-process lock/cancellation. They are skipped on
 Linux rather than substituting a plaintext or mocked DPAPI implementation.
+
+## Bounded evidence-gated staging
+
+```csharp
+using var stager = new UpdateArtifactStager(trust, "sierra-business", "windows-x64",
+    "stable", trustedLocalStagingDirectory,
+    new[] { "https://build.example/approved" }, installedSequence: trustedInstalledSequence);
+using var artifact = await stager.StageAsync(signedReleaseEnvelope, cancellationToken);
+// artifact.Path is a verified temporary file, not permission to execute it.
+// A future host installation adapter must verify publisher signatures and provide recovery.
+```
+
+The builder identity above is illustrative; configure actual approved builders
+independently of downloaded data. The public constructor uses Windows DPAPI state,
+system TLS verification, no automatic redirects/cookies/credentials and identity
+encoding. Both evidence files (artifact URL plus `.cdx.json` / `.intoto.json` on
+the same origin, retaining its query) are verified before installer bytes are read.
+Signed digests bind the exact bytes; CycloneDX and in-toto/SLSA semantics bind them
+to the installer and approved builder. This is **signer-endorsed evidence**, not
+independent proof of the build environment. Unknown document fields are allowed;
+duplicate JSON properties, invalid UTF-8 and oversized documents are refused.
+
+Metadata checkpoints commit before network activity and are reverified/committed
+against current trust after the flushed download. Failed downloads retain the
+observed release watermark. Concurrent newer releases or incompatible rotations,
+expiry, rollback, bad evidence, cancellation and final-save failures refuse the
+result and remove partial staging. Networking never holds the trust-state lock.
+
+Evidence is limited to 2 MiB per document and 30 seconds per request. Artifact
+downloads default to 256 MiB and 120 seconds; the host may explicitly configure
+`maximumBytes` and `requestTimeout` (at most ten minutes), based on its product.
+The deadline includes streaming body reads, not just response headers. Signed and
+actual artifact lengths/hashes must match exactly. The staging root must already
+exist and be a trusted local directory without reparse-point/symlink ancestors.
+Child directories restrict access to the current Windows user (0700 in portable
+test hosts); the artifact keeps a read-sharing lease until disposed. Dispose the
+result after use to close/delete it. Cleanup failures are surfaced for host action.
+
+The SDK does not fetch update feeds, choose products, auto-initialize trust, install
+software or create production keys. It does not modify license/customer documents.
+See [ADR-035](../../docs/adr/ADR-035-dotnet-evidence-staging.md).

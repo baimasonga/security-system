@@ -13,7 +13,7 @@ live acceptance from source tests or replace installed products' trust roots rem
   process-local serialization, bounded independent checks and mandatory evidence for
   explicit staging. Existing single-product checkpoint keys remain compatible.
 
-The verifier/stager layer is Node/Electron only. It does not install software, create
+The verifier/stager layer supports Node/Electron and native .NET (see ADR-035). It does not install software, create
 signing keys, publish files or configure a real product automatically.
 
 ## Central catalog registry — first slice, 3 November 2026
@@ -160,8 +160,8 @@ checks must complete before rollout; live configuration remains separate evidenc
 1. Review the release-console slice, then define rollout-cohort semantics before
    adding staged percentage rollout; absence of a release is never proof of support.
 2. Reusable C#/.NET verifier and atomic rotating trust state are implemented locally
-   (see the acceptance entry below); bounded evidence-gated transport/staging remain,
-   followed by native installation and
+   (see the acceptance entries below), including bounded evidence-gated staging.
+   Next are native installation and
    recovery adapters. Integrate Business Admin and a second product independently.
 3. Production signing custody and immutable hosting, platform publisher signatures,
    compromised-key recovery, interrupted-install drills and live acceptance.
@@ -219,3 +219,43 @@ were made.
 Next: bounded transport and evidence verification/staging in .NET, then integrate
 Business Admin and a second Windows product independently. Native installation,
 interrupted-update recovery and production custody/hosting remain later work.
+
+## Native evidence-gated staging — 6 November 2026
+
+Implemented `ReleaseEvidenceVerifier`, bounded production HTTPS transport and
+`UpdateArtifactStager` on top of the concrete Windows trust store. Signed evidence
+digests, exact installer binding, approved builders, streaming size/hash checks,
+response/body deadlines and final protected-state verification gate every result.
+Root/sequence observation commits before network activity; failed fetches do not
+forget it. Concurrent rotation/newer metadata, expired evidence, failed final saves
+and cancellation discard partial staging. Success returns a disposable private file,
+never installation authority. No installed product, production key or live provider
+configuration changes. The previous atomic-trust PR #48 passed all GitHub checks
+and was merged before starting this increment.
+
+Tests include signer-endorsed but semantically wrong evidence, mutable builder
+policy, unknown-length oversized streams, corrupted/truncated artifacts, clock and
+trust changes during download, cancellation and checkpoint failures. Real local
+HTTPS verifies CA/name validation, redirect refusal and stalled-body deadlines;
+native Windows tests cover protected commits, restrictive ACLs and the read lease.
+Verification and delivery evidence are recorded after running the applicable checks.
+
+Local verification: `npm run check` passed 1,242 tests with three intentional skips;
+formatting, types and boundaries passed with the existing mobile-regex warning.
+The complete .NET suite passed 99 tests with twelve native Windows cases skipped
+on Linux. Nine isolated staging mutations were caught and the restored suite passed.
+Real HTTPS acceptance uses an ephemeral local CA without changing system trust;
+the production transport retains normal TLS verification. Native Windows CI remains
+separate from these Linux results. No schema, production setting, key or installed
+product was changed by this slice.
+
+Windows CI identified an ephemeral test-certificate key that Schannel could not
+use. The disposable test leaf now uses a normal Windows-compatible key context;
+its CA is never installed in system trust. A separate deterministic I/O-after-
+cancellation regression failed before transport normalization and passed afterward,
+preserving deadline/user-cancellation semantics without exposing transport details.
+Native rerun evidence remains separate from local results.
+
+Next: platform publisher verification and native installation/recovery adapters,
+then independently integrate Business Admin and a second Windows product. Production
+signing/hosting, interrupted-install drills and live acceptance remain required.

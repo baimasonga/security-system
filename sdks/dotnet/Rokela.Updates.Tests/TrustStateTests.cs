@@ -21,13 +21,14 @@ internal sealed class TrustFixture : IDisposable
     keys = new[] { new { kid = "key-" + index, jwk = new { kty = "OKP", crv = "Ed25519", x = B64(keys[index].PublicKey.Export(KeyBlobFormat.RawPublicKey)) } } }
   };
   public string Rotation(int version = 2) => Envelope(Root(version), "trust-update-root+jws", (version - 2) * 2, (version - 1) * 2);
-  public string Metadata(long sequence = 7, int rootVersion = 1, bool paused = false) => Envelope(JsonSerializer.Serialize(new
+  public string Metadata(long sequence = 7, int rootVersion = 1, bool paused = false,
+      string? artifactHash = null, string? sbomHash = null, string? provenanceHash = null, string? artifactUrl = null) => Envelope(JsonSerializer.Serialize(new
   {
     schema = 1, product = "sierra-business", platform = "windows-x64", channel = "stable", sequence,
     version = "1.0.0", minimum_sequence = 1, issued_at = Now.ToUnixTimeSeconds(),
     expires = Now.ToUnixTimeSeconds() + 1800, paused,
-    artifact = new { url = "https://updates.example/installer.exe", size = 1234, sha256 = new string('a', 64),
-      sbom_sha256 = new string('b', 64), provenance_sha256 = new string('c', 64) }
+    artifact = new { url = artifactUrl ?? "https://updates.example/installer.exe", size = 1234, sha256 = artifactHash ?? new string('a', 64),
+      sbom_sha256 = sbomHash ?? new string('b', 64), provenance_sha256 = provenanceHash ?? new string('c', 64) }
   }), "trust-update-manifest+jws", (rootVersion - 1) * 2 + 1);
   private string Envelope(string payload, string purpose, params int[] indices) => JsonSerializer.Serialize(new
   {

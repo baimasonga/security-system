@@ -90,6 +90,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
     steps:
@@ -98,15 +99,20 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet restore sdks/dotnet/Rokela.Updates.Tests --locked-mode
-      - run: dotnet test sdks/dotnet/Rokela.Updates.Tests --no-restore --configuration Release
+      - run: dotnet test sdks/dotnet/Rokela.Updates.Tests --no-restore --configuration Release --logger "trx;LogFileName=metadata.trx"
       - name: Verify trust-migration negative controls in an isolated copy
         run: python tools/check-dotnet-trust-mutations.py
+      - name: Verify native staging negative controls in an isolated copy
+        run: python tools/check-dotnet-trust-mutations.py --staging
       - name: Verify protected-store negative controls on native Windows
         if: runner.os == 'Windows'
         run: python tools/check-dotnet-store-mutations.py
       - name: Verify restored native source
         if: runner.os == 'Windows'
         run: dotnet test sdks/dotnet/Rokela.Updates.Tests --no-restore --configuration Release
+      - name: Report native test assertion failures
+        if: failure()
+        run: python tools/report-dotnet-test-failures.py sdks/dotnet/Rokela.Updates.Tests/TestResults
 
   windows-sdk:
     name: Windows protected-storage integration
