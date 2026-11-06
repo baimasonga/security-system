@@ -85,7 +85,12 @@ public sealed class StagingHttpsTests
       var request = new CertificateRequest("CN=updates.example", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
       var san = new SubjectAlternativeNameBuilder(); san.AddDnsName("updates.example"); request.CertificateExtensions.Add(san.Build());
       using var signed = request.Create(ca, DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(1), RandomNumberGenerator.GetBytes(16));
-      leaf = signed.CopyWithPrivateKey(key);
+      using var associated = signed.CopyWithPrivateKey(key);
+      // Schannel cannot always use an ephemeral RSA key context. Import the disposable
+      // test leaf with the normal key lifetime; never install its CA in system trust.
+      byte[] pfx = associated.Export(X509ContentType.Pkcs12);
+      try { leaf = X509CertificateLoader.LoadPkcs12(pfx, null, X509KeyStorageFlags.DefaultKeySet); }
+      finally { CryptographicOperations.ZeroMemory(pfx); }
       listener.Start(); accept = AcceptAsync();
     }
     public SocketsHttpHandler Handler(bool trusted)
