@@ -73,6 +73,7 @@ public sealed class PublisherFixture : IDisposable
   }
   private static string Run(string script)
   {
+    script = "$ErrorActionPreference='Stop'; Import-Module Microsoft.PowerShell.Security -ErrorAction Stop\n" + script;
     using var process = Process.Start(new ProcessStartInfo("powershell.exe")
     {
       UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
