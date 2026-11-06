@@ -4,10 +4,14 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 root = pathlib.Path(__file__).resolve().parent.parent
 dotnet = os.environ.get("DOTNET_COMMAND", "dotnet")
+staging = sys.argv[1:] == ["--staging"]
+if sys.argv[1:] and not staging:
+    raise SystemExit("Expected no arguments or --staging")
 with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
     copy = pathlib.Path(folder)
     shutil.copytree(root / "sdks/dotnet", copy / "sdks/dotnet", ignore=shutil.ignore_patterns("bin", "obj"))
@@ -17,10 +21,8 @@ with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
     project = str(copy / "sdks/dotnet/Rokela.Updates.Tests")
     subprocess.run([dotnet, "restore", project, "--locked-mode"], check=True)
     command = [dotnet, "test", project, "--no-restore", "--configuration", "Release",
-               "--filter", "FullyQualifiedName~TrustStateTests"]
+               "--filter", "FullyQualifiedName~EvidenceTests|FullyQualifiedName~StagingTests|FullyQualifiedName~StagingHttpsTests" if staging else "FullyQualifiedName~TrustStateTests"]
     subprocess.run(command, check=True)
-    source = copy / "sdks/dotnet/Rokela.Updates/UpdateTrustVerifier.cs"
-    original = source.read_text()
     mutations = {
         "root binding": ("RootSha256 = hash,", "RootSha256 = state.Checkpoint.RootSha256,"),
         "release sequence preservation": ("RootSha256 = hash,", "RootSha256 = hash, Sequence = 1,"),
@@ -29,7 +31,23 @@ with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
         "established-state validation": (
             "verifier.ValidateCheckpoint(product, platform, channel, now, state.Checkpoint);", ""),
     }
-    for name, (before, after) in mutations.items():
+    mutations = {name: ("UpdateTrustVerifier.cs", before, after) for name, (before, after) in mutations.items()}
+    if staging:
+        mutations = {
+            "evidence digests": ("ReleaseEvidenceVerifier.cs",
+                'if (Hash(sbom) != metadata.SbomSha256 || Hash(provenance) != metadata.ProvenanceSha256) Fail("evidence digest");', ""),
+            "approved builder": ("ReleaseEvidenceVerifier.cs", '!trustedBuilders.Contains(builder, StringComparer.Ordinal)', "false"),
+            "artifact integrity": ("UpdateArtifactStager.cs", 'if (actual != expected) throw new UpdateVerificationException("artifact integrity");', ""),
+            "streaming byte limit": ("UpdateDownloadTransport.cs", 'if (size > maximum || (expected.HasValue && size > expected)) throw new UpdateVerificationException("download size");', ""),
+            "final authority checkpoint": ("UpdateArtifactStager.cs", 'var final = await verify(envelope, clock(), cancellationToken);', 'var final = metadata;'),
+            "failure cleanup": ("UpdateArtifactStager.cs", 'if (directory is not null) Remove(directory);', ""),
+            "redirect refusal": ("UpdateDownloadTransport.cs", 'AllowAutoRedirect = false', 'AllowAutoRedirect = true'),
+            "body deadline": ("UpdateDownloadTransport.cs", 'deadline.CancelAfter(timeout);', ""),
+            "builder policy copy": ("UpdateArtifactStager.cs", 'builders = trustedBuilders.ToArray();', 'builders = trustedBuilders as string[] ?? trustedBuilders.ToArray();'),
+        }
+    for name, (file, before, after) in mutations.items():
+        source = copy / "sdks/dotnet/Rokela.Updates" / file
+        original = source.read_text()
         if original.count(before) != 1:
             raise RuntimeError("Mutation anchor must match exactly once: " + name)
         source.write_text(original.replace(before, after))

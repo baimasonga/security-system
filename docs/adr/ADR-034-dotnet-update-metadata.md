@@ -57,8 +57,8 @@ DPAPI protects confidentiality/integrity at rest, not deletion or rollback by th
 same Windows user or administrator. Whole-state rollback remains outside this
 threat boundary. No license, customer document or installed updater is modified.
 
-Next slices after the combined trust-store work below: bounded transport and evidence-
-gated staging. Only then integrate each Windows product independently and implement
+Bounded transport and evidence-gated staging are now supplied by ADR-035. Next,
+integrate each Windows product independently and implement
 publisher verification, installation/recovery and interrupted-install acceptance.
 Existing customer documents and license state are unaffected by this library.
 

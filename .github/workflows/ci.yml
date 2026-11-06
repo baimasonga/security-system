@@ -101,6 +101,8 @@ jobs:
       - run: dotnet test sdks/dotnet/Rokela.Updates.Tests --no-restore --configuration Release
       - name: Verify trust-migration negative controls in an isolated copy
         run: python tools/check-dotnet-trust-mutations.py
+      - name: Verify native staging negative controls in an isolated copy
+        run: python tools/check-dotnet-trust-mutations.py --staging
       - name: Verify protected-store negative controls on native Windows
         if: runner.os == 'Windows'
         run: python tools/check-dotnet-store-mutations.py
