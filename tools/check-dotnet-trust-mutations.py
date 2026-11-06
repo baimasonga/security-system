@@ -74,7 +74,8 @@ with tempfile.TemporaryDirectory(prefix="rokela-trust-mutations-") as folder:
             mutations["artifact read lease"] = ("UpdateArtifactStager.cs",
                 'FileAccess.Read, FileShare.Read, 81920,', 'FileAccess.Read, FileShare.ReadWrite, 81920,')
             mutations["current-user-only ACL"] = ("UpdateArtifactStager.cs",
-                'security.SetAccessRuleProtection(true, false);', 'security.SetAccessRuleProtection(false, false);')
+                'new FileSystemAccessRule(identity.User!, FileSystemRights.FullControl,',
+                'new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.FullControl,')
     for name, (file, before, after) in mutations.items():
         source = copy / "sdks/dotnet/Rokela.Updates" / file
         original = source.read_text()
