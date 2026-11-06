@@ -28,7 +28,9 @@ public sealed class PublisherFixture : IDisposable
     string script = """
       $ErrorActionPreference='Stop'; $created=New-Object 'System.Collections.Generic.List[string]'; $ok=$false
       function Sign-Fixture($path,$trust) {
+        [Console]::Error.WriteLine('fixture: creating certificate; trusted='+$trust)
         $cert=New-SelfSignedCertificate -Type CodeSigningCert -Subject ('CN=Rokela disposable CI publisher '+[Guid]::NewGuid().ToString('N')) -CertStoreLocation Cert:\CurrentUser\My -KeyExportPolicy NonExportable -HashAlgorithm SHA256 -NotAfter (Get-Date).AddDays(1)
+        [Console]::Error.WriteLine('fixture: certificate created')
         $created.Add($cert.Thumbprint)
         if($trust) {
           $public=New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList @(,$cert.RawData)
@@ -38,7 +40,9 @@ public sealed class PublisherFixture : IDisposable
           }
           $public.Dispose()
         }
+        [Console]::Error.WriteLine('fixture: signing PE')
         $result=Set-AuthenticodeSignature -FilePath $path -Certificate $cert -HashAlgorithm SHA256
+        [Console]::Error.WriteLine('fixture: signing finished; status='+$result.Status)
         if($trust -and $result.Status -ne 'Valid') {throw ('Synthetic publisher signing was not accepted: '+$result.Status+'; '+$result.StatusMessage)}
         return @{thumbprint=$cert.Thumbprint;certificate=[Convert]::ToBase64String($cert.RawData)}
       }
@@ -73,7 +77,7 @@ public sealed class PublisherFixture : IDisposable
   }
   private static string Run(string script)
   {
-    script = "$ErrorActionPreference='Stop'; Import-Module Microsoft.PowerShell.Security -ErrorAction Stop\n" + script;
+    script = "$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'; Import-Module Microsoft.PowerShell.Security -ErrorAction Stop; [Console]::Error.WriteLine('fixture: security module loaded')\n" + script;
     // CI invokes dotnet from PowerShell 7; its inherited module path is incompatible
     // with Windows PowerShell 5 certificate-provider/type data. Use only inbox modules.
     string shellRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0");
@@ -85,7 +89,11 @@ public sealed class PublisherFixture : IDisposable
     start.Environment["PSModulePath"] = Path.Combine(shellRoot, "Modules");
     using var process = Process.Start(start)!;
     var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
-    if (!process.WaitForExit(60000)) { process.Kill(true); process.WaitForExit(); throw new InvalidOperationException("Synthetic signing timed out"); }
+    if (!process.WaitForExit(60000))
+    {
+      process.Kill(true); process.WaitForExit();
+      throw new InvalidOperationException("Synthetic signing timed out: " + error.GetAwaiter().GetResult());
+    }
     if (process.ExitCode != 0) throw new InvalidOperationException("Synthetic signing failed: " + error.GetAwaiter().GetResult());
     return output.GetAwaiter().GetResult();
   }
